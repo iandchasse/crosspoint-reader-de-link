@@ -35,11 +35,11 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
       // Logical Right maps to user-configured front button.
       return (gpio.*fn)(SETTINGS.frontButtonRight);
     case Button::Up:
-      // Side buttons remain fixed for Up/Down.
-      return (gpio.*fn)(HalGPIO::BTN_UP);
+      // Both side-button combos trigger Up (BTN_UP = combo 1, BTN_UNKNOWN_1 = combo 2).
+      return (gpio.*fn)(HalGPIO::BTN_UP) || (gpio.*fn)(HalGPIO::BTN_UNKNOWN_1);
     case Button::Down:
-      // Side buttons remain fixed for Up/Down.
-      return (gpio.*fn)(HalGPIO::BTN_DOWN);
+      // Both side-button combos trigger Down (BTN_DOWN = combo 1, BTN_UNKNOWN_2 = combo 2).
+      return (gpio.*fn)(HalGPIO::BTN_DOWN) || (gpio.*fn)(HalGPIO::BTN_UNKNOWN_2);
     case Button::Power:
       // Power button bypasses remapping.
       return (gpio.*fn)(HalGPIO::BTN_POWER);

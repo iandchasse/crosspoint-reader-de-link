@@ -28,9 +28,19 @@ bool HalStorage::writeFile(const char* path, const String& content) { return SDC
 
 bool HalStorage::ensureDirectoryExists(const char* path) { return SDCard.ensureDirectoryExists(path); }
 
-FsFile HalStorage::open(const char* path, const oflag_t oflag) { return SDCard.open(path, oflag); }
+FsFile HalStorage::open(const char* path, const oflag_t oflag) {
+  const char* mode = FILE_READ;
+  if ((oflag & O_RDWR) || (oflag & O_WRONLY)) {
+    if (oflag & O_APPEND) {
+      mode = FILE_APPEND;
+    } else {
+      mode = FILE_WRITE;
+    }
+  }
+  return SDCard.open(path, mode);
+}
 
-bool HalStorage::mkdir(const char* path, const bool pFlag) { return SDCard.mkdir(path, pFlag); }
+bool HalStorage::mkdir(const char* path, const bool /* pFlag */) { return SDCard.mkdir(path); }
 
 bool HalStorage::exists(const char* path) { return SDCard.exists(path); }
 

@@ -10,7 +10,17 @@
 #include "KOReaderSettingsActivity.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
+// ---- OTA UPDATE SUPPORT ---------------------------------------------------
+// To disable OTA on this build (e.g. for S3 fork where upstream releases are
+// C3-only firmware), add -UCROSSPOINT_OTA_ENABLED to the env build_flags or
+// remove the define below.
+#ifndef CROSSPOINT_OTA_ENABLED
+#define CROSSPOINT_OTA_ENABLED 1  // Change to 0 or undefine to disable OTA
+#endif
+#if CROSSPOINT_OTA_ENABLED
 #include "OtaUpdateActivity.h"
+#endif
+// ---------------------------------------------------------------------------
 #include "SettingsList.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
@@ -49,7 +59,9 @@ void SettingsActivity::onEnter() {
   systemSettings.push_back(SettingInfo::Action(StrId::STR_KOREADER_SYNC, SettingAction::KOReaderSync));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_BROWSER, SettingAction::OPDSBrowser));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
+#if CROSSPOINT_OTA_ENABLED
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
+#endif
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
 
   // Reset selection to first category
@@ -194,7 +206,9 @@ void SettingsActivity::toggleCurrentSetting() {
         enterSubActivity(new ClearCacheActivity(renderer, mappedInput, onComplete));
         break;
       case SettingAction::CheckForUpdates:
+#if CROSSPOINT_OTA_ENABLED
         enterSubActivity(new OtaUpdateActivity(renderer, mappedInput, onComplete));
+#endif
         break;
       case SettingAction::Language:
         enterSubActivity(new LanguageSelectActivity(renderer, mappedInput, onComplete));

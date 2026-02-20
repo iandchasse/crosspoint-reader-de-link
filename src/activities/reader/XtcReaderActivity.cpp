@@ -221,7 +221,7 @@ void XtcReaderActivity::renderPage() {
     };
 
     // Optimized grayscale rendering without storeBwBuffer (saves 48KB peak memory)
-    // Flow: BW display → LSB/MSB passes → grayscale display → re-render BW for next frame
+    // Flow: BW display â†’ LSB/MSB passes â†’ grayscale display â†’ re-render BW for next frame
 
     // Count pixel distribution for debugging
     uint32_t pixelCounts[4] = {0, 0, 0, 0};

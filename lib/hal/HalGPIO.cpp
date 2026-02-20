@@ -31,15 +31,24 @@ HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {
   const auto wakeupCause = esp_sleep_get_wakeup_cause();
   const auto resetReason = esp_reset_reason();
 
-  if ((wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_POWERON && !usbConnected) ||
-      (wakeupCause == ESP_SLEEP_WAKEUP_GPIO && resetReason == ESP_RST_DEEPSLEEP && usbConnected)) {
+  // Woke from deep sleep via GPIO (power button press)
+  if (wakeupCause == ESP_SLEEP_WAKEUP_GPIO && resetReason == ESP_RST_DEEPSLEEP) {
     return WakeupReason::PowerButton;
   }
-  if (wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_UNKNOWN && usbConnected) {
+
+  // Cold power-on with no USB = battery-powered cold boot, treat as power button press
+  if (wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_POWERON && !usbConnected) {
+    return WakeupReason::PowerButton;
+  }
+
+  // Any non-sleep reset while USB is connected covers both:
+  //   ESP_RST_UNKNOWN  = esptool default_reset / soft reset
+  //   ESP_RST_POWERON  = esptool --after=hard_reset
+  // In both cases we just got flashed (or USB was plugged in cold).
+  // Return AfterFlash so we boot normally and keep the USB CDC port alive on Windows.
+  if (wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && usbConnected) {
     return WakeupReason::AfterFlash;
   }
-  if (wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_POWERON && usbConnected) {
-    return WakeupReason::AfterUSBPower;
-  }
+
   return WakeupReason::Other;
 }

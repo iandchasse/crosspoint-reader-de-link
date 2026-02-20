@@ -47,6 +47,6 @@ static void readString(FsFile& file, std::string& s) {
   uint32_t len;
   readPod(file, len);
   s.resize(len);
-  file.read(&s[0], len);
+  file.read(reinterpret_cast<uint8_t*>(&s[0]), len);
 }
 }  // namespace serialization

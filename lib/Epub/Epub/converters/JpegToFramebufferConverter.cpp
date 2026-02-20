@@ -3,7 +3,6 @@
 #include <GfxRenderer.h>
 #include <Logging.h>
 #include <SDCardManager.h>
-#include <SdFat.h>
 #include <picojpeg.h>
 
 #include <cstdio>
@@ -11,6 +10,7 @@
 
 #include "DitherUtils.h"
 #include "PixelCache.h"
+
 
 struct JpegContext {
   FsFile& file;

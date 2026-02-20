@@ -2,6 +2,7 @@
 
 #include <Logging.h>
 #include <WiFi.h>
+#include <driver/rtc_io.h>
 #include <esp_sleep.h>
 
 #include <cassert>
@@ -11,7 +12,7 @@
 HalPowerManager powerManager;  // Singleton instance
 
 void HalPowerManager::begin() {
-  pinMode(BAT_GPIO0, INPUT);
+  pinMode(BAT_GPIO4, INPUT);
   normalFreq = getCpuFrequencyMhz();
   modeMutex = xSemaphoreCreateMutex();
   assert(modeMutex != nullptr);
@@ -58,14 +59,19 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
     delay(50);
     gpio.update();
   }
-  // Arm the wakeup trigger *after* the button is released
-  esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+  // Power button is ACTIVE-HIGH: resting = 0, pressed = 1.
+  // Enable pulldown so the pin is firmly LOW at rest (no spurious wakeup).
+  rtc_gpio_pulldown_en(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN));
+  // Hold the RTC GPIO state (including pulldown) through deep sleep.
+  rtc_gpio_hold_en(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN));
+  // Wake when the button goes HIGH (ANY_HIGH).
+  esp_sleep_enable_ext1_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_EXT1_WAKEUP_ANY_HIGH);
   // Enter Deep Sleep
   esp_deep_sleep_start();
 }
 
 uint16_t HalPowerManager::getBatteryPercentage() const {
-  static const BatteryMonitor battery = BatteryMonitor(BAT_GPIO0);
+  static const BatteryMonitor battery = BatteryMonitor(BAT_GPIO4, 2.0f, BAT_CHECK);
   return battery.readPercentage();
 }
 

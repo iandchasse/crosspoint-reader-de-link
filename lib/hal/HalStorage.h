@@ -1,8 +1,10 @@
 #pragma once
 
+#include <FsCompat.h>
 #include <SDCardManager.h>
 
 #include <vector>
+
 
 class HalStorage {
  public:

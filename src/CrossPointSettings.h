@@ -3,7 +3,7 @@
 #include <iosfwd>
 
 // Forward declarations
-class FsFile;
+#include <HalStorage.h>
 
 class CrossPointSettings {
  private:

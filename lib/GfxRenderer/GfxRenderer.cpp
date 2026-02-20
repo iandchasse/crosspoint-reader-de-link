@@ -31,27 +31,25 @@ static inline void rotateCoordinates(const GfxRenderer::Orientation orientation,
                                      int* phyY) {
   switch (orientation) {
     case GfxRenderer::Portrait: {
-      // Logical portrait (480x800) → panel (800x480)
-      // Rotation: 90 degrees clockwise
-      *phyX = y;
-      *phyY = HalDisplay::DISPLAY_HEIGHT - 1 - x;
+      // Logical portrait (480x800) → panel (800x480) - Inverted for specific physical mount
+      *phyX = HalDisplay::DISPLAY_WIDTH - 1 - y;
+      *phyY = x;
       break;
     }
     case GfxRenderer::LandscapeClockwise: {
-      // Logical landscape (800x480) rotated 180 degrees (swap top/bottom and left/right)
+      // Logical landscape (800x480)
       *phyX = HalDisplay::DISPLAY_WIDTH - 1 - x;
       *phyY = HalDisplay::DISPLAY_HEIGHT - 1 - y;
       break;
     }
     case GfxRenderer::PortraitInverted: {
-      // Logical portrait (480x800) → panel (800x480)
-      // Rotation: 90 degrees counter-clockwise
-      *phyX = HalDisplay::DISPLAY_WIDTH - 1 - y;
-      *phyY = x;
+      // Logical portrait (480x800) → panel (800x480) - Standard orientation
+      *phyX = y;
+      *phyY = HalDisplay::DISPLAY_HEIGHT - 1 - x;
       break;
     }
     case GfxRenderer::LandscapeCounterClockwise: {
-      // Logical landscape (800x480) aligned with panel orientation
+      // Logical landscape (800x480)
       *phyX = x;
       *phyY = y;
       break;
@@ -516,30 +514,31 @@ void GfxRenderer::fillRoundedRect(const int x, const int y, const int width, con
 }
 
 void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, const int width, const int height) const {
-  int rotatedX = 0;
-  int rotatedY = 0;
-  rotateCoordinates(orientation, x, y, &rotatedX, &rotatedY);
-  // Rotate origin corner
-  switch (orientation) {
-    case Portrait:
-      rotatedY = rotatedY - height;
-      break;
-    case PortraitInverted:
-      rotatedX = rotatedX - width;
-      break;
-    case LandscapeClockwise:
-      rotatedY = rotatedY - height;
-      rotatedX = rotatedX - width;
-      break;
-    case LandscapeCounterClockwise:
-      break;
+  // Standard e-ink assets are pre-rotated 90deg to match the native landscape panel.
+  // We apply a 90-degree clockwise rotation in software to align them with our logical space.
+  for (int r = 0; r < height; r++) {
+    int rowIdx = r * (width / 8);
+    for (int c = 0; c < width; c++) {
+      // 0 bit is black, 1 bit is white
+      bool isBlack = (bitmap[rowIdx + (c / 8)] & (0x80 >> (c % 8))) == 0;
+      // Rotate 90 CW: (c, r) -> (height - 1 - r, c)
+      drawPixel(x + height - 1 - r, y + c, isBlack);
+    }
   }
-  // TODO: Rotate bits
-  display.drawImage(bitmap, rotatedX, rotatedY, width, height);
 }
 
 void GfxRenderer::drawIcon(const uint8_t bitmap[], const int x, const int y, const int width, const int height) const {
-  display.drawImageTransparent(bitmap, y, getScreenWidth() - width - x, height, width);
+  // Apply the same 90-degree rotation as drawImage to match pre-rotated fixed assets.
+  for (int r = 0; r < height; r++) {
+    int rowIdx = r * (width / 8);
+    for (int c = 0; c < width; c++) {
+      // 0 bit is black, 1 bit is white
+      if ((bitmap[rowIdx + (c / 8)] & (0x80 >> (c % 8))) == 0) {
+        // Rotate 90 CW: (c, r) -> (height - 1 - r, c)
+        drawPixel(x + height - 1 - r, y + c, true);
+      }
+    }
+  }
 }
 
 void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, const int maxWidth, const int maxHeight,

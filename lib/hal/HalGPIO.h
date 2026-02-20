@@ -5,16 +5,17 @@
 #include <InputManager.h>
 
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
-#define EPD_SCLK 8   // SPI Clock
-#define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
-#define EPD_CS 21    // Chip Select
-#define EPD_DC 4     // Data/Command
-#define EPD_RST 5    // Reset
-#define EPD_BUSY 6   // Busy
+#define EPD_SCLK 10  // SPI Clock
+#define EPD_MOSI 9   // SPI MOSI (Master Out Slave In)
+#define EPD_CS 11    // Chip Select
+#define EPD_DC 12    // Data/Command
+#define EPD_RST 13   // Reset
+#define EPD_BUSY 14  // Busy
 
 #define SPI_MISO 7  // SPI MISO, shared between SD card and display (Master In Slave Out)
 
-#define BAT_GPIO0 0  // Battery voltage
+#define BAT_GPIO4 4  // Battery voltage
+#define BAT_CHECK 8  // STAT charging pin
 
 #define UART0_RXD 20  // Used for USB connection detection
 
@@ -52,5 +53,8 @@ class HalGPIO {
   static constexpr uint8_t BTN_RIGHT = 3;
   static constexpr uint8_t BTN_UP = 4;
   static constexpr uint8_t BTN_DOWN = 5;
-  static constexpr uint8_t BTN_POWER = 6;
+  // Second ADC combo group — physical duplicates of BTN_UP/BTN_DOWN on this board.
+  static constexpr uint8_t BTN_UNKNOWN_1 = 6;  // Same logical action as BTN_UP
+  static constexpr uint8_t BTN_UNKNOWN_2 = 7;  // Same logical action as BTN_DOWN
+  static constexpr uint8_t BTN_POWER = 8;      // Matches InputManager::BTN_POWER
 };

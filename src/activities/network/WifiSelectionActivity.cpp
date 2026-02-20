@@ -11,6 +11,7 @@
 #include "WifiCredentialStore.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
+#include "esp_wifi.h"
 #include "fontIds.h"
 
 void WifiSelectionActivity::onEnter() {
@@ -88,18 +89,26 @@ void WifiSelectionActivity::onExit() {
 }
 
 void WifiSelectionActivity::startWifiScan() {
+  wifi_country_t country = {.cc = "US", .schan = 1, .nchan = 11, .policy = WIFI_COUNTRY_POLICY_AUTO};
+
+  esp_wifi_set_country(&country);
+
   autoConnecting = false;
   state = WifiSelectionState::SCANNING;
   networks.clear();
   requestUpdate();
 
-  // Set WiFi mode to station
+  WiFi.disconnect(true, true);
+  delay(200);
+
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
+  delay(300);
+
+  WiFi.scanDelete();
   delay(100);
 
-  // Start async scan
-  WiFi.scanNetworks(true);  // true = async scan
+  WiFi.scanNetworks(true);
+  delay(100);
 }
 
 void WifiSelectionActivity::processWifiScanResults() {

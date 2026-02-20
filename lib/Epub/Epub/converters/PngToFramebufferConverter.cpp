@@ -4,13 +4,13 @@
 #include <Logging.h>
 #include <PNGdec.h>
 #include <SDCardManager.h>
-#include <SdFat.h>
 
 #include <cstdlib>
 #include <new>
 
 #include "DitherUtils.h"
 #include "PixelCache.h"
+
 
 namespace {
 

@@ -51,10 +51,15 @@ class GfxRenderer {
       : display(halDisplay), renderMode(BW), orientation(Portrait), fadingFix(false) {}
   ~GfxRenderer() { freeBwBufferChunks(); }
 
-  static constexpr int VIEWABLE_MARGIN_TOP = 9;
-  static constexpr int VIEWABLE_MARGIN_RIGHT = 3;
-  static constexpr int VIEWABLE_MARGIN_BOTTOM = 3;
-  static constexpr int VIEWABLE_MARGIN_LEFT = 3;
+  // static constexpr int VIEWABLE_MARGIN_TOP = 9;
+  // static constexpr int VIEWABLE_MARGIN_RIGHT = 3;
+  // static constexpr int VIEWABLE_MARGIN_BOTTOM = 3;
+  // static constexpr int VIEWABLE_MARGIN_LEFT = 3;
+  // My device has no bezels, so disable this (for now)
+  static constexpr int VIEWABLE_MARGIN_TOP = 0;
+  static constexpr int VIEWABLE_MARGIN_RIGHT = 0;
+  static constexpr int VIEWABLE_MARGIN_BOTTOM = 0;
+  static constexpr int VIEWABLE_MARGIN_LEFT = 0;
 
   // Setup
   void begin();  // must be called right after display.begin()
