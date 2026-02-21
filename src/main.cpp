@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <Epub.h>
 #include <FontDecompressor.h>
+#ifdef FRONTLIGHT_PRESENT
+#include <FrontlightManager.h>
+#endif
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
 #include <HalGPIO.h>
@@ -15,6 +18,9 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#ifdef FRONTLIGHT_PRESENT
+#include "FrontlightGlobal.h"
+#endif
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
@@ -36,6 +42,9 @@ HalDisplay display;
 HalGPIO gpio;
 MappedInputManager mappedInputManager(gpio);
 GfxRenderer renderer(display);
+#ifdef FRONTLIGHT_PRESENT
+FrontlightManager frontlightManager;
+#endif
 FontDecompressor fontDecompressor;
 Activity* currentActivity;
 
@@ -319,6 +328,17 @@ void setup() {
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);
 
+#ifdef FRONTLIGHT_PRESENT
+  // Init frontlight manager
+  frontlightManager.begin();
+  if (SETTINGS.frontlightEnabled) {
+    frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
+    frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
+    if (!frontlightManager.enable()) {
+      SETTINGS.frontlightEnabled = false;
+    }
+  }
+#endif
   switch (gpio.getWakeupReason()) {
     case HalGPIO::WakeupReason::PowerButton:
       // For normal wakeups, verify power button press duration
@@ -416,6 +436,25 @@ void loop() {
     enterDeepSleep();
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
     return;
+  } else if (gpio.wasReleased(HalGPIO::BTN_POWER)) {
+#ifdef FRONTLIGHT_PRESENT
+    if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::TOGGLE_FRONTLIGHT) {
+      if (SETTINGS.frontlightEnabled) {
+        // Toggle OFF
+        SETTINGS.frontlightEnabled = false;
+        frontlightManager.disable();
+      } else {
+        // Toggle ON
+        frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
+        frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
+        if (frontlightManager.enable()) {
+          SETTINGS.frontlightEnabled = true;
+        } else {
+          SETTINGS.frontlightEnabled = false;
+        }
+      }
+    }
+#endif
   }
 
   const unsigned long activityStartTime = millis();

@@ -40,15 +40,34 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
     case Button::Down:
       // Both side-button combos trigger Down (BTN_DOWN = combo 1, BTN_UNKNOWN_2 = combo 2).
       return (gpio.*fn)(HalGPIO::BTN_DOWN) || (gpio.*fn)(HalGPIO::BTN_UNKNOWN_2);
+    case Button::Up1:
+      // Specifically side combo 1 up
+      return (gpio.*fn)(side.pageBack == HalGPIO::BTN_UP ? side.pageBack : side.pageForward);
+    case Button::Down1:
+      // Specifically side combo 1 down
+      return (gpio.*fn)(side.pageBack == HalGPIO::BTN_DOWN ? side.pageBack : side.pageForward);
+    case Button::Up2:
+      // Specifically side combo 2 up
+      return (gpio.*fn)(HalGPIO::BTN_UNKNOWN_1);
+    case Button::Down2:
+      // Specifically side combo 2 down
+      return (gpio.*fn)(HalGPIO::BTN_UNKNOWN_2);
     case Button::Power:
       // Power button bypasses remapping.
       return (gpio.*fn)(HalGPIO::BTN_POWER);
-    case Button::PageBack:
+    case Button::PageBack: {
       // Reader page navigation uses side buttons and can be swapped via settings.
-      return (gpio.*fn)(side.pageBack);
-    case Button::PageForward:
+      // BTN_UP/BTN_DOWN use side combo 1, BTN_UNKNOWN_1/BTN_UNKNOWN_2 use side combo 2.
+      const bool combo1 = (gpio.*fn)(side.pageBack);
+      const uint8_t combo2Hw = (side.pageBack == HalGPIO::BTN_UP) ? HalGPIO::BTN_UNKNOWN_1 : HalGPIO::BTN_UNKNOWN_2;
+      return combo1 || (gpio.*fn)(combo2Hw);
+    }
+    case Button::PageForward: {
       // Reader page navigation uses side buttons and can be swapped via settings.
-      return (gpio.*fn)(side.pageForward);
+      const bool combo1 = (gpio.*fn)(side.pageForward);
+      const uint8_t combo2Hw = (side.pageForward == HalGPIO::BTN_UP) ? HalGPIO::BTN_UNKNOWN_1 : HalGPIO::BTN_UNKNOWN_2;
+      return combo1 || (gpio.*fn)(combo2Hw);
+    }
   }
 
   return false;

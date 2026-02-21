@@ -13,7 +13,10 @@
 // ACTION-type entries and entries without a key are device-only.
 inline std::vector<SettingInfo> getSettingsList() {
   return {
-      // --- Display ---
+  // --- Display ---
+#ifdef FRONTLIGHT_PRESENT
+      SettingInfo::Action(StrId::STR_FRONTLIGHT, SettingAction::FrontlightControl),
+#endif
       SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
                         {StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER, StrId::STR_NONE_OPT,
                          StrId::STR_COVER_CUSTOM},
@@ -74,8 +77,12 @@ inline std::vector<SettingInfo> getSettingsList() {
       SettingInfo::Toggle(StrId::STR_LONG_PRESS_SKIP, &CrossPointSettings::longPressChapterSkip, "longPressChapterSkip",
                           StrId::STR_CAT_CONTROLS),
       SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
-                        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN}, "shortPwrBtn",
-                        StrId::STR_CAT_CONTROLS),
+#ifdef FRONTLIGHT_PRESENT
+                        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_TOGGLE_FRONTLIGHT},
+#else
+                        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN},
+#endif
+                        "shortPwrBtn", StrId::STR_CAT_CONTROLS),
 
       // --- System ---
       SettingInfo::Enum(StrId::STR_TIME_TO_SLEEP, &CrossPointSettings::sleepTimeout,

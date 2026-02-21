@@ -114,7 +114,7 @@ class CrossPointSettings {
   };
 
   // Short power button press actions
-  enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, SHORT_PWRBTN_COUNT };
+  enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, TOGGLE_FRONTLIGHT = 3, SHORT_PWRBTN_COUNT };
 
   // Hide battery percentage
   enum HIDE_BATTERY_PERCENTAGE { HIDE_NEVER = 0, HIDE_READER = 1, HIDE_ALWAYS = 2, HIDE_BATTERY_PERCENTAGE_COUNT };
@@ -157,6 +157,13 @@ class CrossPointSettings {
   // E-ink refresh frequency (default 15 pages)
   uint8_t refreshFrequency = REFRESH_15;
   uint8_t hyphenationEnabled = 0;
+
+#ifdef FRONTLIGHT_PRESENT
+  // Frontlight settings
+  uint8_t frontlightEnabled = 0;
+  uint8_t frontlightBrightness = 50;
+  uint8_t frontlightWarmth = 50;
+#endif
 
   // Reader screen margin settings
   uint8_t screenMargin = 5;

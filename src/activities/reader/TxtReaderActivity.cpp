@@ -8,8 +8,12 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "FrontlightGlobal.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
+#ifdef FRONTLIGHT_PRESENT
+#include "activities/settings/FrontlightControlActivity.h"
+#endif
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -81,12 +85,24 @@ void TxtReaderActivity::loop() {
     return;
   }
 
+#ifdef FRONTLIGHT_PRESENT
+  // Long press CONFIRM (1s+) opens frontlight control
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= goHomeMs) {
+    exitActivity();
+    enterNewActivity(new FrontlightControlActivity(this->renderer, this->mappedInput, [this]() {
+      // After returning from frontlight control, request screen update
+      exitActivity();
+      requestUpdate();
+    }));
+    return;
+  }
+#endif
+
   // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= goHomeMs) {
     onGoBack();
     return;
   }
-
   // Short press BACK goes directly to home
   if (mappedInput.wasReleased(MappedInputManager::Button::Back) && mappedInput.getHeldTime() < goHomeMs) {
     onGoHome();

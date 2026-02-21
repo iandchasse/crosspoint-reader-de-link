@@ -134,7 +134,12 @@ uint8_t CrossPointSettings::writeSettings(FsFile& file, bool count_only) const {
   writer.writeItem(file, frontButtonRight);
   writer.writeItem(file, fadingFix);
   writer.writeItem(file, embeddedStyle);
+#ifdef FRONTLIGHT_PRESENT
   // New fields need to be added at end for backward compatibility
+  writer.writeItem(file, frontlightEnabled);
+  writer.writeItem(file, frontlightBrightness);
+  writer.writeItem(file, frontlightWarmth);
+#endif
 
   return writer.item_count;
 }
@@ -261,7 +266,14 @@ bool CrossPointSettings::loadFromFile() {
     if (++settingsRead >= fileSettingsCount) break;
     serialization::readPod(inputFile, embeddedStyle);
     if (++settingsRead >= fileSettingsCount) break;
+#ifdef FRONTLIGHT_PRESENT
     // New fields added at end for backward compatibility
+    serialization::readPod(inputFile, frontlightEnabled);
+    if (++settingsRead >= fileSettingsCount) break;
+    serialization::readPod(inputFile, frontlightBrightness);
+    if (++settingsRead >= fileSettingsCount) break;
+    serialization::readPod(inputFile, frontlightWarmth);
+#endif
   } while (false);
 
   if (frontButtonMappingRead) {

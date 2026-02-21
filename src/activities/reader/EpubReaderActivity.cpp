@@ -11,10 +11,14 @@
 #include "CrossPointState.h"
 #include "EpubReaderChapterSelectionActivity.h"
 #include "EpubReaderPercentSelectionActivity.h"
+#include "FrontlightGlobal.h"
 #include "KOReaderCredentialStore.h"
 #include "KOReaderSyncActivity.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
+#ifdef FRONTLIGHT_PRESENT
+#include "activities/settings/FrontlightControlActivity.h"
+#endif
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -163,8 +167,21 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  // Enter reader menu activity.
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+#ifdef FRONTLIGHT_PRESENT
+  // Long press CONFIRM (1s+) opens frontlight control
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= goHomeMs) {
+    exitActivity();
+    enterNewActivity(new FrontlightControlActivity(this->renderer, this->mappedInput, [this]() {
+      // After returning from frontlight control, request screen update
+      exitActivity();
+      requestUpdate();
+    }));
+    return;
+  }
+#endif
+
+  // Enter reader menu activity (short press)
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() < goHomeMs) {
     const int currentPage = section ? section->currentPage + 1 : 0;
     const int totalPages = section ? section->pageCount : 0;
     float bookProgress = 0.0f;
@@ -340,6 +357,17 @@ void EpubReaderActivity::jumpToPercent(int percent) {
 
 void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction action) {
   switch (action) {
+#ifdef FRONTLIGHT_PRESENT
+    case EpubReaderMenuActivity::MenuAction::FRONTLIGHT: {
+      exitActivity();
+      enterNewActivity(new FrontlightControlActivity(this->renderer, this->mappedInput, [this]() {
+        // After returning from frontlight control, request screen update
+        exitActivity();
+        requestUpdate();
+      }));
+      return;
+    }
+#endif
     case EpubReaderMenuActivity::MenuAction::SELECT_CHAPTER: {
       // Calculate values BEFORE we start destroying things
       const int currentP = section ? section->currentPage : 0;

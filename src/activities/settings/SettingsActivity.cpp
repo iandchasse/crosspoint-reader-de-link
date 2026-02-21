@@ -7,6 +7,9 @@
 #include "CalibreSettingsActivity.h"
 #include "ClearCacheActivity.h"
 #include "CrossPointSettings.h"
+#ifdef FRONTLIGHT_PRESENT
+#include "FrontlightControlActivity.h"
+#endif
 #include "KOReaderSettingsActivity.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
@@ -15,7 +18,7 @@
 // C3-only firmware), add -UCROSSPOINT_OTA_ENABLED to the env build_flags or
 // remove the define below.
 #ifndef CROSSPOINT_OTA_ENABLED
-#define CROSSPOINT_OTA_ENABLED 1  // Change to 0 or undefine to disable OTA
+#define CROSSPOINT_OTA_ENABLED 0  // Change to 0 or undefine to disable OTA
 #endif
 #if CROSSPOINT_OTA_ENABLED
 #include "OtaUpdateActivity.h"
@@ -53,6 +56,8 @@ void SettingsActivity::onEnter() {
   }
 
   // Append device-only ACTION items
+  displaySettings.insert(displaySettings.begin(),
+                         SettingInfo::Action(StrId::STR_FRONTLIGHT, SettingAction::FrontlightControl));
   controlsSettings.insert(controlsSettings.begin(),
                           SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
@@ -208,6 +213,11 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::CheckForUpdates:
 #if CROSSPOINT_OTA_ENABLED
         enterSubActivity(new OtaUpdateActivity(renderer, mappedInput, onComplete));
+#endif
+        break;
+      case SettingAction::FrontlightControl:
+#ifdef FRONTLIGHT_PRESENT
+        enterSubActivity(new FrontlightControlActivity(renderer, mappedInput, onComplete));
 #endif
         break;
       case SettingAction::Language:
