@@ -210,6 +210,7 @@ void waitForPowerRelease() {
 // Enter deep sleep mode
 void enterDeepSleep() {
   APP_STATE.lastSleepFromReader = currentActivity && currentActivity->isReaderActivity();
+  SETTINGS.saveToFile();
   APP_STATE.saveToFile();
   exitActivity();
   enterNewActivity(new SleepActivity(renderer, mappedInputManager));
