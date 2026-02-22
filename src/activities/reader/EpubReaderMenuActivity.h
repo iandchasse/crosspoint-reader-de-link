@@ -13,9 +13,18 @@ class EpubReaderMenuActivity final : public ActivityWithSubactivity {
  public:
   // Menu actions available from the reader menu.
 #ifdef FRONTLIGHT_PRESENT
-  enum class MenuAction { SELECT_CHAPTER, FRONTLIGHT, GO_TO_PERCENT, ROTATE_SCREEN, GO_HOME, SYNC, DELETE_CACHE };
+  enum class MenuAction {
+    SELECT_CHAPTER,
+    FRONTLIGHT,
+    GO_TO_PERCENT,
+    SCREENSHOT,
+    ROTATE_SCREEN,
+    GO_HOME,
+    SYNC,
+    DELETE_CACHE
+  };
 #else
-  enum class MenuAction { SELECT_CHAPTER, GO_TO_PERCENT, ROTATE_SCREEN, GO_HOME, SYNC, DELETE_CACHE };
+  enum class MenuAction { SELECT_CHAPTER, GO_TO_PERCENT, SCREENSHOT, ROTATE_SCREEN, GO_HOME, SYNC, DELETE_CACHE };
 #endif
 
   explicit EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title,
@@ -43,14 +52,16 @@ class EpubReaderMenuActivity final : public ActivityWithSubactivity {
   };
 
   // Fixed menu layout (order matters for up/down navigation).
-  const std::vector<MenuItem> menuItems = {
-      {MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER},
+  const std::vector<MenuItem> menuItems = {{MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER},
 #ifdef FRONTLIGHT_PRESENT
-      {MenuAction::FRONTLIGHT, StrId::STR_FRONTLIGHT},
+                                           {MenuAction::FRONTLIGHT, StrId::STR_FRONTLIGHT},
 #endif
-      {MenuAction::ROTATE_SCREEN, StrId::STR_ORIENTATION},     {MenuAction::GO_TO_PERCENT, StrId::STR_GO_TO_PERCENT},
-      {MenuAction::GO_HOME, StrId::STR_GO_HOME_BUTTON},        {MenuAction::SYNC, StrId::STR_SYNC_PROGRESS},
-      {MenuAction::DELETE_CACHE, StrId::STR_DELETE_CACHE}};
+                                           {MenuAction::SCREENSHOT, StrId::STR_SCREENSHOT_BUTTON},
+                                           {MenuAction::ROTATE_SCREEN, StrId::STR_ORIENTATION},
+                                           {MenuAction::GO_TO_PERCENT, StrId::STR_GO_TO_PERCENT},
+                                           {MenuAction::GO_HOME, StrId::STR_GO_HOME_BUTTON},
+                                           {MenuAction::SYNC, StrId::STR_SYNC_PROGRESS},
+                                           {MenuAction::DELETE_CACHE, StrId::STR_DELETE_CACHE}};
 
   int selectedIndex = 0;
 
