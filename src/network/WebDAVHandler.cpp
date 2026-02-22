@@ -20,8 +20,7 @@ const char* FIXED_DATE = "Thu, 01 Jan 2024 00:00:00 GMT";
 
 // ── RequestHandler interface ─────────────────────────────────────────────────
 
-bool WebDAVHandler::canHandle(WebServer& server, HTTPMethod method, const String& uri) {
-  (void)server;
+bool WebDAVHandler::canHandle(HTTPMethod method, String uri) {
   (void)uri;
   switch (method) {
     case HTTP_OPTIONS:
@@ -41,83 +40,9 @@ bool WebDAVHandler::canHandle(WebServer& server, HTTPMethod method, const String
   }
 }
 
-bool WebDAVHandler::canRaw(WebServer& server, const String& uri) {
-  (void)uri;
-  return server.method() == HTTP_PUT;
-}
+// Note: canRaw/raw are Core 3.x only. On Core 2.x, PUT body is read in handle() via server.arg("plain").
 
-void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
-  (void)uri;
-  if (raw.status == RAW_START) {
-    _putPath = getRequestPath(server);
-    if (isProtectedPath(_putPath)) {
-      _putOk = false;
-      return;
-    }
-
-    // Ensure parent directory exists
-    int lastSlash = _putPath.lastIndexOf('/');
-    if (lastSlash > 0) {
-      String parentPath = _putPath.substring(0, lastSlash);
-      if (!Storage.exists(parentPath.c_str())) {
-        _putOk = false;
-        return;
-      }
-    }
-
-    if (_putFile) _putFile.close();
-    _putExisted = Storage.exists(_putPath.c_str());
-
-    if (_putExisted) {
-      FsFile existing = Storage.open(_putPath.c_str());
-      if (existing && existing.isDirectory()) {
-        existing.close();
-        _putOk = false;
-        return;
-      }
-      if (existing) existing.close();
-    }
-
-    // Write to a temp file to avoid destroying the original on failed upload
-    String tempPath = _putPath + ".davtmp";
-    Storage.remove(tempPath.c_str());
-    _putOk = Storage.openFileForWrite("DAV", tempPath, _putFile);
-    LOG_DBG("DAV", "PUT START: %s", _putPath.c_str());
-
-  } else if (raw.status == RAW_WRITE) {
-    if (_putFile && _putOk) {
-      esp_task_wdt_reset();
-      size_t written = _putFile.write(raw.buf, raw.currentSize);
-      if (written != raw.currentSize) {
-        _putOk = false;
-      }
-    }
-
-  } else if (raw.status == RAW_END) {
-    if (_putFile) _putFile.close();
-    if (_putOk) {
-      String tempPath = _putPath + ".davtmp";
-      if (_putExisted) Storage.remove(_putPath.c_str());
-      FsFile tmp = Storage.open(tempPath.c_str());
-      if (tmp) {
-        _putOk = tmp.rename(_putPath.c_str());
-        tmp.close();
-      } else {
-        _putOk = false;
-      }
-      if (!_putOk) Storage.remove(tempPath.c_str());
-    }
-    LOG_DBG("DAV", "PUT END: %u bytes, ok=%d", raw.totalSize, _putOk);
-
-  } else if (raw.status == RAW_ABORTED) {
-    if (_putFile) _putFile.close();
-    String tempPath = _putPath + ".davtmp";
-    Storage.remove(tempPath.c_str());
-    _putOk = false;
-  }
-}
-
-bool WebDAVHandler::handle(WebServer& server, HTTPMethod method, const String& uri) {
+bool WebDAVHandler::handle(WebServer& server, HTTPMethod method, String uri) {
   (void)uri;
   switch (method) {
     case HTTP_OPTIONS:
@@ -329,7 +254,7 @@ void WebDAVHandler::handleGet(WebServer& s) {
   s.setContentLength(file.size());
   s.send(200, contentType.c_str(), "");
 
-  NetworkClient client = s.client();
+  WiFiClient client = s.client();
   client.write(file);
   file.close();
 }
@@ -371,7 +296,8 @@ void WebDAVHandler::handleHead(WebServer& s) {
 // ── PUT ──────────────────────────────────────────────────────────────────────
 
 void WebDAVHandler::handlePut(WebServer& s) {
-  // Body was already received via canRaw/raw callbacks
+  // On Core 2.x there is no raw-streaming callback; the WebServer buffers
+  // the entire request body and exposes it via server.arg("plain").
   String path = getRequestPath(s);
   LOG_DBG("DAV", "PUT %s", path.c_str());
 
@@ -380,16 +306,68 @@ void WebDAVHandler::handlePut(WebServer& s) {
     return;
   }
 
-  if (!_putOk) {
-    String tempPath = path + ".davtmp";
+  // Ensure parent directory exists
+  int lastSlash = path.lastIndexOf('/');
+  if (lastSlash > 0) {
+    String parentPath = path.substring(0, lastSlash);
+    if (!Storage.exists(parentPath.c_str())) {
+      s.send(409, "text/plain", "Parent directory not found");
+      return;
+    }
+  }
+
+  bool existed = Storage.exists(path.c_str());
+  if (existed) {
+    FsFile existing = Storage.open(path.c_str());
+    if (existing && existing.isDirectory()) {
+      existing.close();
+      s.send(405, "text/plain", "Target is a directory");
+      return;
+    }
+    if (existing) existing.close();
+  }
+
+  // Get the body from the buffered plain arg
+  const String& body = s.arg("plain");
+  const size_t bodyLen = body.length();
+
+  // Write to a temp file, then rename to avoid destroying the original on failure
+  String tempPath = path + ".davtmp";
+  Storage.remove(tempPath.c_str());
+
+  FsFile putFile;
+  if (!Storage.openFileForWrite("DAV", tempPath, putFile)) {
+    s.send(500, "text/plain", "Could not open file for write");
+    return;
+  }
+
+  bool ok = true;
+  if (bodyLen > 0) {
+    size_t written = putFile.write(reinterpret_cast<const uint8_t*>(body.c_str()), bodyLen);
+    ok = (written == bodyLen);
+  }
+  putFile.close();
+
+  if (ok) {
+    if (existed) Storage.remove(path.c_str());
+    FsFile tmp = Storage.open(tempPath.c_str());
+    if (tmp) {
+      ok = tmp.rename(path.c_str());
+      tmp.close();
+    } else {
+      ok = false;
+    }
+  }
+
+  if (!ok) {
     Storage.remove(tempPath.c_str());
-    s.send(500, "text/plain", "Write failed - incomplete upload or disk full");
+    s.send(500, "text/plain", "Write failed");
     return;
   }
 
   clearEpubCacheIfNeeded(path);
-  s.send(_putExisted ? 204 : 201);
-  LOG_DBG("DAV", "PUT complete: %s", path.c_str());
+  s.send(existed ? 204 : 201);
+  LOG_DBG("DAV", "PUT complete: %s (%u bytes)", path.c_str(), bodyLen);
 }
 
 // ── DELETE ───────────────────────────────────────────────────────────────────

@@ -18,18 +18,32 @@ FrontlightControlActivity::FrontlightControlActivity(GfxRenderer& renderer, Mapp
 void FrontlightControlActivity::onEnter() {
   ActivityWithSubactivity::onEnter();
   skipNextButtonCheck = true;
+
   if (SETTINGS.frontlightEnabled && SETTINGS.frontlightBrightness > 0) {
-    circuitPassed = true;
+    if (!frontlightManager.isEnabled()) {
+      // Hardware isn't running (e.g. woke from sleep). Re-enable it now
+      // so that the menu reflects the true hardware state.
+      frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
+      frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
+      const bool ok = frontlightManager.enable();
+      SETTINGS.frontlightEnabled = ok;
+      circuitPassed = ok;
+    } else {
+      circuitPassed = true;
+    }
     applyLightSettings();
   } else {
-    // If not enabled or brightness is 0, we require a test to enable
+    // Not enabled — don't overwrite SETTINGS here, just reflect current state
     SETTINGS.frontlightEnabled = false;
     circuitPassed = false;
   }
   requestUpdate();
 }
 
-void FrontlightControlActivity::onExit() { ActivityWithSubactivity::onExit(); }
+void FrontlightControlActivity::onExit() {
+  SETTINGS.saveToFile();  // Always persist on any exit path
+  ActivityWithSubactivity::onExit();
+}
 
 void FrontlightControlActivity::loop() {
   if (subActivity) {

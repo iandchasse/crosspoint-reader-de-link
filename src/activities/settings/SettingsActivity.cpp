@@ -30,6 +30,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TimeUtil.h"
 
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
                                                               StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
@@ -227,7 +228,7 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::SyncClock:
         if (WiFi.status() == WL_CONNECTED) {
-          configTime((static_cast<int>(SETTINGS.timezoneOffsetHours) - 12) * 3600, 0, "pool.ntp.org", "time.nist.gov");
+          TimeUtil::reconfigure();
         } else {
           // If not connected, give some feedback? For now just trigger network activity
           enterSubActivity(new WifiSelectionActivity(renderer, mappedInput, onCompleteBool, false));
@@ -242,10 +243,9 @@ void SettingsActivity::toggleCurrentSetting() {
   }
 
   SETTINGS.saveToFile();
-  // Always trigger a time sync update when settings are changed to apply timezone offset immediately if connected
-  if (WiFi.status() == WL_CONNECTED) {
-    configTime((static_cast<int>(SETTINGS.timezoneOffsetHours) - 12) * 3600, 0, "pool.ntp.org", "time.nist.gov");
-  }
+  // Always trigger a time sync update when settings are changed to apply timezone offset immediately.
+  // TimeUtil handles the case where WiFi is disconnected by still updating the local offset.
+  TimeUtil::reconfigure();
 }
 
 void SettingsActivity::render(Activity::RenderLock&&) {

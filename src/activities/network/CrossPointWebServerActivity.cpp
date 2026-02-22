@@ -75,8 +75,9 @@ void CrossPointWebServerActivity::onExit() {
     dnsServer = nullptr;
   }
 
-  // Brief wait for LWIP stack to flush pending packets
-  delay(50);
+  // Wait for LWIP stack to drain queued packets from the now-closed TCP server.
+  // Without enough time here, WiFi.mode(WIFI_OFF) can corrupt the LWIP heap.
+  delay(300);
 
   // Disconnect WiFi gracefully
   if (isApMode) {
@@ -86,11 +87,11 @@ void CrossPointWebServerActivity::onExit() {
     LOG_DBG("WEBACT", "Disconnecting WiFi (graceful)...");
     WiFi.disconnect(false);  // false = don't erase credentials, send disconnect frame
   }
-  delay(30);  // Allow disconnect frame to be sent
+  delay(100);  // Allow disconnect frame to be sent and LWIP to finish teardown
 
   LOG_DBG("WEBACT", "Setting WiFi mode OFF...");
   WiFi.mode(WIFI_OFF);
-  delay(30);  // Allow WiFi hardware to power down
+  delay(50);  // Allow WiFi hardware to power down
 
   LOG_DBG("WEBACT", "Free heap at onExit end: %d bytes", ESP.getFreeHeap());
 }
@@ -308,7 +309,8 @@ void CrossPointWebServerActivity::loop() {
       // Process HTTP requests in tight loop for maximum throughput
       // More iterations = more data processed per main loop cycle
       constexpr int MAX_ITERATIONS = 500;
-      for (int i = 0; i < MAX_ITERATIONS && webServer->isRunning(); i++) {
+      bool exitRequested = false;
+      for (int i = 0; i < MAX_ITERATIONS && webServer && webServer->isRunning(); i++) {
         webServer->handleClient();
         // Reset watchdog every 32 iterations
         if ((i & 0x1F) == 0x1F) {
@@ -322,12 +324,17 @@ void CrossPointWebServerActivity::loop() {
           mappedInput.update();
           // Check for exit button inside loop for responsiveness
           if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-            onGoBack();
-            return;
+            exitRequested = true;
+            break;  // Break BEFORE calling onGoBack() to avoid use-after-free on webServer
           }
         }
       }
       lastHandleClientTime = millis();
+      // Handle deferred exit: webServer must not be touched after onGoBack()
+      if (exitRequested) {
+        onGoBack();
+        return;
+      }
     }
 
     // Handle exit on Back button (also check outside loop)

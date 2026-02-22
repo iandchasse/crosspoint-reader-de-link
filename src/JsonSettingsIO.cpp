@@ -78,6 +78,11 @@ bool JsonSettingsIO::saveSettings(const CrossPointSettings& s, const char* path)
   doc["embeddedStyle"] = s.embeddedStyle;
   doc["timezoneOffsetHours"] = s.timezoneOffsetHours;
   doc["use24HourClock"] = s.use24HourClock;
+#ifdef FRONTLIGHT_PRESENT
+  doc["frontlightEnabled"] = s.frontlightEnabled;
+  doc["frontlightBrightness"] = s.frontlightBrightness;
+  doc["frontlightWarmth"] = s.frontlightWarmth;
+#endif
 
   String json;
   serializeJson(doc, json);
@@ -135,6 +140,11 @@ bool JsonSettingsIO::loadSettings(CrossPointSettings& s, const char* json, bool*
   s.embeddedStyle = doc["embeddedStyle"] | (uint8_t)1;
   s.timezoneOffsetHours = doc["timezoneOffsetHours"] | (uint8_t)12;
   s.use24HourClock = doc["use24HourClock"] | (uint8_t)1;
+#ifdef FRONTLIGHT_PRESENT
+  s.frontlightEnabled = doc["frontlightEnabled"] | (uint8_t)0;
+  s.frontlightBrightness = doc["frontlightBrightness"] | (uint8_t)50;
+  s.frontlightWarmth = doc["frontlightWarmth"] | (uint8_t)50;
+#endif
 
   const char* url = doc["opdsServerUrl"] | "";
   strncpy(s.opdsServerUrl, url, sizeof(s.opdsServerUrl) - 1);

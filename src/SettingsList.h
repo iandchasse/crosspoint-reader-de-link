@@ -36,7 +36,7 @@ inline std::vector<SettingInfo> getSettingsList() {
           {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS, StrId::STR_CLOCK, StrId::STR_HYBRID},
           "hideBatteryPercentage", StrId::STR_CAT_DISPLAY),
       SettingInfo::Value(StrId::STR_TIMEZONE_OFFSET, &CrossPointSettings::timezoneOffsetHours,
-                         SettingInfo::ValueRange{0, 26, 1}, "timezoneOffsetHours", StrId::STR_CAT_SYSTEM),
+                         SettingInfo::ValueRange{0, 23, 1}, "timezoneOffsetHours", StrId::STR_CAT_SYSTEM),
       SettingInfo::Toggle(StrId::STR_USE_24H_CLOCK, &CrossPointSettings::use24HourClock, "use24HourClock",
                           StrId::STR_CAT_SYSTEM),
       SettingInfo::Action(StrId::STR_SYNC_CLOCK, SettingAction::SyncClock, StrId::STR_CAT_SYSTEM),

@@ -38,6 +38,7 @@
 #include "fontIds.h"
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
+#include "util/TimeUtil.h"
 
 HalDisplay display;
 HalGPIO gpio;
@@ -212,6 +213,9 @@ void enterDeepSleep() {
   powerManager.setPowerSaving(false);  // make sure full power is available for the sleep screen and state preservation
   APP_STATE.lastSleepFromReader = currentActivity && currentActivity->isReaderActivity();
   SETTINGS.saveToFile();
+#ifdef FRONTLIGHT_PRESENT
+  frontlightManager.disable();
+#endif
   APP_STATE.saveToFile();
   exitActivity();
   enterNewActivity(new SleepActivity(renderer, mappedInputManager));
@@ -326,6 +330,7 @@ void setup() {
   }
 
   SETTINGS.loadFromFile();
+  TimeUtil::reconfigure();
   I18N.loadSettings();
   KOREADER_STORE.loadFromFile();
   UITheme::getInstance().reload();
@@ -335,10 +340,11 @@ void setup() {
   // Init frontlight manager
   frontlightManager.begin();
   if (SETTINGS.frontlightEnabled) {
-    frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
-    frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
     if (!frontlightManager.enable()) {
       SETTINGS.frontlightEnabled = false;
+    } else {
+      frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
+      frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
     }
   }
 #endif
@@ -466,13 +472,13 @@ void loop() {
         frontlightManager.disable();
       } else {
         // Toggle ON
-        frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
-        frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
         if (frontlightManager.enable()) {
           SETTINGS.frontlightEnabled = true;
         } else {
           SETTINGS.frontlightEnabled = false;
         }
+        frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
+        frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
       }
     }
 #endif

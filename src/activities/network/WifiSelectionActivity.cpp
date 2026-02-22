@@ -14,6 +14,7 @@
 #include "components/UITheme.h"
 #include "esp_wifi.h"
 #include "fontIds.h"
+#include "util/TimeUtil.h"
 
 void WifiSelectionActivity::onEnter() {
   Activity::onEnter();
@@ -251,8 +252,8 @@ void WifiSelectionActivity::checkConnectionStatus() {
     connectedIP = ipStr;
     autoConnecting = false;
 
-    // Trigger SNTP time sync now that we have network (12 = UTC offset 0)
-    configTime((static_cast<int>(SETTINGS.timezoneOffsetHours) - 12) * 3600, 0, "pool.ntp.org", "time.nist.gov");
+    // Trigger SNTP time sync now that we have network
+    TimeUtil::reconfigure();
 
     // Save this as the last connected network - SD card operations need lock as
     // we use SPI for both
