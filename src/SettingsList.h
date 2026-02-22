@@ -15,7 +15,13 @@ inline std::vector<SettingInfo> getSettingsList() {
   return {
   // --- Display ---
 #ifdef FRONTLIGHT_PRESENT
-      SettingInfo::Action(StrId::STR_FRONTLIGHT, SettingAction::FrontlightControl),
+      SettingInfo::Action(StrId::STR_FRONTLIGHT, SettingAction::FrontlightControl, StrId::STR_CAT_DISPLAY),
+      SettingInfo::Toggle(StrId::STR_ENABLE_FRONTLIGHT, &CrossPointSettings::frontlightEnabled, "frontlightEnabled",
+                          StrId::STR_CAT_DISPLAY),
+      SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 50, 5},
+                         "frontlightBrightness", StrId::STR_CAT_DISPLAY),
+      SettingInfo::Value(StrId::STR_WARMTH, &CrossPointSettings::frontlightWarmth, {0, 100, 5}, "frontlightWarmth",
+                         StrId::STR_CAT_DISPLAY),
 #endif
       SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
                         {StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER, StrId::STR_NONE_OPT,
