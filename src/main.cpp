@@ -209,6 +209,7 @@ void waitForPowerRelease() {
 
 // Enter deep sleep mode
 void enterDeepSleep() {
+  powerManager.setPowerSaving(false);  // make sure full power is available for the sleep screen and state preservation
   APP_STATE.lastSleepFromReader = currentActivity && currentActivity->isReaderActivity();
   SETTINGS.saveToFile();
   APP_STATE.saveToFile();
