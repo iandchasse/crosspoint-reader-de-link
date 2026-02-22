@@ -12,6 +12,7 @@
 
 #include "CrossPointSettings.h"
 #include "SettingsList.h"
+#include "WebDAVHandler.h"
 #include "html/FilesPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
 #include "html/SettingsPageHtml.generated.h"
@@ -164,7 +165,7 @@ void CrossPointWebServer::begin() {
   // Pass a heap-allocated instance — never pass a stack/member-variable pointer.
   const char* davHeaders[] = {"Depth", "Destination", "Overwrite", "If", "Lock-Token", "Timeout"};
   server->collectHeaders(davHeaders, 6);
-  server->addHandler(new WebDAVHandler());
+  server->addHandler(new WebDAVHandler());  // Note: WebDAVHandler will be deleted by WebServer when server is stopped
   LOG_DBG("WEB", "WebDAV handler initialized");
 
   server->begin();

@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "WebDAVHandler.h"
-
 // Structure to hold file information
 struct FileInfo {
   String name;
