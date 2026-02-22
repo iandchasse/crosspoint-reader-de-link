@@ -14,6 +14,8 @@
 #ifdef FRONTLIGHT_PRESENT
 #include "activities/settings/FrontlightControlActivity.h"
 #endif
+#include <time.h>
+
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -489,8 +491,18 @@ void TxtReaderActivity::renderStatusBar(const int orientedMarginRight, const int
                          SETTINGS.statusBar == CrossPointSettings::STATUS_BAR_MODE::FULL ||
                          SETTINGS.statusBar == CrossPointSettings::STATUS_BAR_MODE::BOOK_PROGRESS_BAR ||
                          SETTINGS.statusBar == CrossPointSettings::STATUS_BAR_MODE::CHAPTER_PROGRESS_BAR;
+
+  const auto battSetting = SETTINGS.hideBatteryPercentage;
+  const bool showBatteryIcon =
+      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
+       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 == 0)));
   const bool showBatteryPercentage =
-      SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
+      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
+       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 == 0)));
+
+  const bool showClockIcon =
+      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK ||
+       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 != 0)));
 
   auto metrics = UITheme::getInstance().getMetrics();
   const auto screenHeight = renderer.getScreenHeight();
@@ -526,8 +538,27 @@ void TxtReaderActivity::renderStatusBar(const int orientedMarginRight, const int
   }
 
   if (showBattery) {
-    GUI.drawBatteryLeft(renderer, Rect{orientedMarginLeft, textY, metrics.batteryWidth, metrics.batteryHeight},
-                        showBatteryPercentage);
+    if (showClockIcon) {
+      time_t now;
+      ::time(&now);
+      struct tm timeinfo;
+      localtime_r(&now, &timeinfo);
+      if (timeinfo.tm_year > (2020 - 1900)) {
+        char timeStr[16];
+        if (SETTINGS.use24HourClock) {
+          snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        } else {
+          int hour = timeinfo.tm_hour % 12;
+          if (hour == 0) hour = 12;
+          snprintf(timeStr, sizeof(timeStr), "%d:%02d %s", hour, timeinfo.tm_min,
+                   (timeinfo.tm_hour >= 12) ? "PM" : "AM");
+        }
+        renderer.drawText(SMALL_FONT_ID, orientedMarginLeft, textY, timeStr);
+      }
+    } else if (showBatteryIcon || showBatteryPercentage) {
+      GUI.drawBatteryLeft(renderer, Rect{orientedMarginLeft, textY, metrics.batteryWidth, metrics.batteryHeight},
+                          showBatteryPercentage);
+    }
   }
 
   if (showTitle) {

@@ -4,6 +4,7 @@
 #include <I18n.h>
 #include <Logging.h>
 #include <WiFi.h>
+#include <time.h>
 
 #include <map>
 
@@ -249,6 +250,9 @@ void WifiSelectionActivity::checkConnectionStatus() {
     snprintf(ipStr, sizeof(ipStr), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
     connectedIP = ipStr;
     autoConnecting = false;
+
+    // Trigger SNTP time sync now that we have network (12 = UTC offset 0)
+    configTime((static_cast<int>(SETTINGS.timezoneOffsetHours) - 12) * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
     // Save this as the last connected network - SD card operations need lock as
     // we use SPI for both

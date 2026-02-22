@@ -31,9 +31,15 @@ inline std::vector<SettingInfo> getSettingsList() {
           {StrId::STR_NONE_OPT, StrId::STR_NO_PROGRESS, StrId::STR_STATUS_BAR_FULL_PERCENT,
            StrId::STR_STATUS_BAR_FULL_BOOK, StrId::STR_STATUS_BAR_BOOK_ONLY, StrId::STR_STATUS_BAR_FULL_CHAPTER},
           "statusBar", StrId::STR_CAT_DISPLAY),
-      SettingInfo::Enum(StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
-                        {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS}, "hideBatteryPercentage",
-                        StrId::STR_CAT_DISPLAY),
+      SettingInfo::Enum(
+          StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
+          {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS, StrId::STR_CLOCK, StrId::STR_HYBRID},
+          "hideBatteryPercentage", StrId::STR_CAT_DISPLAY),
+      SettingInfo::Value(StrId::STR_TIMEZONE_OFFSET, &CrossPointSettings::timezoneOffsetHours,
+                         SettingInfo::ValueRange{0, 26, 1}, "timezoneOffsetHours", StrId::STR_CAT_SYSTEM),
+      SettingInfo::Toggle(StrId::STR_USE_24H_CLOCK, &CrossPointSettings::use24HourClock, "use24HourClock",
+                          StrId::STR_CAT_SYSTEM),
+      SettingInfo::Action(StrId::STR_SYNC_CLOCK, SettingAction::SyncClock, StrId::STR_CAT_SYSTEM),
       SettingInfo::Enum(
           StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshFrequency,
           {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15, StrId::STR_PAGES_30},

@@ -358,6 +358,11 @@ enum class StrId : uint16_t {
   STR_EMBEDDED_STYLE,
   STR_OPDS_SERVER_URL,
   STR_SCREENSHOT_BUTTON,
+  STR_CLOCK,
+  STR_HYBRID,
+  STR_TIMEZONE_OFFSET,
+  STR_USE_24H_CLOCK,
+  STR_SYNC_CLOCK,
   // Sentinel - must be last
   _COUNT
 };

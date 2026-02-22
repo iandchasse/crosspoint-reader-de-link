@@ -117,7 +117,14 @@ class CrossPointSettings {
   enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, TOGGLE_FRONTLIGHT = 3, SHORT_PWRBTN_COUNT };
 
   // Hide battery percentage
-  enum HIDE_BATTERY_PERCENTAGE { HIDE_NEVER = 0, HIDE_READER = 1, HIDE_ALWAYS = 2, HIDE_BATTERY_PERCENTAGE_COUNT };
+  enum HIDE_BATTERY_PERCENTAGE {
+    HIDE_NEVER = 0,
+    HIDE_READER = 1,
+    HIDE_ALWAYS = 2,
+    SHOW_CLOCK = 3,
+    SHOW_CLOCK_HYBRID = 4,
+    HIDE_BATTERY_PERCENTAGE_COUNT
+  };
 
   // UI Theme
   enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2 };
@@ -173,6 +180,10 @@ class CrossPointSettings {
   char opdsPassword[64] = "";
   // Hide battery percentage
   uint8_t hideBatteryPercentage = HIDE_NEVER;
+  // User selected timezone offset hours (stored as 0-26, where 12 = UTC)
+  uint8_t timezoneOffsetHours = 12;
+  // Use 24-hour clock (1 = enabled, 0 = disabled)
+  uint8_t use24HourClock = 1;
   // Long-press chapter skip on side buttons
   uint8_t longPressChapterSkip = 1;
   // UI Theme

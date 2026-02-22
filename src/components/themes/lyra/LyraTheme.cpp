@@ -5,11 +5,13 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Utf8.h>
+#include <time.h>
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "CrossPointSettings.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "components/icons/book.h"
@@ -184,6 +186,24 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
                       rect.y + LyraMetrics::values.batteryBarHeight + 3, truncatedTitle.c_str(), true,
                       EpdFontFamily::BOLD);
     renderer.drawLine(rect.x, rect.y + rect.height - 3, rect.x + rect.width - 1, rect.y + rect.height - 3, 3, true);
+  }
+
+  // Draw clock in the top-left corner
+  time_t now;
+  ::time(&now);
+  struct tm timeinfo;
+  localtime_r(&now, &timeinfo);
+
+  if (timeinfo.tm_year > (2020 - 1900)) {  // Only show clock if time is set
+    char timeStr[16];
+    if (SETTINGS.use24HourClock) {
+      snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    } else {
+      int hour = timeinfo.tm_hour % 12;
+      if (hour == 0) hour = 12;
+      snprintf(timeStr, sizeof(timeStr), "%d:%02d %s", hour, timeinfo.tm_min, (timeinfo.tm_hour >= 12) ? "PM" : "AM");
+    }
+    renderer.drawText(SMALL_FONT_ID, rect.x + LyraMetrics::values.contentSidePadding, rect.y + 5, timeStr);
   }
 
   if (subtitle) {

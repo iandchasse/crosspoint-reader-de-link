@@ -5,10 +5,12 @@
 #include <HalStorage.h>
 #include <Logging.h>
 #include <Utf8.h>
+#include <time.h>
 
 #include <cstdint>
 #include <string>
 
+#include "CrossPointSettings.h"
 #include "I18n.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
@@ -273,6 +275,24 @@ void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
                                                  rect.width - padding * 2 - BaseMetrics::values.contentSidePadding * 2,
                                                  EpdFontFamily::BOLD);
     renderer.drawCenteredText(UI_12_FONT_ID, rect.y + 5, truncatedTitle.c_str(), true, EpdFontFamily::BOLD);
+  }
+
+  // Draw clock in the top-left corner
+  time_t now;
+  ::time(&now);
+  struct tm timeinfo;
+  localtime_r(&now, &timeinfo);
+
+  if (timeinfo.tm_year > (2020 - 1900)) {  // Only show clock if time is set
+    char timeStr[16];
+    if (SETTINGS.use24HourClock) {
+      snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    } else {
+      int hour = timeinfo.tm_hour % 12;
+      if (hour == 0) hour = 12;
+      snprintf(timeStr, sizeof(timeStr), "%d:%02d %s", hour, timeinfo.tm_min, (timeinfo.tm_hour >= 12) ? "PM" : "AM");
+    }
+    renderer.drawText(SMALL_FONT_ID, rect.x + BaseMetrics::values.contentSidePadding, rect.y + 5, timeStr);
   }
 
   if (subtitle) {

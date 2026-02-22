@@ -24,6 +24,8 @@
 #include "OtaUpdateActivity.h"
 #endif
 // ---------------------------------------------------------------------------
+#include <WiFi.h>
+
 #include "SettingsList.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
@@ -223,6 +225,14 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::Language:
         enterSubActivity(new LanguageSelectActivity(renderer, mappedInput, onComplete));
         break;
+      case SettingAction::SyncClock:
+        if (WiFi.status() == WL_CONNECTED) {
+          configTime((static_cast<int>(SETTINGS.timezoneOffsetHours) - 12) * 3600, 0, "pool.ntp.org", "time.nist.gov");
+        } else {
+          // If not connected, give some feedback? For now just trigger network activity
+          enterSubActivity(new WifiSelectionActivity(renderer, mappedInput, onCompleteBool, false));
+        }
+        break;
       case SettingAction::None:
         // Do nothing
         break;
@@ -232,6 +242,10 @@ void SettingsActivity::toggleCurrentSetting() {
   }
 
   SETTINGS.saveToFile();
+  // Always trigger a time sync update when settings are changed to apply timezone offset immediately if connected
+  if (WiFi.status() == WL_CONNECTED) {
+    configTime((static_cast<int>(SETTINGS.timezoneOffsetHours) - 12) * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  }
 }
 
 void SettingsActivity::render(Activity::RenderLock&&) {

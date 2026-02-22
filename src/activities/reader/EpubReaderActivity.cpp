@@ -6,6 +6,10 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
+#include <time.h>
+
+#include <string>
+#include <vector>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -16,6 +20,7 @@
 #include "KOReaderSyncActivity.h"
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
+
 #ifdef FRONTLIGHT_PRESENT
 #include "activities/settings/FrontlightControlActivity.h"
 #endif
@@ -759,8 +764,18 @@ void EpubReaderActivity::renderStatusBar(const int orientedMarginRight, const in
                                 SETTINGS.statusBar == CrossPointSettings::STATUS_BAR_MODE::FULL ||
                                 SETTINGS.statusBar == CrossPointSettings::STATUS_BAR_MODE::BOOK_PROGRESS_BAR ||
                                 SETTINGS.statusBar == CrossPointSettings::STATUS_BAR_MODE::CHAPTER_PROGRESS_BAR;
-  const bool showBatteryPercentage =
-      SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
+
+  const auto battSetting = SETTINGS.hideBatteryPercentage;
+  const bool showBatteryIcon = (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
+                                (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID &&
+                                 (section->currentPage % 2 == 0)));
+  const bool showBatteryPercentage = (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
+                                      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID &&
+                                       (section->currentPage % 2 == 0)));
+
+  const bool showClockIcon = (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK ||
+                              (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID &&
+                               (section->currentPage % 2 != 0)));
 
   // Position status bar near the bottom of the logical screen, regardless of orientation
   const auto screenHeight = renderer.getScreenHeight();
@@ -803,8 +818,27 @@ void EpubReaderActivity::renderStatusBar(const int orientedMarginRight, const in
   }
 
   if (showBattery) {
-    GUI.drawBatteryLeft(renderer, Rect{orientedMarginLeft + 1, textY, metrics.batteryWidth, metrics.batteryHeight},
-                        showBatteryPercentage);
+    if (showClockIcon) {
+      time_t now;
+      ::time(&now);
+      struct tm timeinfo;
+      localtime_r(&now, &timeinfo);
+      if (timeinfo.tm_year > (2020 - 1900)) {
+        char timeStr[16];
+        if (SETTINGS.use24HourClock) {
+          snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        } else {
+          int hour = timeinfo.tm_hour % 12;
+          if (hour == 0) hour = 12;
+          snprintf(timeStr, sizeof(timeStr), "%d:%02d %s", hour, timeinfo.tm_min,
+                   (timeinfo.tm_hour >= 12) ? "PM" : "AM");
+        }
+        renderer.drawText(SMALL_FONT_ID, orientedMarginLeft + 1, textY, timeStr);
+      }
+    } else if (showBatteryIcon || showBatteryPercentage) {
+      GUI.drawBatteryLeft(renderer, Rect{orientedMarginLeft + 1, textY, metrics.batteryWidth, metrics.batteryHeight},
+                          showBatteryPercentage);
+    }
   }
 
   if (showChapterTitle) {
