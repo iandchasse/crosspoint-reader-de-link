@@ -67,10 +67,6 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
                            const bool pixelState, const EpdFontFamily::Style style) {
   const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
   if (!glyph) {
-    glyph = fontFamily.getGlyph(REPLACEMENT_GLYPH, style);
-  }
-
-  if (!glyph) {
     LOG_ERR("GFX", "No glyph for codepoint %d", cp);
     return;
   }
@@ -235,10 +231,6 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
     if (utf8IsCombiningMark(cp) && hasBaseGlyph) {
       const EpdGlyph* combiningGlyph = font.getGlyph(cp, style);
-      if (!combiningGlyph) {
-        combiningGlyph = font.getGlyph(REPLACEMENT_GLYPH, style);
-      }
-
       int raiseBy = 0;
       if (combiningGlyph) {
         const int currentGap = combiningGlyph->top - combiningGlyph->height - lastBaseTop;
@@ -254,10 +246,6 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
     }
 
     const EpdGlyph* glyph = font.getGlyph(cp, style);
-    if (!glyph) {
-      glyph = font.getGlyph(REPLACEMENT_GLYPH, style);
-    }
-
     if (!utf8IsCombiningMark(cp)) {
       lastBaseX = xpos;
       lastBaseY = yPos;
@@ -908,7 +896,6 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, const EpdFo
       continue;
     }
     const EpdGlyph* glyph = font.getGlyph(cp, style);
-    if (!glyph) glyph = font.getGlyph(REPLACEMENT_GLYPH, style);
     if (glyph) width += glyph->advanceX;
   }
   return width;
@@ -971,10 +958,6 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
     if (utf8IsCombiningMark(cp) && hasBaseGlyph) {
       const EpdGlyph* combiningGlyph = font.getGlyph(cp, style);
-      if (!combiningGlyph) {
-        combiningGlyph = font.getGlyph(REPLACEMENT_GLYPH, style);
-      }
-
       int raiseBy = 0;
       if (combiningGlyph) {
         const int currentGap = combiningGlyph->top - combiningGlyph->height - lastBaseTop;
@@ -990,10 +973,6 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     }
 
     const EpdGlyph* glyph = font.getGlyph(cp, style);
-    if (!glyph) {
-      glyph = font.getGlyph(REPLACEMENT_GLYPH, style);
-    }
-
     if (!utf8IsCombiningMark(cp)) {
       lastBaseX = xPos;
       lastBaseY = yPos;
