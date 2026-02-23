@@ -1,4 +1,4 @@
-#include "ZipFile.h"
+﻿#include "ZipFile.h"
 
 #include <HalStorage.h>
 #include <InflateReader.h>
@@ -8,7 +8,7 @@
 
 struct ZipInflateCtx {
   InflateReader reader;  // Must be first — callback casts uzlib_uncomp* to ZipInflateCtx*
-  FsFile* file = nullptr;
+  EspFsFile* file = nullptr;
   size_t fileRemaining = 0;
   uint8_t* readBuf = nullptr;
   size_t readBufSize = 0;

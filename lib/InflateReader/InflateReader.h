@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <uzlib.h>
 
@@ -25,7 +25,7 @@ enum class InflateStatus {
 //
 //     struct MyCtx {
 //       InflateReader reader;   // must be first
-//       FsFile* file;
+//       EspFsFile* file;
 //       // ...
 //     };
 //     static int myCb(struct uzlib_uncomp* u) {

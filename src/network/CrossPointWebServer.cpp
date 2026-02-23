@@ -1,4 +1,4 @@
-#include "CrossPointWebServer.h"
+﻿#include "CrossPointWebServer.h"
 
 #include <ArduinoJson.h>
 #include <Epub.h>
@@ -12,7 +12,6 @@
 
 #include "CrossPointSettings.h"
 #include "SettingsList.h"
-#include "WebDAVHandler.h"
 #include "html/FilesPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
 #include "html/SettingsPageHtml.generated.h"
@@ -30,7 +29,7 @@ constexpr uint16_t LOCAL_UDP_PORT = 8134;
 CrossPointWebServer* wsInstance = nullptr;
 
 // WebSocket upload state
-FsFile wsUploadFile;
+EspFsFile wsUploadFile;
 String wsUploadFileName;
 String wsUploadPath;
 size_t wsUploadSize = 0;
@@ -90,6 +89,7 @@ CrossPointWebServer::CrossPointWebServer() {}
 CrossPointWebServer::~CrossPointWebServer() { stop(); }
 
 void CrossPointWebServer::begin() {
+  esp_task_wdt_add(NULL);
   if (running) {
     LOG_DBG("WEB", "Web server already running");
     return;
@@ -336,7 +336,7 @@ void CrossPointWebServer::handleStatus() const {
 }
 
 void CrossPointWebServer::scanFiles(const char* path, const std::function<void(FileInfo)>& callback) const {
-  FsFile root = Storage.open(path);
+  EspFsFile root = Storage.open(path);
   if (!root) {
     LOG_DBG("WEB", "Failed to open directory: %s", path);
     return;
@@ -350,7 +350,7 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
 
   LOG_DBG("WEB", "Scanning files in: %s", path);
 
-  FsFile file = root.openNextFile();
+  EspFsFile file = root.openNextFile();
   char name[500];
   while (file) {
     file.getName(name, sizeof(name));
@@ -485,7 +485,7 @@ void CrossPointWebServer::handleDownload() const {
     return;
   }
 
-  FsFile file = Storage.open(itemPath.c_str());
+  EspFsFile file = Storage.open(itemPath.c_str());
   if (!file) {
     server->send(500, "text/plain", "Failed to open file");
     return;
@@ -511,7 +511,8 @@ void CrossPointWebServer::handleDownload() const {
   server->sendHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
   server->send(200, contentType.c_str(), "");
 
-  WiFiClient client = server->client();
+  // WiFiClient client = server->client();
+  NetworkClient client = server->client();
   client.write(file);
   file.close();
 }
@@ -789,7 +790,7 @@ void CrossPointWebServer::handleRename() const {
     return;
   }
 
-  FsFile file = Storage.open(itemPath.c_str());
+  EspFsFile file = Storage.open(itemPath.c_str());
   if (!file) {
     server->send(500, "text/plain", "Failed to open file");
     return;
@@ -865,7 +866,7 @@ void CrossPointWebServer::handleMove() const {
     return;
   }
 
-  FsFile file = Storage.open(itemPath.c_str());
+  EspFsFile file = Storage.open(itemPath.c_str());
   if (!file) {
     server->send(500, "text/plain", "Failed to open file");
     return;
@@ -881,7 +882,7 @@ void CrossPointWebServer::handleMove() const {
     server->send(404, "text/plain", "Destination not found");
     return;
   }
-  FsFile destDir = Storage.open(destPath.c_str());
+  EspFsFile destDir = Storage.open(destPath.c_str());
   if (!destDir || !destDir.isDirectory()) {
     if (destDir) {
       destDir.close();
@@ -996,10 +997,10 @@ void CrossPointWebServer::handleDelete() const {
 
     // Decide whether it's a directory or file by opening it
     bool success = false;
-    FsFile f = Storage.open(itemPath.c_str());
+    EspFsFile f = Storage.open(itemPath.c_str());
     if (f && f.isDirectory()) {
       // For folders, ensure empty before removing
-      FsFile entry = f.openNextFile();
+      EspFsFile entry = f.openNextFile();
       if (entry) {
         entry.close();
         f.close();

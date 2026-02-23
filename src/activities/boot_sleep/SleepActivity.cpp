@@ -1,4 +1,4 @@
-#include "SleepActivity.h"
+﻿#include "SleepActivity.h"
 
 #include <Epub.h>
 #include <GfxRenderer.h>
@@ -80,7 +80,7 @@ void SleepActivity::renderCustomSleepScreen() const {
       APP_STATE.lastSleepImage = randomFileIndex;
       APP_STATE.saveToFile();
       const auto filename = "/sleep/" + files[randomFileIndex];
-      FsFile file;
+      EspFsFile file;
       if (Storage.openFileForRead("SLP", filename, file)) {
         LOG_DBG("SLP", "Randomly loading: /sleep/%s", files[randomFileIndex].c_str());
         delay(100);
@@ -99,7 +99,7 @@ void SleepActivity::renderCustomSleepScreen() const {
 
   // Look for sleep.bmp on the root of the sd card to determine if we should
   // render a custom sleep screen instead of the default.
-  FsFile file;
+  EspFsFile file;
   if (Storage.openFileForRead("SLP", "/sleep.bmp", file)) {
     Bitmap bitmap(file, true);
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
@@ -270,7 +270,7 @@ void SleepActivity::renderCoverSleepScreen() const {
     return (this->*renderNoCoverSleepScreen)();
   }
 
-  FsFile file;
+  EspFsFile file;
   if (Storage.openFileForRead("SLP", coverBmpPath, file)) {
     Bitmap bitmap(file);
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {

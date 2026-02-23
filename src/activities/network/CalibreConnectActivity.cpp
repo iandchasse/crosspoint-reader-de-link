@@ -78,6 +78,7 @@ void CalibreConnectActivity::startWebServer() {
     // mDNS is optional for the Calibre plugin but still helpful for users.
     LOG_DBG("CAL", "mDNS started: http://%s.local/", HOSTNAME);
   }
+  esp_task_wdt_add(NULL);
 
   webServer.reset(new CrossPointWebServer());
   webServer->begin();
@@ -96,6 +97,7 @@ void CalibreConnectActivity::stopWebServer() {
     webServer->stop();
     webServer.reset();
   }
+  esp_task_wdt_delete(NULL);
 }
 
 void CalibreConnectActivity::loop() {

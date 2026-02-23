@@ -1,4 +1,4 @@
-#include "RecentBooksStore.h"
+﻿#include "RecentBooksStore.h"
 
 #include <Epub.h>
 #include <HalStorage.h>
@@ -112,7 +112,7 @@ bool RecentBooksStore::loadFromFile() {
 }
 
 bool RecentBooksStore::loadFromBinaryFile() {
-  FsFile inputFile;
+  EspFsFile inputFile;
   if (!Storage.openFileForRead("RBS", RECENT_BOOKS_FILE_BIN, inputFile)) {
     return false;
   }

@@ -1,10 +1,10 @@
-#include "HttpDownloader.h"
+﻿#include "HttpDownloader.h"
 
 #include <HTTPClient.h>
 #include <Logging.h>
+#include <NetworkClient.h>
+#include <NetworkClientSecure.h>
 #include <StreamString.h>
-#include <WiFiClient.h>
-#include <WiFiClientSecure.h>
 #include <base64.h>
 
 #include <cstring>
@@ -13,16 +13,15 @@
 #include "CrossPointSettings.h"
 #include "util/UrlUtils.h"
 
-
 bool HttpDownloader::fetchUrl(const std::string& url, Stream& outContent) {
   // Use NetworkClientSecure for HTTPS, regular NetworkClient for HTTP
-  std::unique_ptr<WiFiClient> client;
+  std::unique_ptr<NetworkClient> client;
   if (UrlUtils::isHttpsUrl(url)) {
-    auto* secureClient = new WiFiClientSecure();
+    auto* secureClient = new NetworkClientSecure();
     secureClient->setInsecure();
     client.reset(secureClient);
   } else {
-    client.reset(new WiFiClient());
+    client.reset(new NetworkClient());
   }
   HTTPClient http;
 
@@ -66,13 +65,13 @@ bool HttpDownloader::fetchUrl(const std::string& url, std::string& outContent) {
 HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& url, const std::string& destPath,
                                                              ProgressCallback progress) {
   // Use NetworkClientSecure for HTTPS, regular NetworkClient for HTTP
-  std::unique_ptr<WiFiClient> client;
+  std::unique_ptr<NetworkClient> client;
   if (UrlUtils::isHttpsUrl(url)) {
-    auto* secureClient = new WiFiClientSecure();
+    auto* secureClient = new NetworkClientSecure();
     secureClient->setInsecure();
     client.reset(secureClient);
   } else {
-    client.reset(new WiFiClient());
+    client.reset(new NetworkClient());
   }
   HTTPClient http;
 
@@ -106,7 +105,7 @@ HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& 
   }
 
   // Open file for writing
-  FsFile file;
+  EspFsFile file;
   if (!Storage.openFileForWrite("HTTP", destPath.c_str(), file)) {
     LOG_ERR("HTTP", "Failed to open file for writing");
     http.end();
@@ -114,7 +113,7 @@ HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& 
   }
 
   // Get the stream for chunked reading
-  WiFiClient* stream = http.getStreamPtr();
+  NetworkClient* stream = http.getStreamPtr();
   if (!stream) {
     LOG_ERR("HTTP", "Failed to get stream");
     file.close();

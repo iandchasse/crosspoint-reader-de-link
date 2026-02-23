@@ -1,4 +1,4 @@
-#include "JpegToBmpConverter.h"
+﻿#include "JpegToBmpConverter.h"
 
 #include <HalStorage.h>
 #include <Logging.h>
@@ -11,7 +11,7 @@
 
 // Context structure for picojpeg callback
 struct JpegReadContext {
-  FsFile& file;
+  EspFsFile& file;
   uint8_t buffer[512];
   size_t bufferPos;
   size_t bufferFilled;
@@ -199,7 +199,7 @@ unsigned char JpegToBmpConverter::jpegReadCallback(unsigned char* pBuf, const un
 }
 
 // Internal implementation with configurable target size and bit depth
-bool JpegToBmpConverter::jpegFileToBmpStreamInternal(FsFile& jpegFile, Print& bmpOut, int targetWidth, int targetHeight,
+bool JpegToBmpConverter::jpegFileToBmpStreamInternal(EspFsFile& jpegFile, Print& bmpOut, int targetWidth, int targetHeight,
                                                      bool oneBit, bool crop) {
   LOG_DBG("JPG", "Converting JPEG to %s BMP (target: %dx%d)", oneBit ? "1-bit" : "2-bit", targetWidth, targetHeight);
 
@@ -558,18 +558,18 @@ bool JpegToBmpConverter::jpegFileToBmpStreamInternal(FsFile& jpegFile, Print& bm
 }
 
 // Core function: Convert JPEG file to 2-bit BMP (uses default target size)
-bool JpegToBmpConverter::jpegFileToBmpStream(FsFile& jpegFile, Print& bmpOut, bool crop) {
+bool JpegToBmpConverter::jpegFileToBmpStream(EspFsFile& jpegFile, Print& bmpOut, bool crop) {
   return jpegFileToBmpStreamInternal(jpegFile, bmpOut, TARGET_MAX_WIDTH, TARGET_MAX_HEIGHT, false, crop);
 }
 
 // Convert with custom target size (for thumbnails, 2-bit)
-bool JpegToBmpConverter::jpegFileToBmpStreamWithSize(FsFile& jpegFile, Print& bmpOut, int targetMaxWidth,
+bool JpegToBmpConverter::jpegFileToBmpStreamWithSize(EspFsFile& jpegFile, Print& bmpOut, int targetMaxWidth,
                                                      int targetMaxHeight) {
   return jpegFileToBmpStreamInternal(jpegFile, bmpOut, targetMaxWidth, targetMaxHeight, false);
 }
 
 // Convert to 1-bit BMP (black and white only, no grays) for fast home screen rendering
-bool JpegToBmpConverter::jpegFileTo1BitBmpStreamWithSize(FsFile& jpegFile, Print& bmpOut, int targetMaxWidth,
+bool JpegToBmpConverter::jpegFileTo1BitBmpStreamWithSize(EspFsFile& jpegFile, Print& bmpOut, int targetMaxWidth,
                                                          int targetMaxHeight) {
   return jpegFileToBmpStreamInternal(jpegFile, bmpOut, targetMaxWidth, targetMaxHeight, true, true);
 }

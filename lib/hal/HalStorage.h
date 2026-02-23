@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <FS.h>  // need to be included before SdFat.h for compatibility with FS.h's File class
 #include <SDCardManager.h>
@@ -25,19 +25,19 @@ class HalStorage {
   // Ensure a directory exists, creating it if necessary. Returns true on success.
   bool ensureDirectoryExists(const char* path);
 
-  FsFile open(const char* path, const oflag_t oflag = O_RDONLY);
+  EspFsFile open(const char* path, const oflag_t oflag = O_RDONLY);
   bool mkdir(const char* path, const bool pFlag = true);
   bool exists(const char* path);
   bool remove(const char* path);
   bool rename(const char* oldPath, const char* newPath);
   bool rmdir(const char* path);
 
-  bool openFileForRead(const char* moduleName, const char* path, FsFile& file);
-  bool openFileForRead(const char* moduleName, const std::string& path, FsFile& file);
-  bool openFileForRead(const char* moduleName, const String& path, FsFile& file);
-  bool openFileForWrite(const char* moduleName, const char* path, FsFile& file);
-  bool openFileForWrite(const char* moduleName, const std::string& path, FsFile& file);
-  bool openFileForWrite(const char* moduleName, const String& path, FsFile& file);
+  bool openFileForRead(const char* moduleName, const char* path, EspFsFile& file);
+  bool openFileForRead(const char* moduleName, const std::string& path, EspFsFile& file);
+  bool openFileForRead(const char* moduleName, const String& path, EspFsFile& file);
+  bool openFileForWrite(const char* moduleName, const char* path, EspFsFile& file);
+  bool openFileForWrite(const char* moduleName, const std::string& path, EspFsFile& file);
+  bool openFileForWrite(const char* moduleName, const String& path, EspFsFile& file);
   bool removeDir(const char* path);
 
   static HalStorage& getInstance() { return instance; }

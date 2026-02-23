@@ -1,4 +1,4 @@
-#include "EpubReaderActivity.h"
+﻿#include "EpubReaderActivity.h"
 
 #include <Epub/Page.h>
 #include <FsHelpers.h>
@@ -81,7 +81,7 @@ void EpubReaderActivity::onEnter() {
 
   epub->setupCacheDir();
 
-  FsFile f;
+  EspFsFile f;
   if (Storage.openFileForRead("ERS", epub->getCachePath() + "/progress.bin", f)) {
     uint8_t data[6];
     int dataSize = f.read(data, 6);
@@ -667,7 +667,7 @@ void EpubReaderActivity::render(Activity::RenderLock&& lock) {
 }
 
 void EpubReaderActivity::saveProgress(int spineIndex, int currentPage, int pageCount) {
-  FsFile f;
+  EspFsFile f;
   if (Storage.openFileForWrite("ERS", epub->getCachePath() + "/progress.bin", f)) {
     uint8_t data[6];
     data[0] = currentSpineIndex & 0xFF;

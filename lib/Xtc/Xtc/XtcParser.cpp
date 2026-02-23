@@ -1,4 +1,4 @@
-/**
+﻿/**
  * XtcParser.cpp
  *
  * XTC file parsing implementation
@@ -441,7 +441,7 @@ XtcError XtcParser::loadPageStreaming(uint32_t pageIndex,
 }
 
 bool XtcParser::isValidXtcFile(const char* filepath) {
-  FsFile file;
+  EspFsFile file;
   if (!Storage.openFileForRead("XTC", filepath, file)) {
     return false;
   }

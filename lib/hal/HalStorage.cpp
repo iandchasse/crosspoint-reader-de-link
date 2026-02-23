@@ -1,4 +1,4 @@
-#include "HalStorage.h"
+﻿#include "HalStorage.h"
 
 #include <SDCardManager.h>
 
@@ -28,7 +28,7 @@ bool HalStorage::writeFile(const char* path, const String& content) { return SDC
 
 bool HalStorage::ensureDirectoryExists(const char* path) { return SDCard.ensureDirectoryExists(path); }
 
-FsFile HalStorage::open(const char* path, const oflag_t oflag) {
+EspFsFile HalStorage::open(const char* path, const oflag_t oflag) {
   const char* mode = FILE_READ;
   if ((oflag & O_RDWR) || (oflag & O_WRONLY)) {
     if (oflag & O_APPEND) {
@@ -50,27 +50,27 @@ bool HalStorage::rename(const char* oldPath, const char* newPath) { return SDCar
 
 bool HalStorage::rmdir(const char* path) { return SDCard.rmdir(path); }
 
-bool HalStorage::openFileForRead(const char* moduleName, const char* path, FsFile& file) {
+bool HalStorage::openFileForRead(const char* moduleName, const char* path, EspFsFile& file) {
   return SDCard.openFileForRead(moduleName, path, file);
 }
 
-bool HalStorage::openFileForRead(const char* moduleName, const std::string& path, FsFile& file) {
+bool HalStorage::openFileForRead(const char* moduleName, const std::string& path, EspFsFile& file) {
   return openFileForRead(moduleName, path.c_str(), file);
 }
 
-bool HalStorage::openFileForRead(const char* moduleName, const String& path, FsFile& file) {
+bool HalStorage::openFileForRead(const char* moduleName, const String& path, EspFsFile& file) {
   return openFileForRead(moduleName, path.c_str(), file);
 }
 
-bool HalStorage::openFileForWrite(const char* moduleName, const char* path, FsFile& file) {
+bool HalStorage::openFileForWrite(const char* moduleName, const char* path, EspFsFile& file) {
   return SDCard.openFileForWrite(moduleName, path, file);
 }
 
-bool HalStorage::openFileForWrite(const char* moduleName, const std::string& path, FsFile& file) {
+bool HalStorage::openFileForWrite(const char* moduleName, const std::string& path, EspFsFile& file) {
   return openFileForWrite(moduleName, path.c_str(), file);
 }
 
-bool HalStorage::openFileForWrite(const char* moduleName, const String& path, FsFile& file) {
+bool HalStorage::openFileForWrite(const char* moduleName, const String& path, EspFsFile& file) {
   return openFileForWrite(moduleName, path.c_str(), file);
 }
 

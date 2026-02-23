@@ -1,4 +1,4 @@
-#include "CrossPointState.h"
+﻿#include "CrossPointState.h"
 
 #include <HalStorage.h>
 #include <JsonSettingsIO.h>
@@ -46,7 +46,7 @@ bool CrossPointState::loadFromFile() {
 }
 
 bool CrossPointState::loadFromBinaryFile() {
-  FsFile inputFile;
+  EspFsFile inputFile;
   if (!Storage.openFileForRead("CPS", STATE_FILE_BIN, inputFile)) {
     return false;
   }

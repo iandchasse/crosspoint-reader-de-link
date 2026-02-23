@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <HalStorage.h>
 #include <Logging.h>
@@ -56,7 +56,7 @@ struct PixelCache {
   bool writeToFile(const std::string& cachePath) {
     if (!buffer) return false;
 
-    FsFile cacheFile;
+    EspFsFile cacheFile;
     if (!Storage.openFileForWrite("IMG", cachePath, cacheFile)) {
       LOG_ERR("IMG", "Failed to open cache file for writing: %s", cachePath.c_str());
       return false;

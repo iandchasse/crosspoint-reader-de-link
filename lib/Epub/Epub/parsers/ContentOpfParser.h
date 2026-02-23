@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <Print.h>
 
 #include <algorithm>
@@ -28,7 +28,7 @@ class ContentOpfParser final : public Print {
   XML_Parser parser = nullptr;
   ParserState state = START;
   BookMetadataCache* cache;
-  FsFile tempItemStore;
+  EspFsFile tempItemStore;
   std::string coverItemId;
 
   // Index for fast idref→href lookup (used only for large EPUBs)

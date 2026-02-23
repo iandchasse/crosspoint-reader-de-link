@@ -1,4 +1,4 @@
-#include "I18n.h"
+﻿#include "I18n.h"
 
 #include <HalStorage.h>
 #include <HardwareSerial.h>
@@ -47,7 +47,7 @@ const char* I18n::getLanguageName(Language lang) const {
 void I18n::saveSettings() {
   Storage.mkdir("/.crosspoint");
 
-  FsFile file;
+  EspFsFile file;
   if (!Storage.openFileForWrite("I18N", SETTINGS_FILE, file)) {
     Serial.printf("[I18N] Failed to save settings\n");
     return;
@@ -61,7 +61,7 @@ void I18n::saveSettings() {
 }
 
 void I18n::loadSettings() {
-  FsFile file;
+  EspFsFile file;
   if (!Storage.openFileForRead("I18N", SETTINGS_FILE, file)) {
     Serial.printf("[I18N] No settings file, using default (English)\n");
     return;

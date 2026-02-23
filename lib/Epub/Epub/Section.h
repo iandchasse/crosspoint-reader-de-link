@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <functional>
 #include <memory>
 
@@ -12,7 +12,7 @@ class Section {
   const int spineIndex;
   GfxRenderer& renderer;
   std::string filePath;
-  FsFile file;
+  EspFsFile file;
 
   void writeSectionFileHeader(int fontId, float lineCompression, bool extraParagraphSpacing, uint8_t paragraphAlignment,
                               uint16_t viewportWidth, uint16_t viewportHeight, bool hyphenationEnabled,

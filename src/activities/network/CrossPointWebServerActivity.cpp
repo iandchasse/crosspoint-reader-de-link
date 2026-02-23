@@ -230,6 +230,7 @@ void CrossPointWebServerActivity::startWebServer() {
   // Create the web server instance
   webServer.reset(new CrossPointWebServer());
   webServer->begin();
+  esp_task_wdt_add(NULL);
 
   if (webServer->isRunning()) {
     state = WebServerActivityState::SERVER_RUNNING;
@@ -257,6 +258,7 @@ void CrossPointWebServerActivity::stopWebServer() {
     LOG_DBG("WEBACT", "Web server stopped");
   }
   webServer.reset();
+  esp_task_wdt_delete(NULL);
 }
 
 void CrossPointWebServerActivity::loop() {

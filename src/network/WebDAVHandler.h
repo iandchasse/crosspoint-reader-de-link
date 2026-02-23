@@ -1,20 +1,29 @@
-#pragma once
+﻿#pragma once
 
 #include <HalStorage.h>
 #include <WebServer.h>
 
 class WebDAVHandler : public RequestHandler {
  public:
-  // RequestHandler interface (Core 2.x / espressif32 @ 6.12.0 signatures)
-  bool canHandle(HTTPMethod method, String uri) override;
-  bool handle(WebServer& server, HTTPMethod method, String uri) override;
+  // RequestHandler interface
+  bool canHandle(WebServer& server, HTTPMethod method, const String& uri) override;
+  bool canRaw(WebServer& server, const String& uri) override;
+  void raw(WebServer& server, const String& uri, HTTPRaw& raw) override;
+  bool handle(WebServer& server, HTTPMethod method, const String& uri) override;
 
  private:
-  // PUT streaming state
-  FsFile _putFile;
+  // PUT streaming state (raw() is called in chunks)
+  EspFsFile _putFile;
   String _putPath;
   bool _putOk = false;
   bool _putExisted = false;
+  bool _probeOnly = false;
+
+  // Lock state — tracks which path holds an active (dummy) lock.
+  // Used to distinguish a 0-byte Windows probe PUT (arrives before LOCK) from
+  // an intentional 0-byte file creation like "New Text Document" (arrives
+  // after LOCK has been granted).
+  String _lockedPath;
 
   // WebDAV method handlers
   void handleOptions(WebServer& s);

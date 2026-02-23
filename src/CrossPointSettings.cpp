@@ -1,4 +1,4 @@
-#include "CrossPointSettings.h"
+﻿#include "CrossPointSettings.h"
 
 #include <HalStorage.h>
 #include <JsonSettingsIO.h>
@@ -13,7 +13,7 @@
 // Initialize the static instance
 CrossPointSettings CrossPointSettings::instance;
 
-void readAndValidate(FsFile& file, uint8_t& member, const uint8_t maxValue) {
+void readAndValidate(EspFsFile& file, uint8_t& member, const uint8_t maxValue) {
   uint8_t tempValue;
   serialization::readPod(file, tempValue);
   if (tempValue < maxValue) {
@@ -116,7 +116,7 @@ bool CrossPointSettings::loadFromFile() {
 }
 
 bool CrossPointSettings::loadFromBinaryFile() {
-  FsFile inputFile;
+  EspFsFile inputFile;
   if (!Storage.openFileForRead("CPS", SETTINGS_FILE_BIN, inputFile)) {
     return false;
   }

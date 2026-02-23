@@ -1,4 +1,4 @@
-#include "WebDAVHandler.h"
+﻿#include "WebDAVHandler.h"
 
 #include <Epub.h>
 #include <FsHelpers.h>
@@ -20,7 +20,8 @@ const char* FIXED_DATE = "Thu, 01 Jan 2024 00:00:00 GMT";
 
 // ── RequestHandler interface ─────────────────────────────────────────────────
 
-bool WebDAVHandler::canHandle(HTTPMethod method, String uri) {
+bool WebDAVHandler::canHandle(WebServer& server, HTTPMethod method, const String& uri) {
+  (void)server;
   (void)uri;
   switch (method) {
     case HTTP_OPTIONS:
@@ -40,10 +41,112 @@ bool WebDAVHandler::canHandle(HTTPMethod method, String uri) {
   }
 }
 
-// Note: canRaw/raw are Core 3.x only. On Core 2.x, PUT body is read in handle() via server.arg("plain").
-
-bool WebDAVHandler::handle(WebServer& server, HTTPMethod method, String uri) {
+bool WebDAVHandler::canRaw(WebServer& server, const String& uri) {
   (void)uri;
+  return server.method() == HTTP_PUT;
+}
+
+void WebDAVHandler::raw(WebServer& server, const String& uri, HTTPRaw& raw) {
+  (void)uri;
+  if (raw.status == RAW_START) {
+    _putPath = getRequestPath(server);
+    _probeOnly = false;
+    if (isProtectedPath(_putPath)) {
+      _putOk = false;
+      return;
+    }
+
+    // Ensure parent directory exists
+    int lastSlash = _putPath.lastIndexOf('/');
+    if (lastSlash > 0) {
+      String parentPath = _putPath.substring(0, lastSlash);
+      if (!Storage.exists(parentPath.c_str())) {
+        _putOk = false;
+        return;
+      }
+    }
+
+    if (_putFile) _putFile.close();
+    _putExisted = Storage.exists(_putPath.c_str());
+
+    if (_putExisted) {
+      EspFsFile existing = Storage.open(_putPath.c_str());
+      if (existing && existing.isDirectory()) {
+        existing.close();
+        _putOk = false;
+        return;
+      }
+      if (existing) existing.close();
+    }
+
+    String tempPath = _putPath + ".davtmp";
+    Storage.remove(tempPath.c_str());
+    _putOk = Storage.openFileForWrite("DAV", tempPath, _putFile);
+    LOG_DBG("DAV", "PUT START: %s", _putPath.c_str());
+
+  } else if (raw.status == RAW_WRITE) {
+    if (_putFile && _putOk) {
+      esp_task_wdt_reset();
+      size_t written = _putFile.write(raw.buf, raw.currentSize);
+      if (written != raw.currentSize) {
+        _putOk = false;
+      }
+    }
+
+  } else if (raw.status == RAW_END) {
+    if (_putFile) _putFile.close();
+
+    if (raw.totalSize == 0 && !_lockedPath.equals(_putPath)) {
+      String tempPath = _putPath + ".davtmp";
+      Storage.remove(tempPath.c_str());
+      _putOk = true;
+      _probeOnly = true;  // Signal handlePut to send 204 instead of 201
+      LOG_DBG("DAV", "PUT END: 0-byte probe, skipped commit");
+      return;
+    }
+
+    if (_putOk) {
+      String tempPath = _putPath + ".davtmp";
+      if (_putExisted) Storage.remove(_putPath.c_str());
+      EspFsFile tmp = Storage.open(tempPath.c_str());
+      if (tmp) {
+        _putOk = tmp.rename(_putPath.c_str());
+        tmp.close();
+      } else {
+        _putOk = false;
+      }
+      if (!_putOk) Storage.remove(tempPath.c_str());
+
+      if (_putOk) {
+        EspFsFile verify = Storage.open(_putPath.c_str());
+        LOG_DBG("DAV", "PUT verify: size after rename = %u (expected %u)", verify ? verify.size() : 0xFFFFFFFF,
+                raw.totalSize);
+        if (verify) verify.close();
+      }
+    }
+    LOG_DBG("DAV", "PUT END: %u bytes, ok=%d", raw.totalSize, _putOk);
+
+  } else if (raw.status == RAW_ABORTED) {
+    if (_putFile) _putFile.close();
+    String tempPath = _putPath + ".davtmp";
+    Storage.remove(tempPath.c_str());
+    _putOk = false;
+  }
+}
+
+bool WebDAVHandler::handle(WebServer& server, HTTPMethod method, const String& uri) {
+  (void)uri;
+  // Log all headers for debugging Windows compatibility
+  LOG_DBG("DAV", "--- %s %s ---",
+          method == HTTP_PUT        ? "PUT"
+          : method == HTTP_PROPFIND ? "PROPFIND"
+          : method == HTTP_LOCK     ? "LOCK"
+                                    : "OTHER",
+          uri.c_str());
+  for (int i = 0; i < server.headers(); i++) {
+    LOG_DBG("DAV", "  %s: %s", server.headerName(i).c_str(), server.header(i).c_str());
+  }
+  LOG_DBG("DAV", "--- method=%d %s ---", (int)method, uri.c_str());
   switch (method) {
     case HTTP_OPTIONS:
       handleOptions(server);
@@ -86,7 +189,9 @@ bool WebDAVHandler::handle(WebServer& server, HTTPMethod method, String uri) {
 // ── OPTIONS ──────────────────────────────────────────────────────────────────
 
 void WebDAVHandler::handleOptions(WebServer& s) {
-  s.sendHeader("DAV", "1");
+  // Advertise Class 2 (locking) so Windows Mini-Redirector completes the
+  // LOCK→PUT→UNLOCK cycle cleanly instead of rolling back with DELETE.
+  s.sendHeader("DAV", "1, 2");
   s.sendHeader("Allow",
                "OPTIONS, GET, HEAD, PUT, DELETE, "
                "PROPFIND, MKCOL, MOVE, COPY, LOCK, UNLOCK");
@@ -109,7 +214,7 @@ void WebDAVHandler::handlePropfind(WebServer& s) {
     return;
   }
 
-  FsFile root = Storage.open(path.c_str());
+  EspFsFile root = Storage.open(path.c_str());
   if (!root) {
     if (path == "/") {
       // Root should always work — send minimal response
@@ -148,7 +253,7 @@ void WebDAVHandler::handlePropfind(WebServer& s) {
 
   // If depth > 0 and it's a directory, list children
   if (depth > 0) {
-    FsFile file = root.openNextFile();
+    EspFsFile file = root.openNextFile();
     char name[500];
     while (file) {
       file.getName(name, sizeof(name));
@@ -238,7 +343,7 @@ void WebDAVHandler::handleGet(WebServer& s) {
     return;
   }
 
-  FsFile file = Storage.open(path.c_str());
+  EspFsFile file = Storage.open(path.c_str());
   if (!file) {
     s.send(500, "text/plain", "Failed to open file");
     return;
@@ -254,7 +359,7 @@ void WebDAVHandler::handleGet(WebServer& s) {
   s.setContentLength(file.size());
   s.send(200, contentType.c_str(), "");
 
-  WiFiClient client = s.client();
+  NetworkClient client = s.client();
   client.write(file);
   file.close();
 }
@@ -275,7 +380,7 @@ void WebDAVHandler::handleHead(WebServer& s) {
     return;
   }
 
-  FsFile file = Storage.open(path.c_str());
+  EspFsFile file = Storage.open(path.c_str());
   if (!file) {
     s.send(500, "text/plain", "");
     return;
@@ -296,8 +401,6 @@ void WebDAVHandler::handleHead(WebServer& s) {
 // ── PUT ──────────────────────────────────────────────────────────────────────
 
 void WebDAVHandler::handlePut(WebServer& s) {
-  // On Core 2.x there is no raw-streaming callback; the WebServer buffers
-  // the entire request body and exposes it via server.arg("plain").
   String path = getRequestPath(s);
   LOG_DBG("DAV", "PUT %s", path.c_str());
 
@@ -306,73 +409,35 @@ void WebDAVHandler::handlePut(WebServer& s) {
     return;
   }
 
-  // Ensure parent directory exists
-  int lastSlash = path.lastIndexOf('/');
-  if (lastSlash > 0) {
-    String parentPath = path.substring(0, lastSlash);
-    if (!Storage.exists(parentPath.c_str())) {
-      s.send(409, "text/plain", "Parent directory not found");
-      return;
-    }
-  }
-
-  bool existed = Storage.exists(path.c_str());
-  if (existed) {
-    FsFile existing = Storage.open(path.c_str());
-    if (existing && existing.isDirectory()) {
-      existing.close();
-      s.send(405, "text/plain", "Target is a directory");
-      return;
-    }
-    if (existing) existing.close();
-  }
-
-  // Get the body from the buffered plain arg
-  const String& body = s.arg("plain");
-  const size_t bodyLen = body.length();
-
-  // Write to a temp file, then rename to avoid destroying the original on failure
-  String tempPath = path + ".davtmp";
-  Storage.remove(tempPath.c_str());
-
-  FsFile putFile;
-  if (!Storage.openFileForWrite("DAV", tempPath, putFile)) {
-    s.send(500, "text/plain", "Could not open file for write");
+  if (_probeOnly) {
+    _probeOnly = false;
+    s.send(204);  // No Content - nothing was created, don't trigger Windows cleanup
+    LOG_DBG("DAV", "PUT probe response: 204");
     return;
   }
 
-  bool ok = true;
-  if (bodyLen > 0) {
-    size_t written = putFile.write(reinterpret_cast<const uint8_t*>(body.c_str()), bodyLen);
-    ok = (written == bodyLen);
-  }
-  putFile.close();
-
-  if (ok) {
-    if (existed) Storage.remove(path.c_str());
-    FsFile tmp = Storage.open(tempPath.c_str());
-    if (tmp) {
-      ok = tmp.rename(path.c_str());
-      tmp.close();
-    } else {
-      ok = false;
-    }
-  }
-
-  if (!ok) {
+  if (!_putOk) {
+    String tempPath = path + ".davtmp";
     Storage.remove(tempPath.c_str());
-    s.send(500, "text/plain", "Write failed");
+    s.send(500, "text/plain", "Write failed - incomplete upload or disk full");
     return;
   }
 
   clearEpubCacheIfNeeded(path);
-  s.send(existed ? 204 : 201);
-  LOG_DBG("DAV", "PUT complete: %s (%u bytes)", path.c_str(), bodyLen);
+  s.send(_putExisted ? 204 : 201);
+  LOG_DBG("DAV", "PUT complete: %s", path.c_str());
 }
 
 // ── DELETE ───────────────────────────────────────────────────────────────────
 
 void WebDAVHandler::handleDelete(WebServer& s) {
+  // arduino-esp32 3.x misparses UNLOCK as DELETE.
+  // Real UNLOCK carries an If: header with the lock token.
+  // Real DELETE has no If: header.
+  if (s.header("If").length() > 0) {
+    handleUnlock(s);
+    return;
+  }
   String path = getRequestPath(s);
   LOG_DBG("DAV", "DELETE %s", path.c_str());
 
@@ -391,7 +456,7 @@ void WebDAVHandler::handleDelete(WebServer& s) {
     return;
   }
 
-  FsFile file = Storage.open(path.c_str());
+  EspFsFile file = Storage.open(path.c_str());
   if (!file) {
     s.send(500, "text/plain", "Failed to open");
     return;
@@ -399,7 +464,7 @@ void WebDAVHandler::handleDelete(WebServer& s) {
 
   if (file.isDirectory()) {
     // Check if directory is empty
-    FsFile entry = file.openNextFile();
+    EspFsFile entry = file.openNextFile();
     if (entry) {
       entry.close();
       file.close();
@@ -517,7 +582,7 @@ void WebDAVHandler::handleMove(WebServer& s) {
     Storage.remove(dstPath.c_str());
   }
 
-  FsFile file = Storage.open(srcPath.c_str());
+  EspFsFile file = Storage.open(srcPath.c_str());
   if (!file) {
     s.send(500, "text/plain", "Failed to open source");
     return;
@@ -563,7 +628,7 @@ void WebDAVHandler::handleCopy(WebServer& s) {
     return;
   }
 
-  FsFile srcFile = Storage.open(srcPath.c_str());
+  EspFsFile srcFile = Storage.open(srcPath.c_str());
   if (!srcFile) {
     s.send(500, "text/plain", "Failed to open source");
     return;
@@ -597,7 +662,7 @@ void WebDAVHandler::handleCopy(WebServer& s) {
     Storage.remove(dstPath.c_str());
   }
 
-  FsFile dstFile;
+  EspFsFile dstFile;
   if (!Storage.openFileForWrite("DAV", dstPath, dstFile)) {
     srcFile.close();
     s.send(500, "text/plain", "Failed to create destination");
@@ -633,20 +698,29 @@ void WebDAVHandler::handleCopy(WebServer& s) {
 
 void WebDAVHandler::handleLock(WebServer& s) {
   String path = getRequestPath(s);
+  _lockedPath = path;  // Track so 0-byte PUT after LOCK is treated as intentional
   LOG_DBG("DAV", "LOCK %s (dummy)", path.c_str());
 
-  // Return a dummy lock token for client compatibility
+  // Return a dummy lock token for client compatibility.
+  // lockroot MUST match the requested path — Windows validates this and will
+  // roll back (DELETE) the upload if it doesn't match, causing "item no longer
+  // located" errors. depth MUST be 0 for file locks (infinity is only for
+  // collection/directory locks).
+  String encodedPath;
+  urlEncodePath(path, encodedPath);
   String xml =
       "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
       "<D:prop xmlns:D=\"DAV:\">\n"
       "<D:lockdiscovery><D:activelock>\n"
       "<D:locktype><D:write/></D:locktype>\n"
       "<D:lockscope><D:exclusive/></D:lockscope>\n"
-      "<D:depth>infinity</D:depth>\n"
+      "<D:depth>0</D:depth>\n"
       "<D:owner><D:href>crosspoint</D:href></D:owner>\n"
       "<D:timeout>Second-3600</D:timeout>\n"
       "<D:locktoken><D:href>urn:uuid:dummy-lock-token</D:href></D:locktoken>\n"
-      "<D:lockroot><D:href>/</D:href></D:lockroot>\n"
+      "<D:lockroot><D:href>" +
+      encodedPath +
+      "</D:href></D:lockroot>\n"
       "</D:activelock></D:lockdiscovery>\n"
       "</D:prop>\n";
 
@@ -656,6 +730,7 @@ void WebDAVHandler::handleLock(WebServer& s) {
 
 void WebDAVHandler::handleUnlock(WebServer& s) {
   LOG_DBG("DAV", "UNLOCK %s (dummy)", s.uri().c_str());
+  _lockedPath = "";  // Release lock tracking
   s.send(204);
 }
 

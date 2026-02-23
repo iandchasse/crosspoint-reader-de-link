@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <HalStorage.h>
 
@@ -64,7 +64,7 @@ class Bitmap {
  public:
   static const char* errorToString(BmpReaderError err);
 
-  explicit Bitmap(FsFile& file, bool dithering = false) : file(file), dithering(dithering) {}
+  explicit Bitmap(EspFsFile& file, bool dithering = false) : file(file), dithering(dithering) {}
   ~Bitmap();
   BmpReaderError parseHeaders();
   BmpReaderError readNextRow(uint8_t* data, uint8_t* rowBuffer) const;
@@ -78,10 +78,10 @@ class Bitmap {
   uint16_t getBpp() const { return bpp; }
 
  private:
-  static uint16_t readLE16(FsFile& f);
-  static uint32_t readLE32(FsFile& f);
+  static uint16_t readLE16(EspFsFile& f);
+  static uint32_t readLE32(EspFsFile& f);
 
-  FsFile& file;
+  EspFsFile& file;
   bool dithering = false;
   int width = 0;
   int height = 0;

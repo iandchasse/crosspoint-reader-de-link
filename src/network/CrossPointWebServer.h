@@ -1,13 +1,16 @@
-#pragma once
+﻿#pragma once
 
 #include <HalStorage.h>
 #include <WebServer.h>
 #include <WebSocketsServer.h>
-#include <WiFiUdp.h>
+// #include <WiFiUdp.h>
+#include <NetworkUdp.h>
 
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "WebDAVHandler.h"
 
 // Structure to hold file information
 struct FileInfo {
@@ -31,7 +34,7 @@ class CrossPointWebServer {
 
   // Used by POST upload handler
   struct UploadState {
-    FsFile file;
+    EspFsFile file;
     String fileName;
     String path = "/";
     size_t size = 0;
@@ -71,11 +74,13 @@ class CrossPointWebServer {
  private:
   std::unique_ptr<WebServer> server = nullptr;
   std::unique_ptr<WebSocketsServer> wsServer = nullptr;
+  WebDAVHandler davHandler;
   bool running = false;
   bool apMode = false;  // true when running in AP mode, false for STA mode
   uint16_t port = 80;
   uint16_t wsPort = 81;  // WebSocket port
-  WiFiUDP udp;
+  NetworkUDP udp;
+  // WiFiUDP udp;
   bool udpActive = false;
 
   // WebSocket upload state

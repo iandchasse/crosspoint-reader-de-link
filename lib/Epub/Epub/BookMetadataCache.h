@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <HalStorage.h>
 
@@ -50,10 +50,10 @@ class BookMetadataCache {
   bool loaded;
   bool buildMode;
 
-  FsFile bookFile;
+  EspFsFile bookFile;
   // Temp file handles during build
-  FsFile spineFile;
-  FsFile tocFile;
+  EspFsFile spineFile;
+  EspFsFile tocFile;
 
   // Index for fast href→spineIndex lookup (used only for large EPUBs)
   struct SpineHrefIndexEntry {
@@ -76,10 +76,10 @@ class BookMetadataCache {
     return hash;
   }
 
-  uint32_t writeSpineEntry(FsFile& file, const SpineEntry& entry) const;
-  uint32_t writeTocEntry(FsFile& file, const TocEntry& entry) const;
-  SpineEntry readSpineEntry(FsFile& file) const;
-  TocEntry readTocEntry(FsFile& file) const;
+  uint32_t writeSpineEntry(EspFsFile& file, const SpineEntry& entry) const;
+  uint32_t writeTocEntry(EspFsFile& file, const TocEntry& entry) const;
+  SpineEntry readSpineEntry(EspFsFile& file) const;
+  TocEntry readTocEntry(EspFsFile& file) const;
 
  public:
   BookMetadata coreMetadata;

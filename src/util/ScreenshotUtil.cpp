@@ -1,4 +1,4 @@
-#include "ScreenshotUtil.h"
+﻿#include "ScreenshotUtil.h"
 
 #include <Arduino.h>
 #include <BitmapHelpers.h>
@@ -54,7 +54,7 @@ bool ScreenshotUtil::saveFramebufferAsBmp(const char* filename, const uint8_t* f
     }
   }
 
-  FsFile file;
+  EspFsFile file;
   if (!Storage.openFileForWrite("SCR", filename, file)) {
     LOG_ERR("SCR", "Failed to save screenshot");
     return false;

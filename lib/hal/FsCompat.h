@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 /**
  * FsCompat.h
  *
- * Provides a SdFat-compatible file type (FsFile) built on top of ESP32's
+ * Provides a SdFat-compatible file type (EspFsFile) built on top of ESP32's
  * native fs::File (from the FS / SD_MMC libraries).
  *
  * This shim bridges the following SdFat-specific API calls that do not exist
@@ -18,7 +18,7 @@
  *  - size()                → file size (already on fs::File)
  *
  * Usage: just #include <FsCompat.h> wherever SdFat.h was previously included.
- * FsFile is now this wrapper type, so existing code compiles as-is.
+ * EspFsFile is now this wrapper type, so existing code compiles as-is.
  */
 
 #include <FS.h>
@@ -28,16 +28,16 @@
 #include <fcntl.h>  // Provides O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_TRUNC, O_APPEND
 typedef int oflag_t;
 
-class FsFile : public fs::File {
+class EspFsFile : public fs::File {
  public:
   // Default constructor
-  FsFile() = default;
+  EspFsFile() = default;
 
   // Construct from an existing fs::File (e.g. from SD_MMC.open())
-  explicit FsFile(fs::File&& f) : fs::File(std::move(f)) {}
+  explicit EspFsFile(fs::File&& f) : fs::File(std::move(f)) {}
 
   // Allow assignment from fs::File
-  FsFile& operator=(fs::File&& f) {
+  EspFsFile& operator=(fs::File&& f) {
     fs::File::operator=(std::move(f));
     return *this;
   }
@@ -128,12 +128,12 @@ class FsFile : public fs::File {
   bool isOpen() const { return operator bool(); }
 
   // -------------------------------------------------------------------------
-  // openNextFile() — SdFat's openNextFile() returns an FsFile; fs::File's
-  // returns an fs::File. We override here to return FsFile so the iterator
+  // openNextFile() — SdFat's openNextFile() returns an EspFsFile; fs::File's
+  // returns an fs::File. We override here to return EspFsFile so the iterator
   // pattern `for(auto file = dir.openNextFile(); file; ...)` works correctly
   // and the resulting files have `getName()` available.
   // -------------------------------------------------------------------------
-  FsFile openNextFile() { return FsFile(fs::File::openNextFile()); }
+  EspFsFile openNextFile() { return EspFsFile(fs::File::openNextFile()); }
 
   // -------------------------------------------------------------------------
   // rewindDirectory() — identical to base class, but present for clarity

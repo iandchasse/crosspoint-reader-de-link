@@ -115,17 +115,17 @@ At line:1 char:1
  
                  from src/CrossPointSettings.h:6,
                  from src/MappedInputManager.cpp:3:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
 In file included from lib/hal/HalStorage.h:4,
                  from src/CrossPointSettings.h:6,
                  from src/MappedInputManager.cpp:3:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -155,17 +155,17 @@ open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:40:63: error: 'S
 In file included from lib/hal/HalStorage.h:3,
                  from src/CrossPointSettings.h:6,
                  from src/CrossPointSettings.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
 In file included from lib/hal/HalStorage.h:4,
                  from src/CrossPointSettings.h:6,
                  from src/CrossPointSettings.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -184,7 +184,7 @@ open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:38:42: error: 'S
                                           ^~~~~~
 In file included from lib/hal/HalStorage.h:3,
                  from src/CrossPointState.cpp:3:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -195,10 +195,10 @@ open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:39:41: error: 'S
                                          ^~~~~~
 In file included from lib/hal/HalStorage.h:4,
                  from src/CrossPointState.cpp:3:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::rename(const 
 char*, const char*)':
@@ -234,7 +234,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from lib/Epub/Epub/BookMetadataCache.h:3,
                  from lib/Epub/Epub.h:10,
                  from src/RecentBooksStore.cpp:3:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -242,10 +242,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from lib/Epub/Epub/BookMetadataCache.h:3,
                  from lib/Epub/Epub.h:10,
                  from src/RecentBooksStore.cpp:3:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 *** [.pio\build\default\src\MappedInputManager.cpp.o] Error 1
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
@@ -278,7 +278,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from lib/GfxRenderer/GfxRenderer.h:9,
                  from src/activities/Activity.h:12,
                  from src/activities/Activity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -288,7 +288,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/Activity.h:12,
                  from src/activities/ActivityWithSubactivity.h:4,
                  from src/activities/ActivityWithSubactivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -297,10 +297,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from lib/GfxRenderer/GfxRenderer.h:9,
                  from src/activities/Activity.h:12,
                  from src/activities/Activity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 In file included from lib/hal/HalStorage.h:4,
                  from lib/GfxRenderer/Bitmap.h:3,
@@ -308,10 +308,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/Activity.h:12,
                  from src/activities/ActivityWithSubactivity.h:4,
                  from src/activities/ActivityWithSubactivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -364,7 +364,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/boot_sleep/../Activity.h:12,
                  from src/activities/boot_sleep/SleepActivity.h:2,
                  from src/activities/boot_sleep/SleepActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -374,13 +374,13 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/boot_sleep/../Activity.h:12,
                  from src/activities/boot_sleep/BootActivity.h:2,
                  from src/activities/boot_sleep/BootActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
 In file included from lib/hal/HalStorage.h:3,
                  from src/WifiCredentialStore.cpp:3:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -390,10 +390,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/boot_sleep/../Activity.h:12,
                  from src/activities/boot_sleep/SleepActivity.h:2,
                  from src/activities/boot_sleep/SleepActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::rename(const 
 char*, const char*)':
@@ -406,10 +406,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/boot_sleep/../Activity.h:12,
                  from src/activities/boot_sleep/BootActivity.h:2,
                  from src/activities/boot_sleep/BootActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 In file included from lib/hal/HalStorage.h:3,
                  from lib/GfxRenderer/Bitmap.h:3,
@@ -417,16 +417,16 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/home/../Activity.h:12,
                  from src/activities/home/HomeActivity.h:5,
                  from src/activities/home/HomeActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
 In file included from lib/hal/HalStorage.h:4,
                  from src/WifiCredentialStore.cpp:3:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -449,10 +449,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/home/../Activity.h:12,
                  from src/activities/home/HomeActivity.h:5,
                  from src/activities/home/HomeActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -547,7 +547,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/home/../Activity.h:12,
                  from src/activities/home/RecentBooksActivity.h:8,
                  from src/activities/home/RecentBooksActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -557,10 +557,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/home/../Activity.h:12,
                  from src/activities/home/RecentBooksActivity.h:8,
                  from src/activities/home/RecentBooksActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -598,7 +598,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/browser/../ActivityWithSubactivity.h:4,
                  from src/activities/browser/OpdsBookBrowserActivity.h:8,
                  from src/activities/browser/OpdsBookBrowserActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -610,10 +610,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/browser/../ActivityWithSubactivity.h:4,
                  from src/activities/browser/OpdsBookBrowserActivity.h:8,
                  from src/activities/browser/OpdsBookBrowserActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -648,7 +648,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/home/../Activity.h:12,
                  from src/activities/home/MyLibraryActivity.h:6,
                  from src/activities/home/MyLibraryActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -658,10 +658,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/home/../Activity.h:12,
                  from src/activities/home/MyLibraryActivity.h:6,
                  from src/activities/home/MyLibraryActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -700,7 +700,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from lib/Epub/Epub.h:10,
                  from src/activities/reader/EpubReaderChapterSelectionActivity.h:2,
                  from src/activities/reader/EpubReaderChapterSelectionActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -709,10 +709,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from lib/Epub/Epub.h:10,
                  from src/activities/reader/EpubReaderChapterSelectionActivity.h:2,
                  from src/activities/reader/EpubReaderChapterSelectionActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -744,7 +744,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from lib/Epub/Epub.h:10,
                  from src/activities/reader/EpubReaderMenuActivity.h:2,
                  from src/activities/reader/EpubReaderMenuActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -753,10 +753,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from lib/Epub/Epub.h:10,
                  from src/activities/reader/EpubReaderMenuActivity.h:2,
                  from src/activities/reader/EpubReaderMenuActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -789,7 +789,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/network/../Activity.h:12,
                  from src/activities/network/NetworkModeSelectionActivity.h:5,
                  from src/activities/network/NetworkModeSelectionActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -799,10 +799,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/network/../Activity.h:12,
                  from src/activities/network/NetworkModeSelectionActivity.h:5,
                  from src/activities/network/NetworkModeSelectionActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 In file included from lib/hal/HalStorage.h:3,
                  from lib/GfxRenderer/Bitmap.h:3,
@@ -811,7 +811,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/reader/../ActivityWithSubactivity.h:4,
                  from src/activities/reader/ReaderActivity.h:4,
                  from src/activities/reader/ReaderActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -827,10 +827,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/reader/../ActivityWithSubactivity.h:4,
                  from src/activities/reader/ReaderActivity.h:4,
                  from src/activities/reader/ReaderActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::exists(const 
 char*)':
@@ -882,7 +882,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from lib/Epub/Epub.h:10,
                  from src/activities/reader/EpubReaderActivity.h:2,
                  from src/activities/reader/EpubReaderActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -891,10 +891,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from lib/Epub/Epub.h:10,
                  from src/activities/reader/EpubReaderActivity.h:2,
                  from src/activities/reader/EpubReaderActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -908,7 +908,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/ActivityWithSubactivity.h:4,
                  from src/activities/reader/EpubReaderPercentSelectionActivity.h:6,
                  from src/activities/reader/EpubReaderPercentSelectionActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -924,10 +924,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/ActivityWithSubactivity.h:4,
                  from src/activities/reader/EpubReaderPercentSelectionActivity.h:6,
                  from src/activities/reader/EpubReaderPercentSelectionActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::remove(const 
 char*)':
@@ -976,7 +976,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/ActivityWithSubactivity.h:4,
                  from src/activities/network/WifiSelectionActivity.h:9,
                  from src/activities/network/WifiSelectionActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -987,10 +987,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/ActivityWithSubactivity.h:4,
                  from src/activities/network/WifiSelectionActivity.h:9,
                  from src/activities/network/WifiSelectionActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -1014,7 +1014,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/ActivityWithSubactivity.h:4,
                  from src/activities/network/CalibreConnectActivity.h:7,
                  from src/activities/network/CalibreConnectActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -1035,10 +1035,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/ActivityWithSubactivity.h:4,
                  from src/activities/network/CalibreConnectActivity.h:7,
                  from src/activities/network/CalibreConnectActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -1067,7 +1067,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from src/activities/network/NetworkModeSelectionActivity.h:5,
                  from src/activities/network/CrossPointWebServerActivity.h:7,
                  from src/activities/network/CrossPointWebServerActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -1081,7 +1081,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from lib/Epub/Epub.h:10,
                  from src/activities/reader/KOReaderSyncActivity.h:2,
                  from src/activities/reader/KOReaderSyncActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -1093,20 +1093,20 @@ In file included from lib/hal/HalStorage.h:4,
                  from src/activities/network/NetworkModeSelectionActivity.h:5,
                  from src/activities/network/CrossPointWebServerActivity.h:7,
                  from src/activities/network/CrossPointWebServerActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 In file included from lib/hal/HalStorage.h:4,
                  from lib/Epub/Epub/BookMetadataCache.h:3,
                  from lib/Epub/Epub.h:10,
                  from src/activities/reader/KOReaderSyncActivity.h:2,
                  from src/activities/reader/KOReaderSyncActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':
@@ -1165,7 +1165,7 @@ In file included from lib/hal/HalStorage.h:3,
                  from lib/Txt/Txt.h:3,
                  from src/activities/reader/TxtReaderActivity.h:3,
                  from src/activities/reader/TxtReaderActivity.cpp:1:
-lib/hal/FsCompat.h: In member function 'bool FsFile::rename(const char*)':
+lib/hal/FsCompat.h: In member function 'bool EspFsFile::rename(const char*)':
 lib/hal/FsCompat.h:122:12: error: 'SD_MMC' was not declared in this scope
      return SD_MMC.rename(oldPath, newPath);
             ^~~~~~
@@ -1173,10 +1173,10 @@ In file included from lib/hal/HalStorage.h:4,
                  from lib/Txt/Txt.h:3,
                  from src/activities/reader/TxtReaderActivity.h:3,
                  from src/activities/reader/TxtReaderActivity.cpp:1:
-open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'FsFile SDCardManager::open(const 
+open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'EspFsFile SDCardManager::open(const 
 char*, const char*)':
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h:35:79: error: 'SD_MMC' was not declared in this scope
-   FsFile open(const char* path, const char* mode = FILE_READ) { return FsFile(SD_MMC.open(path, mode)); }
+   EspFsFile open(const char* path, const char* mode = FILE_READ) { return EspFsFile(SD_MMC.open(path, mode)); }
                                                                                ^~~~~~
 open-x4-sdk/libs/hardware/SDCardManager/include/SDCardManager.h: In member function 'bool SDCardManager::mkdir(const 
 char*)':

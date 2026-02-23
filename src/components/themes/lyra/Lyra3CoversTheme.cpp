@@ -1,4 +1,4 @@
-#include "Lyra3CoversTheme.h"
+﻿#include "Lyra3CoversTheme.h"
 
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -46,7 +46,7 @@ void Lyra3CoversTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, con
               UITheme::getCoverThumbPath(coverPath, Lyra3CoversMetrics::values.homeCoverHeight);
 
           // First time: load cover from SD and render
-          FsFile file;
+          EspFsFile file;
           if (Storage.openFileForRead("HOME", coverBmpPath, file)) {
             Bitmap bitmap(file);
             if (bitmap.parseHeaders() == BmpReaderError::Ok) {

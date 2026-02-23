@@ -1,4 +1,4 @@
-#include "BmpViewerActivity.h"
+﻿#include "BmpViewerActivity.h"
 
 #include <Bitmap.h>
 #include <GfxRenderer.h>
@@ -16,7 +16,7 @@ void BmpViewerActivity::onEnter() {
   Activity::onEnter();
   // Removed the redundant initial renderer.clearScreen()
 
-  FsFile file;
+  EspFsFile file;
 
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();

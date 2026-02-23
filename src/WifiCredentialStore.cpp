@@ -1,4 +1,4 @@
-#include "WifiCredentialStore.h"
+﻿#include "WifiCredentialStore.h"
 
 #include <HalStorage.h>
 #include <JsonSettingsIO.h>
@@ -67,7 +67,7 @@ bool WifiCredentialStore::loadFromFile() {
 }
 
 bool WifiCredentialStore::loadFromBinaryFile() {
-  FsFile file;
+  EspFsFile file;
   if (!Storage.openFileForRead("WCS", WIFI_FILE_BIN, file)) {
     return false;
   }

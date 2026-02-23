@@ -1,4 +1,4 @@
-#include "TextBlock.h"
+﻿#include "TextBlock.h"
 
 #include <GfxRenderer.h>
 #include <Logging.h>
@@ -41,7 +41,7 @@ void TextBlock::render(const GfxRenderer& renderer, const int fontId, const int 
   }
 }
 
-bool TextBlock::serialize(FsFile& file) const {
+bool TextBlock::serialize(EspFsFile& file) const {
   if (words.size() != wordXpos.size() || words.size() != wordStyles.size()) {
     LOG_ERR("TXB", "Serialization failed: size mismatch (words=%u, xpos=%u, styles=%u)\n", words.size(),
             wordXpos.size(), wordStyles.size());
@@ -71,7 +71,7 @@ bool TextBlock::serialize(FsFile& file) const {
   return true;
 }
 
-std::unique_ptr<TextBlock> TextBlock::deserialize(FsFile& file) {
+std::unique_ptr<TextBlock> TextBlock::deserialize(EspFsFile& file) {
   uint16_t wc;
   std::vector<std::string> words;
   std::vector<uint16_t> wordXpos;

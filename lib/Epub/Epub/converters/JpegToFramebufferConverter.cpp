@@ -1,4 +1,4 @@
-#include "JpegToFramebufferConverter.h"
+﻿#include "JpegToFramebufferConverter.h"
 
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -12,15 +12,15 @@
 #include "PixelCache.h"
 
 struct JpegContext {
-  FsFile& file;
+  EspFsFile& file;
   uint8_t buffer[512];
   size_t bufferPos;
   size_t bufferFilled;
-  JpegContext(FsFile& f) : file(f), bufferPos(0), bufferFilled(0) {}
+  JpegContext(EspFsFile& f) : file(f), bufferPos(0), bufferFilled(0) {}
 };
 
 bool JpegToFramebufferConverter::getDimensionsStatic(const std::string& imagePath, ImageDimensions& out) {
-  FsFile file;
+  EspFsFile file;
   if (!Storage.openFileForRead("JPG", imagePath, file)) {
     LOG_ERR("JPG", "Failed to open file for dimensions: %s", imagePath.c_str());
     return false;
@@ -47,7 +47,7 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
                                                      const RenderConfig& config) {
   LOG_DBG("JPG", "Decoding JPEG: %s", imagePath.c_str());
 
-  FsFile file;
+  EspFsFile file;
   if (!Storage.openFileForRead("JPG", imagePath, file)) {
     LOG_ERR("JPG", "Failed to open file: %s", imagePath.c_str());
     return false;

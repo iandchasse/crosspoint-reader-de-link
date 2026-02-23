@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <HalStorage.h>
 
 #include <algorithm>
@@ -21,7 +21,7 @@ class PageElement {
   explicit PageElement(const int16_t xPos, const int16_t yPos) : xPos(xPos), yPos(yPos) {}
   virtual ~PageElement() = default;
   virtual void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) = 0;
-  virtual bool serialize(FsFile& file) = 0;
+  virtual bool serialize(EspFsFile& file) = 0;
   virtual PageElementTag getTag() const = 0;  // Add type identification
 };
 
@@ -33,9 +33,9 @@ class PageLine final : public PageElement {
   PageLine(std::shared_ptr<TextBlock> block, const int16_t xPos, const int16_t yPos)
       : PageElement(xPos, yPos), block(std::move(block)) {}
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
-  bool serialize(FsFile& file) override;
+  bool serialize(EspFsFile& file) override;
   PageElementTag getTag() const override { return TAG_PageLine; }
-  static std::unique_ptr<PageLine> deserialize(FsFile& file);
+  static std::unique_ptr<PageLine> deserialize(EspFsFile& file);
 };
 
 // New PageImage class
@@ -46,9 +46,9 @@ class PageImage final : public PageElement {
   PageImage(std::shared_ptr<ImageBlock> block, const int16_t xPos, const int16_t yPos)
       : PageElement(xPos, yPos), imageBlock(std::move(block)) {}
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) override;
-  bool serialize(FsFile& file) override;
+  bool serialize(EspFsFile& file) override;
   PageElementTag getTag() const override { return TAG_PageImage; }
-  static std::unique_ptr<PageImage> deserialize(FsFile& file);
+  static std::unique_ptr<PageImage> deserialize(EspFsFile& file);
   const ImageBlock& getImageBlock() const { return *imageBlock; }
 };
 
@@ -57,8 +57,8 @@ class Page {
   // the list of block index and line numbers on this page
   std::vector<std::shared_ptr<PageElement>> elements;
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) const;
-  bool serialize(FsFile& file) const;
-  static std::unique_ptr<Page> deserialize(FsFile& file);
+  bool serialize(EspFsFile& file) const;
+  static std::unique_ptr<Page> deserialize(EspFsFile& file);
 
   // Check if page contains any images (used to force full refresh)
   bool hasImages() const {

@@ -1,4 +1,4 @@
-#include "Section.h"
+﻿#include "Section.h"
 
 #include <HalStorage.h>
 #include <Logging.h>
@@ -153,7 +153,7 @@ bool Section::createSectionFile(const int fontId, const float lineCompression, c
       Storage.remove(tmpHtmlPath.c_str());
     }
 
-    FsFile tmpHtml;
+    EspFsFile tmpHtml;
     if (!Storage.openFileForWrite("SCT", tmpHtmlPath, tmpHtml)) {
       continue;
     }

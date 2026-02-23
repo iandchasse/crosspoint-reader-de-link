@@ -1,4 +1,4 @@
-/**
+﻿/**
  * XtcParser.h
  *
  * XTC file parsing and page data extraction
@@ -81,7 +81,7 @@ class XtcParser {
   XtcError getLastError() const { return m_lastError; }
 
  private:
-  FsFile m_file;
+  EspFsFile m_file;
   bool m_isOpen;
   XtcHeader m_header;
   std::vector<PageInfo> m_pageTable;

@@ -1,4 +1,4 @@
-#include "Page.h"
+﻿#include "Page.h"
 
 #include <Logging.h>
 #include <Serialization.h>
@@ -7,7 +7,7 @@ void PageLine::render(GfxRenderer& renderer, const int fontId, const int xOffset
   block->render(renderer, fontId, xPos + xOffset, yPos + yOffset);
 }
 
-bool PageLine::serialize(FsFile& file) {
+bool PageLine::serialize(EspFsFile& file) {
   serialization::writePod(file, xPos);
   serialization::writePod(file, yPos);
 
@@ -15,7 +15,7 @@ bool PageLine::serialize(FsFile& file) {
   return block->serialize(file);
 }
 
-std::unique_ptr<PageLine> PageLine::deserialize(FsFile& file) {
+std::unique_ptr<PageLine> PageLine::deserialize(EspFsFile& file) {
   int16_t xPos;
   int16_t yPos;
   serialization::readPod(file, xPos);
@@ -30,7 +30,7 @@ void PageImage::render(GfxRenderer& renderer, const int fontId, const int xOffse
   imageBlock->render(renderer, xPos + xOffset, yPos + yOffset);
 }
 
-bool PageImage::serialize(FsFile& file) {
+bool PageImage::serialize(EspFsFile& file) {
   serialization::writePod(file, xPos);
   serialization::writePod(file, yPos);
 
@@ -38,7 +38,7 @@ bool PageImage::serialize(FsFile& file) {
   return imageBlock->serialize(file);
 }
 
-std::unique_ptr<PageImage> PageImage::deserialize(FsFile& file) {
+std::unique_ptr<PageImage> PageImage::deserialize(EspFsFile& file) {
   int16_t xPos;
   int16_t yPos;
   serialization::readPod(file, xPos);
@@ -54,7 +54,7 @@ void Page::render(GfxRenderer& renderer, const int fontId, const int xOffset, co
   }
 }
 
-bool Page::serialize(FsFile& file) const {
+bool Page::serialize(EspFsFile& file) const {
   const uint16_t count = elements.size();
   serialization::writePod(file, count);
 
@@ -70,7 +70,7 @@ bool Page::serialize(FsFile& file) const {
   return true;
 }
 
-std::unique_ptr<Page> Page::deserialize(FsFile& file) {
+std::unique_ptr<Page> Page::deserialize(EspFsFile& file) {
   auto page = std::unique_ptr<Page>(new Page());
 
   uint16_t count;
