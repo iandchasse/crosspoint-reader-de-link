@@ -210,7 +210,7 @@ void waitForPowerRelease() {
 
 // Enter deep sleep mode
 void enterDeepSleep() {
-  powerManager.setPowerSaving(false);  // make sure full power is available for the sleep screen and state preservation
+  HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
   APP_STATE.lastSleepFromReader = currentActivity && currentActivity->isReaderActivity();
   SETTINGS.saveToFile();
 #ifdef FRONTLIGHT_PRESENT

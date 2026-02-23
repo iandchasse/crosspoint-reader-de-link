@@ -1,10 +1,9 @@
 #pragma once
 
-#include <FsCompat.h>
+#include <FS.h>  // need to be included before SdFat.h for compatibility with FS.h's File class
 #include <SDCardManager.h>
 
 #include <vector>
-
 
 class HalStorage {
  public:

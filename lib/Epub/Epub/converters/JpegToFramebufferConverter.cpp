@@ -1,8 +1,8 @@
 #include "JpegToFramebufferConverter.h"
 
 #include <GfxRenderer.h>
+#include <HalStorage.h>
 #include <Logging.h>
-#include <SDCardManager.h>
 #include <picojpeg.h>
 
 #include <cstdio>
@@ -10,7 +10,6 @@
 
 #include "DitherUtils.h"
 #include "PixelCache.h"
-
 
 struct JpegContext {
   FsFile& file;

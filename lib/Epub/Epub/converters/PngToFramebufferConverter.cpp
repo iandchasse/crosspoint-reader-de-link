@@ -1,16 +1,15 @@
 #include "PngToFramebufferConverter.h"
 
 #include <GfxRenderer.h>
+#include <HalStorage.h>
 #include <Logging.h>
 #include <PNGdec.h>
-#include <SDCardManager.h>
 
 #include <cstdlib>
 #include <new>
 
 #include "DitherUtils.h"
 #include "PixelCache.h"
-
 
 namespace {
 
