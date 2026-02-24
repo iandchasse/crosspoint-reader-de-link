@@ -8,6 +8,13 @@
 #include <esp_task_wdt.h>
 #include <qrcode.h>
 
+static inline void safeWdtReset() {
+  if (esp_task_wdt_reset() != ESP_OK) {
+    esp_task_wdt_add(NULL);
+    esp_task_wdt_reset();
+  }
+}
+
 #include <cstddef>
 
 #include "MappedInputManager.h"
@@ -230,7 +237,6 @@ void CrossPointWebServerActivity::startWebServer() {
   // Create the web server instance
   webServer.reset(new CrossPointWebServer());
   webServer->begin();
-  esp_task_wdt_add(NULL);
 
   if (webServer->isRunning()) {
     state = WebServerActivityState::SERVER_RUNNING;
@@ -258,7 +264,6 @@ void CrossPointWebServerActivity::stopWebServer() {
     LOG_DBG("WEBACT", "Web server stopped");
   }
   webServer.reset();
-  esp_task_wdt_delete(NULL);
 }
 
 void CrossPointWebServerActivity::loop() {
@@ -306,7 +311,7 @@ void CrossPointWebServerActivity::loop() {
       }
 
       // Reset watchdog BEFORE processing - HTTP header parsing can be slow
-      esp_task_wdt_reset();
+      safeWdtReset();
 
       // Process HTTP requests in tight loop for maximum throughput
       // More iterations = more data processed per main loop cycle
@@ -316,7 +321,7 @@ void CrossPointWebServerActivity::loop() {
         webServer->handleClient();
         // Reset watchdog every 32 iterations
         if ((i & 0x1F) == 0x1F) {
-          esp_task_wdt_reset();
+          safeWdtReset();
         }
         // Yield and check for exit button every 64 iterations
         if ((i & 0x3F) == 0x3F) {

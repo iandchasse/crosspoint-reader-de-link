@@ -6,6 +6,13 @@
 #include <WiFi.h>
 #include <esp_task_wdt.h>
 
+static inline void safeWdtReset() {
+  if (esp_task_wdt_reset() != ESP_OK) {
+    esp_task_wdt_add(NULL);
+    esp_task_wdt_reset();
+  }
+}
+
 #include "MappedInputManager.h"
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
@@ -78,8 +85,6 @@ void CalibreConnectActivity::startWebServer() {
     // mDNS is optional for the Calibre plugin but still helpful for users.
     LOG_DBG("CAL", "mDNS started: http://%s.local/", HOSTNAME);
   }
-  esp_task_wdt_add(NULL);
-
   webServer.reset(new CrossPointWebServer());
   webServer->begin();
 
@@ -97,7 +102,6 @@ void CalibreConnectActivity::stopWebServer() {
     webServer->stop();
     webServer.reset();
   }
-  esp_task_wdt_delete(NULL);
 }
 
 void CalibreConnectActivity::loop() {
@@ -116,12 +120,12 @@ void CalibreConnectActivity::loop() {
       LOG_DBG("CAL", "WARNING: %lu ms gap since last handleClient", timeSinceLastHandleClient);
     }
 
-    esp_task_wdt_reset();
+    safeWdtReset();
     constexpr int MAX_ITERATIONS = 80;
     for (int i = 0; i < MAX_ITERATIONS && webServer->isRunning(); i++) {
       webServer->handleClient();
       if ((i & 0x07) == 0x07) {
-        esp_task_wdt_reset();
+        safeWdtReset();
       }
       if ((i & 0x0F) == 0x0F) {
         yield();

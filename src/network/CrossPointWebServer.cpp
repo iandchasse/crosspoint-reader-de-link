@@ -17,6 +17,17 @@
 #include "html/SettingsPageHtml.generated.h"
 #include "util/StringUtils.h"
 
+// Safe WDT reset - registers the task first if not already registered.
+// Prevents crashes when safeWdtReset() is called before the task
+// has been subscribed, which can happen if begin() failed or stop()/begin()
+// ordering is unexpected.
+static inline void safeWdtReset() {
+  if (esp_task_wdt_reset() != ESP_OK) {
+    esp_task_wdt_add(NULL);
+    esp_task_wdt_reset();
+  }
+}
+
 namespace {
 // Folders/files to hide from the web interface file browser
 // Note: Items starting with "." are automatically hidden
@@ -192,6 +203,12 @@ void CrossPointWebServer::begin() {
 }
 
 void CrossPointWebServer::stop() {
+  // Always unregister from WDT regardless of running state.
+  // If begin() was called, the task is registered and must be cleaned up
+  // even if stop() hits an early return, otherwise the WDT fires in
+  // unrelated code after the server is gone.
+  esp_task_wdt_delete(NULL);  // Safe to call even if not registered
+
   if (!running || !server) {
     LOG_DBG("WEB", "stop() called but already stopped (running=%d, server=%p)", running, server.get());
     return;
@@ -386,8 +403,8 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
     }
 
     file.close();
-    yield();               // Yield to allow WiFi and other tasks to process during long scans
-    esp_task_wdt_reset();  // Reset watchdog to prevent timeout on large directories
+    yield();         // Yield to allow WiFi and other tasks to process during long scans
+    safeWdtReset();  // Reset watchdog to prevent timeout on large directories
     file = root.openNextFile();
   }
   root.close();
@@ -511,9 +528,17 @@ void CrossPointWebServer::handleDownload() const {
   server->sendHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
   server->send(200, contentType.c_str(), "");
 
-  // WiFiClient client = server->client();
+  // Stream in chunks so the WDT can be reset between reads.
+  // client.write(file) is a single blocking call that triggers the
+  // watchdog on large files.
   NetworkClient client = server->client();
-  client.write(file);
+  uint8_t buf[4096];
+  while (file.available()) {
+    safeWdtReset();
+    int bytesRead = file.read(buf, sizeof(buf));
+    if (bytesRead <= 0) break;
+    client.write(buf, bytesRead);
+  }
   file.close();
 }
 
@@ -524,12 +549,12 @@ static size_t writeCount = 0;
 
 static bool flushUploadBuffer(CrossPointWebServer::UploadState& state) {
   if (state.bufferPos > 0 && state.file) {
-    esp_task_wdt_reset();  // Reset watchdog before potentially slow SD write
+    safeWdtReset();  // Reset watchdog before potentially slow SD write
     const unsigned long writeStart = millis();
     const size_t written = state.file.write(state.buffer.data(), state.bufferPos);
     totalWriteTime += millis() - writeStart;
     writeCount++;
-    esp_task_wdt_reset();  // Reset watchdog after SD write
+    safeWdtReset();  // Reset watchdog after SD write
 
     if (written != state.bufferPos) {
       LOG_DBG("WEB", "[UPLOAD] Buffer flush failed: expected %d, wrote %d", state.bufferPos, written);
@@ -545,7 +570,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
   static size_t lastLoggedSize = 0;
 
   // Reset watchdog at start of every upload callback - HTTP parsing can be slow
-  esp_task_wdt_reset();
+  safeWdtReset();
 
   // Safety check: ensure server is still valid
   if (!running || !server) {
@@ -557,7 +582,7 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
 
   if (upload.status == UPLOAD_FILE_START) {
     // Reset watchdog - this is the critical 1% crash point
-    esp_task_wdt_reset();
+    safeWdtReset();
 
     state.fileName = upload.filename;
     state.size = 0;
@@ -595,21 +620,21 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     filePath += state.fileName;
 
     // Check if file already exists - SD operations can be slow
-    esp_task_wdt_reset();
+    safeWdtReset();
     if (Storage.exists(filePath.c_str())) {
       LOG_DBG("WEB", "[UPLOAD] Overwriting existing file: %s", filePath.c_str());
-      esp_task_wdt_reset();
+      safeWdtReset();
       Storage.remove(filePath.c_str());
     }
 
     // Open file for writing - this can be slow due to FAT cluster allocation
-    esp_task_wdt_reset();
+    safeWdtReset();
     if (!Storage.openFileForWrite("WEB", filePath, state.file)) {
       state.error = "Failed to create file on SD card";
       LOG_DBG("WEB", "[UPLOAD] FAILED to create file: %s", filePath.c_str());
       return;
     }
-    esp_task_wdt_reset();
+    safeWdtReset();
 
     LOG_DBG("WEB", "[UPLOAD] File created successfully: %s", filePath.c_str());
   } else if (upload.status == UPLOAD_FILE_WRITE) {
@@ -1259,19 +1284,19 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
                   filePath.c_str());
 
           // Check if file exists and remove it
-          esp_task_wdt_reset();
+          safeWdtReset();
           if (Storage.exists(filePath.c_str())) {
             Storage.remove(filePath.c_str());
           }
 
           // Open file for writing
-          esp_task_wdt_reset();
+          safeWdtReset();
           if (!Storage.openFileForWrite("WS", filePath, wsUploadFile)) {
             wsServer->sendTXT(num, "ERROR:Failed to create file");
             wsUploadInProgress = false;
             return;
           }
-          esp_task_wdt_reset();
+          safeWdtReset();
 
           wsUploadInProgress = true;
           wsServer->sendTXT(num, "READY");
@@ -1289,9 +1314,9 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
       }
 
       // Write binary data directly to file
-      esp_task_wdt_reset();
+      safeWdtReset();
       size_t written = wsUploadFile.write(payload, length);
-      esp_task_wdt_reset();
+      safeWdtReset();
 
       if (written != length) {
         wsUploadFile.close();
