@@ -28,7 +28,6 @@ const StrId progressBarThicknessNames[PROGRESS_BAR_THICKNESS_ITEMS] = {
 constexpr int TITLE_ITEMS = 3;
 const StrId titleNames[TITLE_ITEMS] = {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE};
 
-<<<<<<< HEAD
 constexpr int BATTERY_ITEMS = 5;
 const StrId batteryNames[BATTERY_ITEMS] = {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS, StrId::STR_CLOCK,
                                            StrId::STR_HYBRID};
@@ -36,9 +35,7 @@ const StrId batteryNames[BATTERY_ITEMS] = {StrId::STR_NEVER, StrId::STR_IN_READE
 const char* translatedShow = tr(STR_SHOW);
 const char* translatedHide = tr(STR_HIDE);
 
-== == == =
->>>>>>> 451774d (fix: broken translations in status bar settings (#1188))
-             const int widthMargin = 10;
+const int widthMargin = 10;
 const int verticalPreviewPadding = 50;
 const int verticalPreviewTextPadding = 40;
 }  // namespace

@@ -458,7 +458,6 @@ void TxtReaderActivity::renderStatusBar() const {
 
   GUI.drawStatusBar(renderer, progress, currentPage + 1, totalPages, title);
 }
-}
 
 void TxtReaderActivity::saveProgress() const {
   EspFsFile f;

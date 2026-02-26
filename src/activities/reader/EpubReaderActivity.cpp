@@ -792,7 +792,6 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   renderer.restoreBwBuffer();
 }
 
-<<<<<<< HEAD
 void EpubReaderActivity::renderStatusBar() const {
   // Calculate progress in book
   const int currentPage = section->currentPage + 1;
@@ -816,7 +815,6 @@ void EpubReaderActivity::renderStatusBar() const {
   }
 
   GUI.drawStatusBar(renderer, bookProgress, currentPage, pageCount, title);
-}
 }
 
 void EpubReaderActivity::navigateToHref(const char* href, const bool savePosition) {
