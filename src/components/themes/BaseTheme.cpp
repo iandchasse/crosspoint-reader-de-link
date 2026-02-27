@@ -733,7 +733,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     const int rendererableScreenWidth =
         renderer.getScreenWidth() - (metrics.statusBarHorizontalMargin * 2) - orientedMarginLeft - orientedMarginRight;
 
-    const int batterySize = SETTINGS.statusBarBattery ? (showBatteryPercentage ? 50 : 20) : 0;
+    const int batterySize = SETTINGS.statusBarBattery ? ((showBatteryPercentage || showClock) ? 50 : 20) : 0;
     const int titleMarginLeft = batterySize + 30;
     const int titleMarginRight = progressTextWidth + 30;
 
