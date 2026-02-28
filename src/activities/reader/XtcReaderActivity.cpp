@@ -30,7 +30,7 @@ constexpr unsigned long goHomeMs = 1000;
 }  // namespace
 
 void XtcReaderActivity::onEnter() {
-  ActivityWithSubactivity::onEnter();
+  Activity::onEnter();
 
   if (!xtc) {
     return;
@@ -51,7 +51,7 @@ void XtcReaderActivity::onEnter() {
 }
 
 void XtcReaderActivity::onExit() {
-  ActivityWithSubactivity::onExit();
+  Activity::onExit();
 
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
@@ -59,45 +59,31 @@ void XtcReaderActivity::onExit() {
 }
 
 void XtcReaderActivity::loop() {
-  // Pass input responsibility to sub activity if exists
-  if (subActivity) {
-    subActivity->loop();
-    return;
-  }
-
 #ifdef FRONTLIGHT_PRESENT
   // Long press CONFIRM (1s+) opens frontlight control
   if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= goHomeMs) {
-    exitActivity();
-    enterNewActivity(new FrontlightControlActivity(this->renderer, this->mappedInput, [this]() {
-      // After returning from frontlight control, request screen update
-      exitActivity();
-      requestUpdate();
-    }));
+    startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
+                           [this](const ActivityResult& result) {
+                             // After returning from frontlight control, request screen update
+                           });
     return;
   }
 #endif
-
   // Enter chapter selection activity
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() < goHomeMs) {
     if (xtc && xtc->hasChapters() && !xtc->getChapters().empty()) {
-      exitActivity();
-      enterNewActivity(new XtcReaderChapterSelectionActivity(
-          this->renderer, this->mappedInput, xtc, currentPage,
-          [this] {
-            exitActivity();
-            requestUpdate();
-          },
-          [this](const uint32_t newPage) {
-            currentPage = newPage;
-            exitActivity();
-            requestUpdate();
-          }));
+      startActivityForResult(
+          std::make_unique<XtcReaderChapterSelectionActivity>(renderer, mappedInput, xtc, currentPage),
+          [this](const ActivityResult& result) {
+            if (!result.isCancelled) {
+              currentPage = std::get<PageResult>(result.data).page;
+            }
+          });
     }
   }
   // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= goHomeMs) {
-    onGoBack();
+    activityManager.goToMyLibrary(xtc ? xtc->getPath() : "");
     return;
   }
 
@@ -151,7 +137,7 @@ void XtcReaderActivity::loop() {
   }
 }
 
-void XtcReaderActivity::render(Activity::RenderLock&&) {
+void XtcReaderActivity::render(RenderLock&&) {
   if (!xtc) {
     return;
   }

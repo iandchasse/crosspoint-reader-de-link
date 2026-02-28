@@ -11,12 +11,11 @@
 #include "fontIds.h"
 #include "util/StringUtils.h"
 
-FrontlightControlActivity::FrontlightControlActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                                     std::function<void()> onGoBack)
-    : ActivityWithSubactivity("Frontlight", renderer, mappedInput), onGoBack(std::move(onGoBack)), buttonNavigator() {}
+FrontlightControlActivity::FrontlightControlActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
+    : Activity("Frontlight", renderer, mappedInput), buttonNavigator() {}
 
 void FrontlightControlActivity::onEnter() {
-  ActivityWithSubactivity::onEnter();
+  Activity::onEnter();
   skipNextButtonCheck = true;
 
   if (SETTINGS.frontlightEnabled && SETTINGS.frontlightBrightness > 0) {
@@ -42,15 +41,10 @@ void FrontlightControlActivity::onEnter() {
 
 void FrontlightControlActivity::onExit() {
   SETTINGS.saveToFile();  // Always persist on any exit path
-  ActivityWithSubactivity::onExit();
+  Activity::onExit();
 }
 
 void FrontlightControlActivity::loop() {
-  if (subActivity) {
-    subActivity->loop();
-    return;
-  }
-
   if (skipNextButtonCheck) {
     const bool confirmCleared = !mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
                                 !mappedInput.wasReleased(MappedInputManager::Button::Confirm);
@@ -126,9 +120,7 @@ void FrontlightControlActivity::loop() {
 
   buttonNavigator.onRelease({MappedInputManager::Button::Back}, [this] {
     SETTINGS.saveToFile();
-    if (this->onGoBack) {
-      this->onGoBack();
-    }
+    finish();
   });
 }
 
@@ -142,10 +134,6 @@ void FrontlightControlActivity::applyLightSettings() {
 }
 
 void FrontlightControlActivity::render(RenderLock&&) {
-  if (subActivity) {
-    return;
-  }
-
   const int screenWidth = renderer.getScreenWidth();
   const int screenHeight = renderer.getScreenHeight();
   const auto metrics = UITheme::getInstance().getMetrics();

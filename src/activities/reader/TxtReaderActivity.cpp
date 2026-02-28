@@ -29,7 +29,7 @@ constexpr uint8_t CACHE_VERSION = 2;          // Increment when cache format cha
 }  // namespace
 
 void TxtReaderActivity::onEnter() {
-  ActivityWithSubactivity::onEnter();
+  Activity::onEnter();
 
   if (!txt) {
     return;
@@ -67,7 +67,7 @@ void TxtReaderActivity::onEnter() {
 }
 
 void TxtReaderActivity::onExit() {
-  ActivityWithSubactivity::onExit();
+  Activity::onExit();
 
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
@@ -80,27 +80,19 @@ void TxtReaderActivity::onExit() {
 }
 
 void TxtReaderActivity::loop() {
-  if (subActivity) {
-    subActivity->loop();
-    return;
-  }
-
 #ifdef FRONTLIGHT_PRESENT
   // Long press CONFIRM (1s+) opens frontlight control
   if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= goHomeMs) {
-    exitActivity();
-    enterNewActivity(new FrontlightControlActivity(this->renderer, this->mappedInput, [this]() {
-      // After returning from frontlight control, request screen update
-      exitActivity();
-      requestUpdate();
-    }));
+    startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
+                           [this](const ActivityResult& result) {
+                             // After returning from frontlight control, request screen update
+                           });
     return;
   }
 #endif
-
   // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= goHomeMs) {
-    onGoBack();
+    activityManager.goToMyLibrary(txt ? txt->getPath() : "");
     return;
   }
   // Short press BACK goes directly to home
@@ -343,7 +335,7 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
   return !outLines.empty();
 }
 
-void TxtReaderActivity::render(Activity::RenderLock&&) {
+void TxtReaderActivity::render(RenderLock&&) {
   if (!txt) {
     return;
   }
@@ -454,8 +446,10 @@ void TxtReaderActivity::renderPage() {
 
 void TxtReaderActivity::renderStatusBar() const {
   const float progress = totalPages > 0 ? (currentPage + 1) * 100.0f / totalPages : 0;
-  std::string title = txt->getTitle();
-
+  std::string title;
+  if (SETTINGS.statusBarTitle != CrossPointSettings::STATUS_BAR_TITLE::HIDE_TITLE) {
+    title = txt->getTitle();
+  }
   GUI.drawStatusBar(renderer, progress, currentPage + 1, totalPages, title);
 }
 

@@ -4,17 +4,16 @@
 
 #include <functional>
 
-#include "activities/ActivityWithSubactivity.h"
+#include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 
 // Forward declaration
 class GfxRenderer;
 class MappedInputManager;
 
-class FrontlightControlActivity : public ActivityWithSubactivity {
+class FrontlightControlActivity : public Activity {
  public:
-  explicit FrontlightControlActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                     std::function<void()> onGoBack);
+  explicit FrontlightControlActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
   ~FrontlightControlActivity() override = default;
 
   void onEnter() override;
@@ -23,7 +22,6 @@ class FrontlightControlActivity : public ActivityWithSubactivity {
   void render(RenderLock&&) override;
 
  private:
-  std::function<void()> onGoBack;
   ButtonNavigator buttonNavigator;
 
   void applyLightSettings();
