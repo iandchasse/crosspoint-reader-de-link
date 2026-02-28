@@ -393,6 +393,17 @@ void loop() {
     if (gpio.isPressed(HalGPIO::BTN_DOWN)) {
       return;
     }
+    // additional protection: force reset if in a soft-locked condition
+    const unsigned long startWait = millis();
+    while (gpio.isPressed(HalGPIO::BTN_POWER)) {
+      if (millis() - startWait >= 10000) {
+        LOG_ERR("PWR", "Power button held for 10s during sleep prep. Forcing reset.");
+        esp_restart();
+      }
+      delay(50);
+      gpio.update();
+    }
+    // if it doesn't reset, go ahead with deep sleep
     enterDeepSleep();
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
     return;
