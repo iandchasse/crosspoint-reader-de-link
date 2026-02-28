@@ -54,3 +54,7 @@ class HalStorage {
 #ifdef SdMan
 #undef SdMan
 #endif
+
+// Aliases to support upstream abstraction layer commits
+using FsFile = EspFsFile;
+using HalFile = EspFsFile;
