@@ -7,6 +7,7 @@
 #include <Preferences.h>
 
 #include "EpdFontSerializer.h"
+#include "EpdStreamFont.h"
 
 // ─── Static member definitions ────────────────────────────────────────────────
 
@@ -46,8 +47,15 @@ void EpdFontFileLoader::init() {
   initialized = true;
 
   if (familyBasePath.length() > 0) {
-    LOG_INF("FFL", "Custom SD font configured: %s [%d/%d/%d/%d]", familyBasePath.c_str(), customPt[SMALL],
-            customPt[MEDIUM], customPt[LARGE], customPt[EXTRA_LARGE]);
+    char checkPath[256];
+    snprintf(checkPath, sizeof(checkPath), "%s/%d_regular.epdfont", familyBasePath.c_str(), customPt[MEDIUM]);
+    if (!Storage.exists(checkPath)) {
+      LOG_ERR("FFL", "Configured font missing: %s. Clearing cache.", checkPath);
+      clearFamily();
+    } else {
+      LOG_INF("FFL", "Custom SD font configured: %s [%d/%d/%d/%d]", familyBasePath.c_str(), customPt[SMALL],
+              customPt[MEDIUM], customPt[LARGE], customPt[EXTRA_LARGE]);
+    }
   } else {
     LOG_DBG("FFL", "No custom SD font configured");
   }
@@ -90,7 +98,7 @@ EpdFont* EpdFontFileLoader::loadStyle(SizeSlot slot, const char* styleSuffix) {
     return nullptr;
   }
 
-  return EpdFontSerializer::loadFromFile(path);
+  return EpdStreamFont::load(path);
 }
 
 // ─── getFamily ────────────────────────────────────────────────────────────────
@@ -125,10 +133,10 @@ EpdFontFamily* EpdFontFileLoader::getFamily(SizeSlot slot) {
   EpdFontFamily* fam = (EpdFontFamily*)heap_caps_malloc(sizeof(EpdFontFamily), MALLOC_CAP_SPIRAM);
   if (!fam) {
     LOG_ERR("FFL", "PSRAM alloc for EpdFontFamily failed");
-    EpdFontSerializer::freeFont(regular);
-    if (bold != regular) EpdFontSerializer::freeFont(bold);
-    if (italic != regular && italic != bold) EpdFontSerializer::freeFont(italic);
-    if (boldItalic != regular && boldItalic != bold && boldItalic != italic) EpdFontSerializer::freeFont(boldItalic);
+    delete regular;
+    if (bold != regular) delete bold;
+    if (italic != regular && italic != bold) delete italic;
+    if (boldItalic != regular && boldItalic != bold && boldItalic != italic) delete boldItalic;
     return nullptr;
   }
 
@@ -149,7 +157,7 @@ void EpdFontFileLoader::freeCachedFamily() {
   if (!cacheValid || !cachedFamily) return;
 
   auto freeUnique = [](const EpdFont* f, const EpdFont* ref1, const EpdFont* ref2, const EpdFont* ref3) {
-    if (f && f != ref1 && f != ref2 && f != ref3) EpdFontSerializer::freeFont(const_cast<EpdFont*>(f));
+    if (f && f != ref1 && f != ref2 && f != ref3) delete f;
   };
 
   const EpdFont* r = cachedFamily->getFontPtr(EpdFontFamily::REGULAR);

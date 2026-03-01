@@ -171,3 +171,11 @@ const EpdGlyph* EpdFont::getGlyph(const uint32_t cp) const {
   }
   return nullptr;
 }
+
+const uint8_t* EpdFont::getBitmap(const uint32_t cp) const {
+  const EpdGlyph* glyph = getGlyph(cp);
+  if (!glyph || glyph->dataLength == 0 || !data->bitmap) {
+    return nullptr;
+  }
+  return data->bitmap + glyph->dataOffset;
+}

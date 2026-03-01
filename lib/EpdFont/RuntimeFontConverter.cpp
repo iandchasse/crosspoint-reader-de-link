@@ -16,7 +16,6 @@
 #include "esp_heap_caps.h"
 #include "stb_truetype.h"
 
-
 struct EpdUnicodeIntervalBase {
   uint32_t first;
   uint32_t last;
@@ -38,8 +37,10 @@ static const EpdUnicodeIntervalBase baseIntervals[] = {
     {0xFFFD, 0xFFFD}                                       // Replacement
 };
 
-EpdFont* RuntimeFontConverter::generateEpdFontFromPath(const char* sdPath, int sizePt, bool is2Bit) {
-  LOG_INF("RFC", "Loading font via HalStorage: %s (size: %d, 2-bit: %s)", sdPath, sizePt, is2Bit ? "yes" : "no");
+EpdFont* RuntimeFontConverter::generateEpdFontFromPath(const char* sdPath, int sizePt, bool is2Bit,
+                                                       const char* charsets) {
+  LOG_INF("RFC", "Loading font via HalStorage: %s (size: %d, 2-bit: %s, charset: %s)", sdPath, sizePt,
+          is2Bit ? "yes" : "no", charsets ? "subset" : "full");
 
   EspFsFile file;
   if (!Storage.openFileForRead("RFC", sdPath, file)) {
@@ -67,7 +68,7 @@ EpdFont* RuntimeFontConverter::generateEpdFontFromPath(const char* sdPath, int s
   file.close();
 
   LOG_DBG("RFC", "Rasterizing font...");
-  EpdFont* font = generateEpdFont(ttfBuffer, size, sizePt, is2Bit);
+  EpdFont* font = generateEpdFont(ttfBuffer, size, sizePt, is2Bit, charsets);
 
   if (font) {
     LOG_INF("RFC", "Successfully generated EpdFont");
@@ -80,11 +81,12 @@ EpdFont* RuntimeFontConverter::generateEpdFontFromPath(const char* sdPath, int s
 }
 
 EpdFont* RuntimeFontConverter::generateEpdFontFromBuffer(const uint8_t* ttfBuffer, size_t ttfSize, int sizePt,
-                                                         bool is2Bit) {
-  return generateEpdFont(ttfBuffer, ttfSize, sizePt, is2Bit);
+                                                         bool is2Bit, const char* charsets) {
+  return generateEpdFont(ttfBuffer, ttfSize, sizePt, is2Bit, charsets);
 }
 
-EpdFont* RuntimeFontConverter::generateEpdFont(const uint8_t* ttfBuffer, size_t ttfSize, int sizePt, bool is2Bit) {
+EpdFont* RuntimeFontConverter::generateEpdFont(const uint8_t* ttfBuffer, size_t ttfSize, int sizePt, bool is2Bit,
+                                               const char* charsets) {
   stbtt_fontinfo fontInfo;
   if (!stbtt_InitFont(&fontInfo, ttfBuffer, stbtt_GetFontOffsetForIndex(ttfBuffer, 0))) {
     LOG_ERR("RFC", "stbtt_InitFont failed");
@@ -106,6 +108,33 @@ EpdFont* RuntimeFontConverter::generateEpdFont(const uint8_t* ttfBuffer, size_t 
   size_t total_bitmap_size = 0;
   size_t valid_glyph_count = 0;
 
+  // Helper to decode a UTF-8 string into a subset list of codepoints
+  std::vector<uint32_t> customCodepoints;
+  if (charsets && charsets[0] != '\0') {
+    const uint8_t* p = (const uint8_t*)charsets;
+    while (*p) {
+      uint32_t c = *p;
+      if (c < 0x80) {
+        customCodepoints.push_back(c);
+        p++;
+      } else if ((c & 0xE0) == 0xC0) {
+        customCodepoints.push_back(((c & 0x1F) << 6) | (p[1] & 0x3F));
+        p += 2;
+      } else if ((c & 0xF0) == 0xE0) {
+        customCodepoints.push_back(((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F));
+        p += 3;
+      } else if ((c & 0xF8) == 0xF0) {
+        customCodepoints.push_back(((c & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F));
+        p += 4;
+      } else {
+        p++;
+      }
+    }
+    std::sort(customCodepoints.begin(), customCodepoints.end());
+    auto last = std::unique(customCodepoints.begin(), customCodepoints.end());
+    customCodepoints.erase(last, customCodepoints.end());
+  }
+
   // First pass: sizing and counting
   for (size_t i = 0; i < sizeof(baseIntervals) / sizeof(baseIntervals[0]); ++i) {
     bool in_range = false;
@@ -113,6 +142,17 @@ EpdFont* RuntimeFontConverter::generateEpdFont(const uint8_t* ttfBuffer, size_t 
     uint32_t current_offset = valid_glyph_count;
 
     for (uint32_t cp = baseIntervals[i].first; cp <= baseIntervals[i].last; ++cp) {
+      if (!customCodepoints.empty()) {
+        auto it = std::lower_bound(customCodepoints.begin(), customCodepoints.end(), cp);
+        if (it == customCodepoints.end() || *it != cp) {
+          if (in_range) {
+            intervalIndices.push_back({current_first, cp - 1, current_offset});
+            in_range = false;
+          }
+          continue;
+        }
+      }
+
       int glyphIndex = stbtt_FindGlyphIndex(&fontInfo, cp);
       if (glyphIndex > 0) {
         if (!in_range) {
@@ -209,6 +249,13 @@ EpdFont* RuntimeFontConverter::generateEpdFont(const uint8_t* ttfBuffer, size_t 
 
   for (size_t i = 0; i < intervalIndices.size(); ++i) {
     for (uint32_t cp = intervalIndices[i].first; cp <= intervalIndices[i].last; ++cp) {
+      if (!customCodepoints.empty()) {
+        auto it = std::lower_bound(customCodepoints.begin(), customCodepoints.end(), cp);
+        if (it == customCodepoints.end() || *it != cp) {
+          continue;
+        }
+      }
+
       int glyphIndex = stbtt_FindGlyphIndex(&fontInfo, cp);
       if (glyphIndex <= 0) continue;
 
@@ -314,36 +361,261 @@ size_t RuntimeFontConverter::countGlyphs(const EpdFont* font) {
   return total;
 }
 
-bool RuntimeFontConverter::generateAndSaveToFile(const char* sdTtfPath, int sizePt, bool is2Bit,
-                                                 const char* outEpdFontPath) {
-  LOG_INF("RFC", "generateAndSaveToFile: %s -> %s (pt=%d)", sdTtfPath, outEpdFontPath, sizePt);
+static bool writeU8(EspFsFile& f, uint8_t v) { return f.write(&v, 1) == 1; }
+static bool writeU16(EspFsFile& f, uint16_t v) { return f.write(reinterpret_cast<const uint8_t*>(&v), 2) == 2; }
+static bool writeU32(EspFsFile& f, uint32_t v) { return f.write(reinterpret_cast<const uint8_t*>(&v), 4) == 4; }
+static bool writeI32(EspFsFile& f, int32_t v) { return f.write(reinterpret_cast<const uint8_t*>(&v), 4) == 4; }
+static bool writeBytes(EspFsFile& f, const void* buf, size_t n) {
+  return f.write(reinterpret_cast<const uint8_t*>(buf), n) == (int)n;
+}
 
-  EpdFont* font = generateEpdFontFromPath(sdTtfPath, sizePt, is2Bit);
-  if (!font) {
-    LOG_ERR("RFC", "Font generation failed for %s", sdTtfPath);
+bool RuntimeFontConverter::generateAndSaveToFile(const char* sdTtfPath, int sizePt, bool is2Bit,
+                                                 const char* outEpdFontPath, const char* charsets) {
+  LOG_INF("RFC", "Streaming font generation: %s -> %s (pt=%d)", sdTtfPath, outEpdFontPath, sizePt);
+
+  EspFsFile ttfFile;
+  if (!Storage.openFileForRead("RFC", sdTtfPath, ttfFile)) {
+    LOG_ERR("RFC", "Failed to open TTF file: %s", sdTtfPath);
+    return false;
+  }
+  size_t ttfSize = ttfFile.size();
+  if (ttfSize == 0 || ttfSize > 5 * 1024 * 1024) {
+    LOG_ERR("RFC", "Invalid font file size: %zu", ttfSize);
+    ttfFile.close();
+    return false;
+  }
+  uint8_t* ttfBuffer = (uint8_t*)heap_caps_malloc(ttfSize, MALLOC_CAP_SPIRAM);
+  if (!ttfBuffer) {
+    ttfFile.close();
+    return false;
+  }
+  ttfFile.read(ttfBuffer, ttfSize);
+  ttfFile.close();
+
+  stbtt_fontinfo fontInfo;
+  if (!stbtt_InitFont(&fontInfo, ttfBuffer, stbtt_GetFontOffsetForIndex(ttfBuffer, 0))) {
+    LOG_ERR("RFC", "stbtt_InitFont failed");
+    heap_caps_free(ttfBuffer);
     return false;
   }
 
-  size_t glyphCount = countGlyphs(font);
+  String outPathStr = outEpdFontPath;
+  int lastSlash = outPathStr.lastIndexOf('/');
+  if (lastSlash > 0) {
+    String parentDir = outPathStr.substring(0, lastSlash);
+    if (!Storage.exists(parentDir.c_str())) {
+      Storage.mkdir(parentDir.c_str());
+    }
+  }
 
   EspFsFile outFile;
   if (!Storage.openFileForWrite("RFC", outEpdFontPath, outFile)) {
     LOG_ERR("RFC", "Cannot open output file: %s", outEpdFontPath);
-    freeEpdFont(font);
+    heap_caps_free(ttfBuffer);
     return false;
   }
 
-  bool ok = EpdFontSerializer::serialize(font, glyphCount, outFile);
-  outFile.close();
-  freeEpdFont(font);
+  // --- PASS 1: Calculate metrics and count intervals ---
+  float ppem = sizePt * 150.0f / 72.0f;
+  float scale = stbtt_ScaleForMappingEmToPixels(&fontInfo, ppem);
 
-  if (ok) {
-    LOG_INF("RFC", "Saved %s (%zu glyphs)", outEpdFontPath, glyphCount);
-  } else {
-    LOG_ERR("RFC", "Serialize failed for %s", outEpdFontPath);
-    Storage.remove(outEpdFontPath);
+  int ascent_units, descent_units, lineGap_units;
+  stbtt_GetFontVMetrics(&fontInfo, &ascent_units, &descent_units, &lineGap_units);
+  int ascent = roundf(ascent_units * scale);
+  int descent = roundf(descent_units * scale);
+  int advanceY = ascent - descent + roundf(lineGap_units * scale);
+
+  std::vector<uint32_t> customCodepoints;
+  if (charsets && charsets[0] != '\0') {
+    const uint8_t* p = (const uint8_t*)charsets;
+    while (*p) {
+      uint32_t c = *p;
+      if (c < 0x80) {
+        customCodepoints.push_back(c);
+        p++;
+      } else if ((c & 0xE0) == 0xC0) {
+        customCodepoints.push_back(((c & 0x1F) << 6) | (p[1] & 0x3F));
+        p += 2;
+      } else if ((c & 0xF0) == 0xE0) {
+        customCodepoints.push_back(((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F));
+        p += 3;
+      } else if ((c & 0xF8) == 0xF0) {
+        customCodepoints.push_back(((c & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F));
+        p += 4;
+      } else {
+        p++;
+      }
+    }
+    std::sort(customCodepoints.begin(), customCodepoints.end());
+    auto last = std::unique(customCodepoints.begin(), customCodepoints.end());
+    customCodepoints.erase(last, customCodepoints.end());
   }
-  return ok;
+
+  std::vector<EpdUnicodeInterval> intervals;
+  size_t valid_glyph_count = 0;
+
+  for (size_t i = 0; i < sizeof(baseIntervals) / sizeof(baseIntervals[0]); ++i) {
+    bool in_range = false;
+    uint32_t current_first = 0;
+    uint32_t current_offset = valid_glyph_count;
+
+    for (uint32_t cp = baseIntervals[i].first; cp <= baseIntervals[i].last; ++cp) {
+      if (!customCodepoints.empty()) {
+        auto it = std::lower_bound(customCodepoints.begin(), customCodepoints.end(), cp);
+        if (it == customCodepoints.end() || *it != cp) {
+          if (in_range) {
+            intervals.push_back({current_first, cp - 1, current_offset});
+            in_range = false;
+          }
+          continue;
+        }
+      }
+      int glyphIndex = stbtt_FindGlyphIndex(&fontInfo, cp);
+      if (glyphIndex > 0) {
+        if (!in_range) {
+          current_first = cp;
+          current_offset = valid_glyph_count;
+          in_range = true;
+        }
+        valid_glyph_count++;
+      } else {
+        if (in_range) {
+          intervals.push_back({current_first, cp - 1, current_offset});
+          in_range = false;
+        }
+      }
+    }
+    if (in_range) {
+      intervals.push_back({current_first, baseIntervals[i].last, current_offset});
+    }
+  }
+
+  if (valid_glyph_count == 0) {
+    LOG_ERR("RFC", "No valid glyphs found");
+    outFile.close();
+    Storage.remove(outEpdFontPath);
+    heap_caps_free(ttfBuffer);
+    return false;
+  }
+
+  // Write Dummy Header (we'll rewrite this at the end)
+  writeU32(outFile, EpdFontSerializer::MAGIC);
+  writeU8(outFile, EpdFontSerializer::VERSION);
+  writeU8(outFile, std::min(255, std::max(0, advanceY)));
+  writeI32(outFile, (int32_t)ascent);
+  writeI32(outFile, (int32_t)descent);
+  writeU8(outFile, is2Bit ? 1 : 0);
+
+  writeU32(outFile, (uint32_t)intervals.size());
+  writeBytes(outFile, intervals.data(), sizeof(EpdUnicodeInterval) * intervals.size());
+
+  writeU32(outFile, (uint32_t)valid_glyph_count);
+  // We don't have the glyph table yet, so leave blank space for it to overwrite later
+  uint32_t glyphsTableOffset = outFile.position();
+  for (size_t i = 0; i < valid_glyph_count * sizeof(EpdGlyph); i++) {
+    writeU8(outFile, 0);
+  }
+
+  // Empty Kern/Ligature counts
+  writeU16(outFile, 0);
+  writeU16(outFile, 0);
+  writeU8(outFile, 0);
+  writeU8(outFile, 0);
+  writeU32(outFile, 0);
+
+  // Save position of Bitmap Length so we can rewrite it later
+  uint32_t bitmapLenOffset = outFile.position();
+  writeU32(outFile, 0);
+
+  // --- PASS 2: Rasterize and write bitmaps directly to file ---
+  std::vector<EpdGlyph> glyphs(valid_glyph_count);
+  size_t current_glyph_idx = 0;
+  size_t current_bitmap_offset = 0;
+
+  for (size_t i = 0; i < intervals.size(); ++i) {
+    for (uint32_t cp = intervals[i].first; cp <= intervals[i].last; ++cp) {
+      if (!customCodepoints.empty()) {
+        auto it = std::lower_bound(customCodepoints.begin(), customCodepoints.end(), cp);
+        if (it == customCodepoints.end() || *it != cp) continue;
+      }
+      int glyphIndex = stbtt_FindGlyphIndex(&fontInfo, cp);
+      if (glyphIndex <= 0) continue;
+
+      int x0, y0, x1, y1;
+      int advanceWidth, leftSideBearing;
+      stbtt_GetGlyphHMetrics(&fontInfo, glyphIndex, &advanceWidth, &leftSideBearing);
+      stbtt_GetGlyphBitmapBox(&fontInfo, glyphIndex, scale, scale, &x0, &y0, &x1, &y1);
+
+      int w = x1 - x0;
+      int h = y1 - y0;
+      int advanceX_fp4 = roundf(advanceWidth * scale * 16.0f);
+
+      EpdGlyph& g = glyphs[current_glyph_idx];
+      glyphs[current_glyph_idx].width = w;
+      glyphs[current_glyph_idx].height = h;
+      glyphs[current_glyph_idx].advanceX = (uint16_t)std::min(65535, std::max(0, advanceX_fp4));
+      glyphs[current_glyph_idx].left = x0;
+      glyphs[current_glyph_idx].top = -y0;
+      glyphs[current_glyph_idx].dataOffset = current_bitmap_offset;
+
+      if (w > 0 && h > 0) {
+        std::vector<uint8_t> tempMask(w * h);
+        stbtt_MakeGlyphBitmap(&fontInfo, tempMask.data(), w, h, w, scale, scale, glyphIndex);
+
+        int pixelCount = w * h;
+        uint8_t out_byte = 0;
+        int bit_in_byte = 0;
+        std::vector<uint8_t> compiledBitmap;
+
+        for (int p = 0; p < pixelCount; ++p) {
+          uint8_t alpha = tempMask[p];
+          uint8_t val = 0;
+          if (is2Bit) {
+            if (alpha >= 192)
+              val = 3;
+            else if (alpha >= 128)
+              val = 2;
+            else if (alpha >= 64)
+              val = 1;
+            out_byte = (out_byte << 2) | val;
+            bit_in_byte += 2;
+          } else {
+            if (alpha >= 128) val = 1;
+            out_byte = (out_byte << 1) | val;
+            bit_in_byte += 1;
+          }
+          if (bit_in_byte == 8) {
+            compiledBitmap.push_back(out_byte);
+            out_byte = 0;
+            bit_in_byte = 0;
+          }
+        }
+        if (bit_in_byte > 0) {
+          out_byte <<= (8 - bit_in_byte);
+          compiledBitmap.push_back(out_byte);
+        }
+
+        writeBytes(outFile, compiledBitmap.data(), compiledBitmap.size());
+        current_bitmap_offset += compiledBitmap.size();
+        glyphs[current_glyph_idx].dataLength = compiledBitmap.size();
+      } else {
+        glyphs[current_glyph_idx].dataLength = 0;
+      }
+      current_glyph_idx++;
+    }
+  }
+
+  // --- PASS 3: Rewind and fill blank tables ---
+  outFile.seek(glyphsTableOffset);
+  writeBytes(outFile, glyphs.data(), sizeof(EpdGlyph) * glyphs.size());
+
+  outFile.seek(bitmapLenOffset);
+  writeU32(outFile, (uint32_t)current_bitmap_offset);
+
+  outFile.close();
+  heap_caps_free(ttfBuffer);
+  LOG_INF("RFC", "Streaming generator finished!");
+  return true;
 }
 
 #endif

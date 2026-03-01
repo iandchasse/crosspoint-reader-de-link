@@ -9,6 +9,7 @@
 
 #include "CrossPointSettings.h"
 #include "EpdFontFileLoader.h"
+#include "EpdFontSerializer.h"
 #include "GfxRenderer.h"
 #include "HalStorage.h"
 #include "I18n.h"
@@ -272,12 +273,20 @@ void CustomFontActivity::updatePreview(int slot) {
   const std::string& ttfPath = resolvedTtfPaths[0].empty() ? "" : resolvedTtfPaths[0];
   if (ttfPath.empty()) return;
 
-  previewFont =
-      RuntimeFontConverter::generateEpdFontFromPath(ttfPath.c_str(), customPt[slot], SETTINGS.textAntiAliasing);
-  if (previewFont) {
-    previewFamily = new EpdFontFamily(previewFont);
-    renderer.insertFont(PREVIEW_FONT_ID, *previewFamily);
+  const char* PREVIEW_PATH = "/.fonts/preview.epdfont";
+  const char* PREVIEW_CHARSET = "The quick brown fox jumps over the lazy dog 0123456789";
+
+  bool ok = RuntimeFontConverter::generateAndSaveToFile(ttfPath.c_str(), customPt[slot], SETTINGS.textAntiAliasing,
+                                                        PREVIEW_PATH, PREVIEW_CHARSET);
+
+  if (ok) {
+    previewFont = EpdFontSerializer::loadFromFile(PREVIEW_PATH);
+    if (previewFont) {
+      previewFamily = new EpdFontFamily(previewFont);
+      renderer.insertFont(PREVIEW_FONT_ID, *previewFamily);
+    }
   }
+
   lastPreviewedPt[slot] = customPt[slot];
   lastPreviewSlot = slot;
 }

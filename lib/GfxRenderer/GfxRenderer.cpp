@@ -3,7 +3,8 @@
 #include <Logging.h>
 #include <Utf8.h>
 
-const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const EpdGlyph* glyph) const {
+const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFont* font, const EpdGlyph* glyph, uint32_t cp) const {
+  const EpdFontData* fontData = font->data;
   if (fontData->groups != nullptr) {
     if (!fontDecompressor) {
       LOG_ERR("GFX", "Compressed font but no FontDecompressor set");
@@ -12,7 +13,7 @@ const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const Ep
     uint16_t glyphIndex = static_cast<uint16_t>(glyph - fontData->glyph);
     return fontDecompressor->getBitmap(fontData, glyph, glyphIndex);
   }
-  return &fontData->bitmap[glyph->dataOffset];
+  return font->getBitmap(cp);
 }
 
 void GfxRenderer::begin() {
@@ -71,14 +72,15 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     return;
   }
 
-  const EpdFontData* fontData = fontFamily.getData(style);
+  const EpdFont* font = fontFamily.getFontPtr(style);
+  const EpdFontData* fontData = font->data;
   const bool is2Bit = fontData->is2Bit;
   const uint8_t width = glyph->width;
   const uint8_t height = glyph->height;
   const int left = glyph->left;
   const int top = glyph->top;
 
-  const uint8_t* bitmap = renderer.getGlyphBitmap(fontData, glyph);
+  const uint8_t* bitmap = renderer.getGlyphBitmap(font, glyph, cp);
 
   if (bitmap != nullptr) {
     // For Normal:  outer loop advances screenY, inner loop advances screenX

@@ -149,7 +149,7 @@ class GfxRenderer {
   void cleanupGrayscaleWithFrameBuffer() const;
 
   // Font helpers
-  const uint8_t* getGlyphBitmap(const EpdFontData* fontData, const EpdGlyph* glyph) const;
+  const uint8_t* getGlyphBitmap(const EpdFont* font, const EpdGlyph* glyph, uint32_t cp) const;
 
   // Low level functions
   uint8_t* getFrameBuffer() const;
