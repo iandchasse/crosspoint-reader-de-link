@@ -388,27 +388,8 @@ void loop() {
     return;
   }
 
-  if (gpio.isPressed(HalGPIO::BTN_POWER) && gpio.getHeldTime() > SETTINGS.getPowerButtonDuration()) {
-    // If the screenshot combination is potentially being pressed, don't sleep
-    if (gpio.isPressed(HalGPIO::BTN_DOWN)) {
-      return;
-    }
-    // additional protection: force reset if in a soft-locked condition
-    const unsigned long startWait = millis();
-    while (gpio.isPressed(HalGPIO::BTN_POWER)) {
-      if (millis() - startWait >= 10000) {
-        LOG_ERR("PWR", "Power button held for 10s during sleep prep. Forcing reset.");
-        esp_restart();
-      }
-      delay(50);
-      gpio.update();
-    }
-    // if it doesn't reset, go ahead with deep sleep
-    enterDeepSleep();
-    // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
-    return;
-  } else if (gpio.wasReleased(HalGPIO::BTN_POWER)) {
 #ifdef FRONTLIGHT_PRESENT
+  if (gpio.wasReleased(HalGPIO::BTN_POWER)) {
     if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::TOGGLE_FRONTLIGHT) {
       if (SETTINGS.frontlightEnabled) {
         // Toggle OFF
@@ -425,7 +406,32 @@ void loop() {
         frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
       }
     }
+  }
 #endif
+
+  if (gpio.isPressed(HalGPIO::BTN_POWER) && gpio.getHeldTime() > SETTINGS.getPowerButtonDuration()) {
+    // If the screenshot combination is potentially being pressed, don't sleep
+    if (gpio.isPressed(HalGPIO::BTN_DOWN)) {
+      return;
+    }
+    // additional protection: force reset if in a soft-locked condition
+    const unsigned long startWait = millis();
+    delay(50);
+    if (gpio.isPressed(HalGPIO::BTN_POWER)) {
+      GUI.drawPopup(renderer, "Keep Holding to Reset");
+      while (gpio.isPressed(HalGPIO::BTN_POWER)) {
+        if (millis() - startWait >= 10000) {
+          LOG_ERR("PWR", "Power button held for 10s during sleep prep. Forcing reset.");
+          esp_restart();
+        }
+        delay(50);
+        gpio.update();
+      }
+    }
+    // if it doesn't reset, go ahead with deep sleep
+    enterDeepSleep();
+    // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
+    return;
   }
 
   const unsigned long activityStartTime = millis();
