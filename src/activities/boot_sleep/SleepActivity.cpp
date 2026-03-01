@@ -26,8 +26,14 @@ void SleepActivity::onEnter() {
       renderCustomSleepScreen();
       break;
     case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER):
-    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM):
       renderCoverSleepScreen();
+      break;
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM):
+      if (APP_STATE.lastSleepFromReader) {
+        renderCoverSleepScreen();
+      } else {
+        renderCustomSleepScreen();
+      }
       break;
     default:
       renderDefaultSleepScreen();
@@ -172,7 +178,7 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
   }
 
   LOG_DBG("SLP", "drawing to %d x %d", x, y);
-  renderer.clearScreen();
+  renderer.clearScreen(0xFF);
 
   const bool hasGreyscale = bitmap.hasGreyscale() &&
                             SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER;
