@@ -29,7 +29,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #ifdef ENABLE_CUSTOM_FONTS
-#include <CustomFontManager.h>
+#include <EpdFontFileLoader.h>
 #endif
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
@@ -240,9 +240,7 @@ void setupDisplayAndFonts() {
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
 
 #ifdef ENABLE_CUSTOM_FONTS
-  if (CustomFontManager::hasCustomFont()) {
-    renderer.insertFont(CUSTOM_PSRAM_FONT_ID, *CustomFontManager::getActiveCustomFont());
-  }
+  EpdFontFileLoader::init();
 #endif
 
   LOG_DBG("MAIN", "Fonts setup");
@@ -274,7 +272,7 @@ void setup() {
   }
 
 #ifdef ENABLE_CUSTOM_FONTS
-  CustomFontManager::init();
+  EpdFontFileLoader::init();
 #endif
 
   SETTINGS.loadFromFile();

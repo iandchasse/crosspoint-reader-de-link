@@ -12,8 +12,10 @@
 #include <cmath>
 #include <vector>
 
+#include "EpdFontSerializer.h"
 #include "esp_heap_caps.h"
 #include "stb_truetype.h"
+
 
 struct EpdUnicodeIntervalBase {
   uint32_t first;
@@ -299,6 +301,49 @@ void RuntimeFontConverter::freeEpdFont(EpdFont* font) {
 
   // We packed EpdFont and everything into one block based around EpdFont*.
   heap_caps_free(font);
+}
+
+size_t RuntimeFontConverter::countGlyphs(const EpdFont* font) {
+  if (!font || !font->data) return 0;
+  // Sum glyph counts from all intervals
+  size_t total = 0;
+  for (uint32_t i = 0; i < font->data->intervalCount; ++i) {
+    const EpdUnicodeInterval& iv = font->data->intervals[i];
+    total += (iv.last - iv.first + 1);
+  }
+  return total;
+}
+
+bool RuntimeFontConverter::generateAndSaveToFile(const char* sdTtfPath, int sizePt, bool is2Bit,
+                                                 const char* outEpdFontPath) {
+  LOG_INF("RFC", "generateAndSaveToFile: %s -> %s (pt=%d)", sdTtfPath, outEpdFontPath, sizePt);
+
+  EpdFont* font = generateEpdFontFromPath(sdTtfPath, sizePt, is2Bit);
+  if (!font) {
+    LOG_ERR("RFC", "Font generation failed for %s", sdTtfPath);
+    return false;
+  }
+
+  size_t glyphCount = countGlyphs(font);
+
+  EspFsFile outFile;
+  if (!Storage.openFileForWrite("RFC", outEpdFontPath, outFile)) {
+    LOG_ERR("RFC", "Cannot open output file: %s", outEpdFontPath);
+    freeEpdFont(font);
+    return false;
+  }
+
+  bool ok = EpdFontSerializer::serialize(font, glyphCount, outFile);
+  outFile.close();
+  freeEpdFont(font);
+
+  if (ok) {
+    LOG_INF("RFC", "Saved %s (%zu glyphs)", outEpdFontPath, glyphCount);
+  } else {
+    LOG_ERR("RFC", "Serialize failed for %s", outEpdFontPath);
+    Storage.remove(outEpdFontPath);
+  }
+  return ok;
 }
 
 #endif

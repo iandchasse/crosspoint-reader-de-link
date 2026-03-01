@@ -30,6 +30,9 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/ScreenshotUtil.h"
+#ifdef ENABLE_CUSTOM_FONTS
+#include <EpdFontFileLoader.h>
+#endif
 
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
@@ -99,6 +102,33 @@ void EpubReaderActivity::onEnter() {
     }
     f.close();
   }
+
+  // Detect if font settings changed while we were away (e.g. in Settings)
+  bool fontChanged = false;
+  if (lastFontId != SETTINGS.getReaderFontId() || lastFontSize != SETTINGS.fontSize) {
+    fontChanged = true;
+    lastFontId = SETTINGS.getReaderFontId();
+    lastFontSize = SETTINGS.fontSize;
+    // Section layout cache is completely invalid if font geometry changed
+    section.reset();
+  }
+
+#ifdef ENABLE_CUSTOM_FONTS
+  // Always ensure the custom font is freshly loaded and active in the renderer on entry
+  if (SETTINGS.fontFamily == CrossPointSettings::CUSTOM_FONT) {
+    const int fontId = SETTINGS.getReaderFontId();
+    auto slot = static_cast<EpdFontFileLoader::SizeSlot>(SETTINGS.fontSize);
+    EpdFontFamily* fam = EpdFontFileLoader::getFamily(slot);
+    if (fam) {
+      if (fontChanged) {
+        // Force the renderer to drop any old/stale font pointer it might be holding
+        renderer.removeFont(fontId);
+      }
+      renderer.insertFont(fontId, *fam);
+    }
+  }
+#endif
+
   // We may want a better condition to detect if we are opening for the first time.
   // This will trigger if the book is re-opened at Chapter 0.
   if (currentSpineIndex == 0) {
@@ -716,6 +746,17 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   // Force special handling for pages with images when anti-aliasing is on
   bool imagePageWithAA = page->hasImages() && SETTINGS.textAntiAliasing;
 
+  // Lazy-load SD-cached custom font if not yet registered
+#ifdef ENABLE_CUSTOM_FONTS
+  if (SETTINGS.fontFamily == CrossPointSettings::CUSTOM_FONT) {
+    const int fontId = SETTINGS.getReaderFontId();
+    if (!renderer.hasFont(fontId)) {
+      auto slot = static_cast<EpdFontFileLoader::SizeSlot>(SETTINGS.fontSize);
+      EpdFontFamily* fam = EpdFontFileLoader::getFamily(slot);
+      if (fam) renderer.insertFont(fontId, *fam);
+    }
+  }
+#endif
   page->render(renderer, SETTINGS.getReaderFontId(), orientedMarginLeft, orientedMarginTop);
   renderStatusBar();
   if (imagePageWithAA) {

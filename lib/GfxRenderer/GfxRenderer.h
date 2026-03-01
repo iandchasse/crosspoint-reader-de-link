@@ -66,6 +66,7 @@ class GfxRenderer {
   void insertFont(int fontId, EpdFontFamily font);
   void setFontDecompressor(FontDecompressor* d) { fontDecompressor = d; }
   void removeFont(int fontId) { fontMap.erase(fontId); }
+  bool hasFont(int fontId) const { return fontMap.count(fontId) > 0; }
   void clearFontCache() {
     if (fontDecompressor) fontDecompressor->clearCache();
   }

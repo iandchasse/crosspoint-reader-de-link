@@ -19,6 +19,10 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+#ifdef ENABLE_CUSTOM_FONTS
+#include "EpdFontFileLoader.h"
+#endif
+
 namespace {
 constexpr unsigned long goHomeMs = 1000;
 constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
@@ -61,6 +65,31 @@ void TxtReaderActivity::onEnter() {
   APP_STATE.openEpubPath = filePath;
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(filePath, fileName, "", "");
+
+  // Detect if font settings changed while we were away (e.g. in Settings)
+  bool fontChanged = false;
+  if (lastFontId != SETTINGS.getReaderFontId() || lastFontSize != SETTINGS.fontSize) {
+    fontChanged = true;
+    lastFontId = SETTINGS.getReaderFontId();
+    lastFontSize = SETTINGS.fontSize;
+    initialized = false;
+  }
+
+#ifdef ENABLE_CUSTOM_FONTS
+  // Always ensure the custom font is freshly loaded and active in the renderer on entry
+  if (SETTINGS.fontFamily == CrossPointSettings::CUSTOM_FONT) {
+    const int fontId = SETTINGS.getReaderFontId();
+    auto slot = static_cast<EpdFontFileLoader::SizeSlot>(SETTINGS.fontSize);
+    EpdFontFamily* fam = EpdFontFileLoader::getFamily(slot);
+    if (fam) {
+      if (fontChanged) {
+        // Force the renderer to drop any old/stale font pointer it might be holding
+        renderer.removeFont(fontId);
+      }
+      renderer.insertFont(fontId, *fam);
+    }
+  }
+#endif
 
   // Trigger first update
   requestUpdate();

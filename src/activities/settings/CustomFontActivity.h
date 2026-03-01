@@ -2,27 +2,21 @@
 
 #ifdef ENABLE_CUSTOM_FONTS
 
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "EpdFontFileLoader.h"
+#include "HalPowerManager.h"
 #include "activities/Activity.h"
+#include "components/UITheme.h"
+#include "components/themes/BaseTheme.h"
 #include "util/ButtonNavigator.h"
 
 class CustomFontActivity final : public Activity {
-  ButtonNavigator buttonNavigator;
-  std::vector<std::string> files;
-  std::string basepath = "/";
-  std::string selectedFontPath;
-  size_t selectorIndex = 0;
-  bool previewMode = false;
-  bool sizeSelectionMode = false;
-  int targetSize = 14;
-
-  void loadFiles();
-  size_t findEntry(const std::string& name) const;
-  void onSelectFile(const std::string& fullPath);
-
  public:
+  enum class State { BROWSER, CONFIRM, SIZE_CONFIG, GENERATING, DONE_OK, DONE_ERROR };
+
   explicit CustomFontActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : Activity("CustomFont", renderer, mappedInput) {}
 
@@ -30,6 +24,58 @@ class CustomFontActivity final : public Activity {
   void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
+
+ private:
+  // ── Input debounce ────────────────────────────────────────────────────────
+  unsigned long enterTimeMs = 0;
+  static constexpr unsigned long INPUT_DEBOUNCE_MS = 500;
+
+  // ── Browser state ─────────────────────────────────────────────────────────
+  ButtonNavigator buttonNavigator;
+  std::vector<std::string> files;  // only font-family FOLDERS shown
+  std::string basepath = "/fonts";
+  std::string selectedFamilyPath;
+  // Resolved TTF paths for each style (empty = not found / use regular)
+  std::string resolvedTtfPaths[4];
+  int foundStyleCount = 0;
+  size_t selectorIndex = 0;
+
+  // ── Size configuration state ──────────────────────────────────────────────
+  static constexpr int NUM_SIZE_SLOTS = EpdFontFileLoader::SIZE_SLOT_COUNT;
+  int customPt[NUM_SIZE_SLOTS] = {12, 14, 16, 18};
+  int sizeConfigRow = 0;  // 0-3 = size rows, 4 = Generate button
+
+  // ── Preview state ─────────────────────────────────────────────────────────
+  EpdFont* previewFont = nullptr;
+  EpdFontFamily* previewFamily = nullptr;
+  static constexpr int PREVIEW_FONT_ID = -2000000005;  // temporary ID for previews
+  int lastPreviewedPt[NUM_SIZE_SLOTS] = {0};
+  int lastPreviewSlot = -1;
+
+  // ── Generation state ──────────────────────────────────────────────────────
+  int genStep = 0;
+  int totalSteps = 0;
+  bool genOk = false;
+  std::string genError;
+  std::unique_ptr<HalPowerManager::Lock> pwrLock;  // held during generation
+
+  // ── State machine ─────────────────────────────────────────────────────────
+  State state = State::BROWSER;
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+  void loadFolders();                                   // list only directories in basepath
+  bool scanFamilyStyles(const std::string& familyDir);  // populate resolvedTtfPaths
+  size_t findEntry(const std::string& name) const;
+  void onSelectFolder(const std::string& familyDir);
+  void startGeneration();
+
+  void updatePreview(int slot);
+  void cleanupPreview();
+
+  void renderBrowser(int w, int h, const ThemeMetrics& metrics);
+  void renderSizeConfig(int w, int h, const ThemeMetrics& metrics);
+  void renderGenerating(int w, int h, const ThemeMetrics& metrics);
+  void renderDone(int w, int h, const ThemeMetrics& metrics, bool ok);
 };
 
 #endif

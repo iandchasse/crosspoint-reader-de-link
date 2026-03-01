@@ -5,7 +5,6 @@
 #include "EpdFont.h"
 #include "HalStorage.h"
 
-
 #ifdef ENABLE_CUSTOM_FONTS
 
 class RuntimeFontConverter {
@@ -17,8 +16,16 @@ class RuntimeFontConverter {
   // Helper to load a single font style from a path.
   static EpdFont* generateEpdFontFromPath(const char* sdPath, int sizePt, bool is2Bit);
 
+  // Generate a font from TTF, serialize it to an .epdfont file, then free
+  // the PSRAM immediately. The caller's SD directory must exist.
+  // Returns true on success.
+  static bool generateAndSaveToFile(const char* sdTtfPath, int sizePt, bool is2Bit, const char* outEpdFontPath);
+
   // Helper cleanup function for an individual EpdFont.
   static void freeEpdFont(EpdFont* font);
+
+  // Returns the number of glyphs in a font data block (needed for serialization).
+  static size_t countGlyphs(const EpdFont* font);
 
  private:
   // Internal implementation for rasterization.

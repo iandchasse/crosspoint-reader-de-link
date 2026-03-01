@@ -10,6 +10,10 @@
 
 #include "fontIds.h"
 
+#ifdef ENABLE_CUSTOM_FONTS
+#include <EpdFontFileLoader.h>
+#endif
+
 // Initialize the static instance
 CrossPointSettings CrossPointSettings::instance;
 
@@ -354,7 +358,7 @@ int CrossPointSettings::getReaderFontId() const {
       }
 #ifdef ENABLE_CUSTOM_FONTS
     case CUSTOM_FONT:
-      return CUSTOM_PSRAM_FONT_ID;
+      return EpdFontFileLoader::getFontId(static_cast<EpdFontFileLoader::SizeSlot>(fontSize));
 #endif
   }
 }

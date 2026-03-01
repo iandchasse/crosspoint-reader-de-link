@@ -21,6 +21,9 @@ class TxtReaderActivity final : public Activity {
   int viewportWidth = 0;
   bool initialized = false;
 
+  int lastFontId = -1;
+  int lastFontSize = -1;
+
   // Cached settings for cache validation (different fonts/margins require re-indexing)
   int cachedFontId = 0;
   uint8_t cachedScreenMargin = 0;
