@@ -14,6 +14,7 @@
 #include "LanguageSelectActivity.h"
 #ifdef ENABLE_CUSTOM_FONTS
 #include "CustomFontActivity.h"
+#include "EpdFontFileLoader.h"
 #endif
 #include "MappedInputManager.h"
 // ---- OTA UPDATE SUPPORT ---------------------------------------------------
@@ -283,7 +284,16 @@ void SettingsActivity::render(RenderLock&&) {
           valueText = value ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
         } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
           const uint8_t value = SETTINGS.*(setting.valuePtr);
-          valueText = I18N.get(setting.enumValues[value]);
+
+#ifdef ENABLE_CUSTOM_FONTS
+          if (setting.nameId == StrId::STR_FONT_FAMILY && value == CrossPointSettings::CUSTOM_FONT &&
+              EpdFontFileLoader::isAvailable()) {
+            valueText = EpdFontFileLoader::getFamilyName().c_str();
+          } else
+#endif
+          {
+            valueText = I18N.get(setting.enumValues[value]);
+          }
         } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
           valueText = std::to_string(SETTINGS.*(setting.valuePtr));
         }

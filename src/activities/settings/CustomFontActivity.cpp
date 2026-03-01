@@ -286,6 +286,11 @@ void CustomFontActivity::updatePreview(int slot) {
 
 void CustomFontActivity::startGeneration() {
   cleanupPreview();
+
+  std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
+  std::string dotFontsDir = std::string("/.fonts/") + familyName;
+  deleteDirectory(dotFontsDir.c_str());
+
   state = State::GENERATING;
   genStep = 0;
   totalSteps = NUM_SIZE_SLOTS * NUM_STYLES;
@@ -456,6 +461,14 @@ void CustomFontActivity::loop() {
       // Use the pre-resolved TTF path; fall back to regular (index 0)
       const std::string& ttfPath =
           resolvedTtfPaths[styleIdx].empty() ? resolvedTtfPaths[0] : resolvedTtfPaths[styleIdx];
+
+      if (resolvedTtfPaths[styleIdx].empty() && styleIdx != 0) {
+        // Skip generating redundant _bold/_italic fallback files, the loader will
+        // automatically fall back to _regular at runtime if they are missing.
+        genStep++;
+        requestUpdate();
+        return;
+      }
 
       std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
 
