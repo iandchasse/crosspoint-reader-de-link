@@ -266,6 +266,18 @@ float CrossPointSettings::getReaderLineCompression() const {
         case WIDE:
           return 1.0f;
       }
+#ifdef ENABLE_CUSTOM_FONTS
+    case CUSTOM_FONT:
+      switch (lineSpacing) {
+        case TIGHT:
+          return 0.95f;
+        case NORMAL:
+        default:
+          return 1.0f;
+        case WIDE:
+          return 1.1f;
+      }
+#endif
   }
 }
 
@@ -340,5 +352,9 @@ int CrossPointSettings::getReaderFontId() const {
         case EXTRA_LARGE:
           return OPENDYSLEXIC_14_FONT_ID;
       }
+#ifdef ENABLE_CUSTOM_FONTS
+    case CUSTOM_FONT:
+      return CUSTOM_PSRAM_FONT_ID;
+#endif
   }
 }

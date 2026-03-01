@@ -24,6 +24,9 @@ enum class SettingAction {
   CheckForUpdates,
   Language,
   SyncClock,
+#ifdef ENABLE_CUSTOM_FONTS
+  SelectCustomFont,
+#endif
 };
 
 struct SettingInfo {

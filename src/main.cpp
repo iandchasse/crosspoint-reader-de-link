@@ -28,6 +28,9 @@
 #include "activities/ActivityManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#ifdef ENABLE_CUSTOM_FONTS
+#include <CustomFontManager.h>
+#endif
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
 #include "util/TimeUtil.h"
@@ -235,6 +238,13 @@ void setupDisplayAndFonts() {
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
+
+#ifdef ENABLE_CUSTOM_FONTS
+  if (CustomFontManager::hasCustomFont()) {
+    renderer.insertFont(CUSTOM_PSRAM_FONT_ID, *CustomFontManager::getActiveCustomFont());
+  }
+#endif
+
   LOG_DBG("MAIN", "Fonts setup");
 }
 
@@ -262,6 +272,10 @@ void setup() {
     activityManager.goToFullScreenMessage("SD card error", EpdFontFamily::BOLD);
     return;
   }
+
+#ifdef ENABLE_CUSTOM_FONTS
+  CustomFontManager::init();
+#endif
 
   SETTINGS.loadFromFile();
   TimeUtil::reconfigure();

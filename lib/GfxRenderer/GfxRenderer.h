@@ -67,6 +67,7 @@ class GfxRenderer {
   void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);
   void setFontDecompressor(FontDecompressor* d) { fontDecompressor = d; }
+  void removeFont(int fontId) { fontMap.erase(fontId); }
   void clearFontCache() {
     if (fontDecompressor) fontDecompressor->clearCache();
   }

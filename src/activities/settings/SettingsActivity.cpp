@@ -12,6 +12,9 @@
 #endif
 #include "KOReaderSettingsActivity.h"
 #include "LanguageSelectActivity.h"
+#ifdef ENABLE_CUSTOM_FONTS
+#include "CustomFontActivity.h"
+#endif
 #include "MappedInputManager.h"
 // ---- OTA UPDATE SUPPORT ---------------------------------------------------
 // To disable OTA on this build (e.g. for S3 fork where upstream releases are
@@ -73,6 +76,9 @@ void SettingsActivity::onEnter() {
 #endif
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
+#ifdef ENABLE_CUSTOM_FONTS
+  readerSettings.push_back(SettingInfo::Action(StrId::STR_SELECT_CUSTOM_FONT, SettingAction::SelectCustomFont));
+#endif
 
   // Reset selection to first category
   selectedCategoryIndex = 0;
@@ -214,6 +220,11 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::Language:
         startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
         break;
+#ifdef ENABLE_CUSTOM_FONTS
+      case SettingAction::SelectCustomFont:
+        startActivityForResult(std::make_unique<CustomFontActivity>(renderer, mappedInput), resultHandler);
+        break;
+#endif
       case SettingAction::SyncClock:
         if (WiFi.status() == WL_CONNECTED) {
           TimeUtil::reconfigure();

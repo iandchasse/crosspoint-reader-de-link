@@ -2,7 +2,9 @@
 // https://github.com/vroland/epdiy/blob/c61e9e923ce2418150d54f88cea5d196cdc40c54/src/epd_internals.h
 
 #pragma once
+#include <cstddef>
 #include <cstdint>
+
 
 /// Font data stored PER GLYPH
 typedef struct {
@@ -66,4 +68,5 @@ typedef struct {
   uint8_t kernRightClassCount;                ///< Number of distinct right classes (matrix cols)
   const EpdLigaturePair* ligaturePairs;       ///< Sorted ligature pair table (nullptr if none)
   uint32_t ligaturePairCount;                 ///< Number of entries in ligaturePairs
+  size_t totalAllocatedSize;
 } EpdFontData;

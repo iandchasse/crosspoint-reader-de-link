@@ -19,19 +19,31 @@ const EpdFont* EpdFontFamily::getFont(const Style style) const {
 }
 
 void EpdFontFamily::getTextDimensions(const char* string, int* w, int* h, const Style style) const {
-  getFont(style)->getTextDimensions(string, w, h);
+  const EpdFont* font = getFont(style);
+  if (font) {
+    font->getTextDimensions(string, w, h);
+  } else {
+    *w = 0;
+    *h = 0;
+  }
 }
 
-const EpdFontData* EpdFontFamily::getData(const Style style) const { return getFont(style)->data; }
+const EpdFontData* EpdFontFamily::getData(const Style style) const {
+  const EpdFont* font = getFont(style);
+  return font ? font->data : nullptr;
+}
 
 const EpdGlyph* EpdFontFamily::getGlyph(const uint32_t cp, const Style style) const {
-  return getFont(style)->getGlyph(cp);
+  const EpdFont* font = getFont(style);
+  return font ? font->getGlyph(cp) : nullptr;
 }
 
 int8_t EpdFontFamily::getKerning(const uint32_t leftCp, const uint32_t rightCp, const Style style) const {
-  return getFont(style)->getKerning(leftCp, rightCp);
+  const EpdFont* font = getFont(style);
+  return font ? font->getKerning(leftCp, rightCp) : 0;
 }
 
 uint32_t EpdFontFamily::applyLigatures(const uint32_t cp, const char*& text, const Style style) const {
-  return getFont(style)->applyLigatures(cp, text);
+  const EpdFont* font = getFont(style);
+  return font ? font->applyLigatures(cp, text) : cp;
 }

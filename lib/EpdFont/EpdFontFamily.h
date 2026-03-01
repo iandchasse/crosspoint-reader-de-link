@@ -15,6 +15,19 @@ class EpdFontFamily {
   int8_t getKerning(uint32_t leftCp, uint32_t rightCp, Style style = REGULAR) const;
   uint32_t applyLigatures(uint32_t cp, const char*& text, Style style = REGULAR) const;
 
+  const EpdFont* getFontPtr(Style style) const {
+    switch (style) {
+      case BOLD:
+        return bold;
+      case ITALIC:
+        return italic;
+      case BOLD_ITALIC:
+        return boldItalic;
+      default:
+        return regular;
+    }
+  }
+
  private:
   const EpdFont* regular;
   const EpdFont* bold;
