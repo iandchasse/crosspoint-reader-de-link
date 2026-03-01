@@ -5,15 +5,30 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <time.h>
 
 #include <string>
 
 #include "Bitmap.h"  // Required for BmpHeader struct definition
+#include "TimeUtil.h"
 
 void ScreenshotUtil::takeScreenshot(GfxRenderer& renderer) {
   const uint8_t* fb = renderer.getFrameBuffer();
   if (fb) {
-    String filename_str = "/screenshots/screenshot-" + String(millis()) + ".bmp";
+    String filename_str;
+    if (TimeUtil::isTimeValid()) {
+      time_t now;
+      ::time(&now);
+      struct tm timeinfo;
+      localtime_r(&now, &timeinfo);
+      char buf[32];
+      // MM_DD_YYYY_HH_mm format for filename compatibility
+      snprintf(buf, sizeof(buf), "%02d_%02d_%04d_%02d_%02d", timeinfo.tm_mon + 1, timeinfo.tm_mday,
+               timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min);
+      filename_str = "/screenshots/screenshot-" + String(buf) + ".bmp";
+    } else {
+      filename_str = "/screenshots/screenshot-" + String(millis()) + ".bmp";
+    }
     if (ScreenshotUtil::saveFramebufferAsBmp(filename_str.c_str(), fb, HalDisplay::DISPLAY_WIDTH,
                                              HalDisplay::DISPLAY_HEIGHT)) {
       LOG_DBG("SCR", "Screenshot saved to %s", filename_str.c_str());
@@ -91,10 +106,16 @@ bool ScreenshotUtil::saveFramebufferAsBmp(const char* filename, const uint8_t* f
 
   for (int outY = 0; outY < phyHeight; outY++) {
     for (int outX = 0; outX < phyWidth; outX++) {
-      // 90d counter-clockwise: source (srcX, srcY)
+      // 270d counter-clockwise (90d clockwise): source (srcX, srcY)
       // BMP rows are bottom-to-top, so outY=0 is the bottom of the displayed image
+      int srcX = outY;
+      int srcY = outX;
+
+      /* Original 90d counter-clockwise logic:
       int srcX = width - 1 - outY;     // phyHeight == width
       int srcY = phyWidth - 1 - outX;  // phyWidth == height
+      */
+
       int fbIndex = srcY * (width / 8) + (srcX / 8);
       uint8_t pixel = (framebuffer[fbIndex] >> (7 - (srcX % 8))) & 0x01;
       rowBuffer[outX / 8] |= pixel << (7 - (outX % 8));
