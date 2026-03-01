@@ -217,12 +217,13 @@ EpdFont* RuntimeFontConverter::generateEpdFont(const uint8_t* ttfBuffer, size_t 
 
       int w = x1 - x0;
       int h = y1 - y0;
-      int advanceX_px = roundf(advanceWidth * scale);
+      // advanceX is 12.4 fixed-point (shifted 4)
+      int advanceX_fp4 = roundf(advanceWidth * scale * 16.0f);
 
       EpdGlyph& g = outGlyphs[current_glyph_idx];
       g.width = w;
       g.height = h;
-      g.advanceX = std::min(255, std::max(0, advanceX_px));
+      g.advanceX = (uint16_t)std::min(65535, std::max(0, advanceX_fp4));
       g.left = x0;
       g.top = -y0;
       g.dataOffset = current_bitmap_offset;
