@@ -172,7 +172,10 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
   }
 
   LOG_DBG("SLP", "drawing to %d x %d", x, y);
-  renderer.clearScreen();
+  renderer.clearScreen(0x00);
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+  renderer.clearScreen(0xFF);
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 
   const bool hasGreyscale = bitmap.hasGreyscale() &&
                             SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER;
