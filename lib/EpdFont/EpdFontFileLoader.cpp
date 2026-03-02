@@ -11,6 +11,10 @@
 
 // ─── Static member definitions ────────────────────────────────────────────────
 
+#include <ArduinoJson.h>
+
+// ─── Static member definitions ────────────────────────────────────────────────
+
 EpdFontFamily* EpdFontFileLoader::cachedFamily = nullptr;
 EpdFontFileLoader::SizeSlot EpdFontFileLoader::cachedSlot = EpdFontFileLoader::SMALL;
 bool EpdFontFileLoader::cacheValid = false;
@@ -18,12 +22,7 @@ String EpdFontFileLoader::familyBasePath = "";
 int EpdFontFileLoader::customPt[EpdFontFileLoader::SIZE_SLOT_COUNT] = {12, 14, 16, 18};
 bool EpdFontFileLoader::initialized = false;
 
-static const char* NVS_NAMESPACE = "sd_font";
-static const char* NVS_PATH_KEY = "path";
-static const char* NVS_PT_S_KEY = "pt_s";
-static const char* NVS_PT_M_KEY = "pt_m";
-static const char* NVS_PT_L_KEY = "pt_l";
-static const char* NVS_PT_XL_KEY = "pt_xl";
+static const char* CONFIG_PATH = "/.fonts/config.json";
 
 static const int SD_FONT_IDS[EpdFontFileLoader::SIZE_SLOT_COUNT] = {
     EpdFontFileLoader::FONT_ID_SMALL,
@@ -35,14 +34,22 @@ static const int SD_FONT_IDS[EpdFontFileLoader::SIZE_SLOT_COUNT] = {
 // ─── init ─────────────────────────────────────────────────────────────────────
 
 void EpdFontFileLoader::init() {
-  Preferences prefs;
-  prefs.begin(NVS_NAMESPACE, true);
-  familyBasePath = prefs.getString(NVS_PATH_KEY, "");
-  customPt[SMALL] = prefs.getInt(NVS_PT_S_KEY, 12);
-  customPt[MEDIUM] = prefs.getInt(NVS_PT_M_KEY, 14);
-  customPt[LARGE] = prefs.getInt(NVS_PT_L_KEY, 16);
-  customPt[EXTRA_LARGE] = prefs.getInt(NVS_PT_XL_KEY, 18);
-  prefs.end();
+  if (Storage.exists(CONFIG_PATH)) {
+    String json = Storage.readFile(CONFIG_PATH);
+    JsonDocument doc;
+    auto error = deserializeJson(doc, json);
+    if (!error) {
+      familyBasePath = doc["path"] | "";
+      JsonArray pts = doc["pts"];
+      if (pts.size() == SIZE_SLOT_COUNT) {
+        for (int i = 0; i < SIZE_SLOT_COUNT; i++) {
+          customPt[i] = pts[i];
+        }
+      }
+    } else {
+      LOG_ERR("FFL", "Failed to parse config.json: %s", error.c_str());
+    }
+  }
 
   initialized = true;
 
@@ -50,7 +57,7 @@ void EpdFontFileLoader::init() {
     char checkPath[256];
     snprintf(checkPath, sizeof(checkPath), "%s/%d_regular.epdfont", familyBasePath.c_str(), customPt[MEDIUM]);
     if (!Storage.exists(checkPath)) {
-      LOG_ERR("FFL", "Configured font missing: %s. Clearing cache.", checkPath);
+      LOG_ERR("FFL", "Configured font missing: %s. Clearing config.", checkPath);
       clearFamily();
     } else {
       LOG_INF("FFL", "Custom SD font configured: %s [%d/%d/%d/%d]", familyBasePath.c_str(), customPt[SMALL],
@@ -182,17 +189,18 @@ bool EpdFontFileLoader::setFamily(const String& basePath, const int pts[SIZE_SLO
   familyBasePath = basePath;
   for (int i = 0; i < SIZE_SLOT_COUNT; i++) customPt[i] = pts[i];
 
-  Preferences prefs;
-  prefs.begin(NVS_NAMESPACE, false);
-  prefs.putString(NVS_PATH_KEY, familyBasePath);
-  prefs.putInt(NVS_PT_S_KEY, customPt[SMALL]);
-  prefs.putInt(NVS_PT_M_KEY, customPt[MEDIUM]);
-  prefs.putInt(NVS_PT_L_KEY, customPt[LARGE]);
-  prefs.putInt(NVS_PT_XL_KEY, customPt[EXTRA_LARGE]);
-  prefs.end();
+  JsonDocument doc;
+  doc["path"] = familyBasePath;
+  JsonArray ptsArr = doc["pts"].to<JsonArray>();
+  for (int i = 0; i < SIZE_SLOT_COUNT; i++) ptsArr.add(customPt[i]);
 
-  LOG_INF("FFL", "Custom SD font family saved: %s [%d/%d/%d/%d]", familyBasePath.c_str(), customPt[SMALL],
-          customPt[MEDIUM], customPt[LARGE], customPt[EXTRA_LARGE]);
+  String json;
+  serializeJson(doc, json);
+  Storage.mkdir("/.fonts");
+  Storage.writeFile(CONFIG_PATH, json);
+
+  LOG_INF("FFL", "Custom SD font family saved to %s: %s [%d/%d/%d/%d]", CONFIG_PATH, familyBasePath.c_str(),
+          customPt[SMALL], customPt[MEDIUM], customPt[LARGE], customPt[EXTRA_LARGE]);
   return true;
 }
 
@@ -201,10 +209,9 @@ bool EpdFontFileLoader::setFamily(const String& basePath, const int pts[SIZE_SLO
 void EpdFontFileLoader::clearFamily() {
   clearCache();
   familyBasePath = "";
-  Preferences prefs;
-  prefs.begin(NVS_NAMESPACE, false);
-  prefs.clear();
-  prefs.end();
+  if (Storage.exists(CONFIG_PATH)) {
+    Storage.remove(CONFIG_PATH);
+  }
 }
 
 #endif  // ENABLE_CUSTOM_FONTS

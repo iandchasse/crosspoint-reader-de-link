@@ -177,8 +177,16 @@ void SettingsActivity::toggleCurrentSetting() {
     const bool currentValue = SETTINGS.*(setting.valuePtr);
     SETTINGS.*(setting.valuePtr) = !currentValue;
   } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
-    const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
-    SETTINGS.*(setting.valuePtr) = (currentValue + 1) % static_cast<uint8_t>(setting.enumValues.size());
+    uint8_t nextValue = (SETTINGS.*(setting.valuePtr) + 1) % static_cast<uint8_t>(setting.enumValues.size());
+
+#ifdef ENABLE_CUSTOM_FONTS
+    // Special case: Skip CUSTOM_FONT if nothing is loaded on SD
+    if (setting.nameId == StrId::STR_FONT_FAMILY &&
+        nextValue == static_cast<uint8_t>(CrossPointSettings::CUSTOM_FONT) && !EpdFontFileLoader::isAvailable()) {
+      nextValue = (nextValue + 1) % static_cast<uint8_t>(setting.enumValues.size());
+    }
+#endif
+    SETTINGS.*(setting.valuePtr) = nextValue;
   } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
     const int8_t currentValue = SETTINGS.*(setting.valuePtr);
     if (currentValue + setting.valueRange.step > setting.valueRange.max) {
@@ -288,7 +296,11 @@ void SettingsActivity::render(RenderLock&&) {
 #ifdef ENABLE_CUSTOM_FONTS
           if (setting.nameId == StrId::STR_FONT_FAMILY && value == CrossPointSettings::CUSTOM_FONT &&
               EpdFontFileLoader::isAvailable()) {
-            valueText = EpdFontFileLoader::getFamilyName().c_str();
+            String name = EpdFontFileLoader::getFamilyName();
+            if (name.length() > 0 && name[0] >= 'a' && name[0] <= 'z') {
+              name[0] = (char)(name[0] - ('a' - 'A'));
+            }
+            valueText = std::string(name.c_str()) + "*";
           } else
 #endif
           {

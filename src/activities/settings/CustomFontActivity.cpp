@@ -2,6 +2,8 @@
 
 #ifdef ENABLE_CUSTOM_FONTS
 
+#include <ArduinoJson.h>
+
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -123,6 +125,9 @@ void CustomFontActivity::onExit() {
   cleanupPreview();
   files.clear();
 }
+
+bool CustomFontActivity::preventAutoSleep() { return state == State::GENERATING; }
+bool CustomFontActivity::skipLoopDelay() { return state == State::GENERATING; }
 
 // ─── loadFolders ─────────────────────────────────────────────────────────────
 // Lists only sub-directories of /fonts — each is a font family candidate.
@@ -307,6 +312,8 @@ void CustomFontActivity::startGeneration() {
   genError = "";
   // Acquire power lock — keeps CPU at full speed for the duration of generation
   pwrLock = std::make_unique<HalPowerManager::Lock>();
+  // Small delay for SD card stability after potential deletions
+  delay(100);
   requestUpdate();
 }
 
@@ -375,14 +382,36 @@ void CustomFontActivity::loop() {
       }
     });
     buttonNavigator.onNextRelease([this] {
-      if (sizeConfigRow < 2) {
+      if (sizeConfigRow < 3) {
         sizeConfigRow++;
         requestUpdate();
       }
     });
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       if (sizeConfigRow == 0) {
-        // Regenerate
+        // [Select]
+        std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
+        std::string dotFontsDir = std::string("/.fonts/") + familyName;
+
+        // Try to load point sizes from config.json if it's the current family
+        int pts[NUM_SIZE_SLOTS] = {12, 14, 16, 18};
+        if (Storage.exists("/.fonts/config.json")) {
+          String json = Storage.readFile("/.fonts/config.json");
+          JsonDocument doc;
+          if (!deserializeJson(doc, json)) {
+            JsonArray ptsArr = doc["pts"];
+            if (ptsArr.size() == NUM_SIZE_SLOTS) {
+              for (int i = 0; i < NUM_SIZE_SLOTS; i++) pts[i] = ptsArr[i];
+            }
+          }
+        }
+
+        EpdFontFileLoader::setFamily(dotFontsDir.c_str(), pts);
+        SETTINGS.fontFamily = CrossPointSettings::CUSTOM_FONT;
+        SETTINGS.saveToFile();
+        finish();
+      } else if (sizeConfigRow == 1) {
+        // [Regenerate]
         state = State::SIZE_CONFIG;
         sizeConfigRow = 0;
         customPt[0] = 12;
@@ -391,8 +420,8 @@ void CustomFontActivity::loop() {
         customPt[3] = 18;
         updatePreview(0);
         requestUpdate();
-      } else if (sizeConfigRow == 1) {
-        // Delete cache
+      } else if (sizeConfigRow == 2) {
+        // [Delete cache]
         std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
         std::string dotFontsDir = std::string("/.fonts/") + familyName;
         deleteDirectory(dotFontsDir.c_str());
@@ -408,6 +437,7 @@ void CustomFontActivity::loop() {
         sizeConfigRow = 0;
         requestUpdate();
       } else {
+        // [Back]
         state = State::BROWSER;
         requestUpdate();
       }
@@ -614,15 +644,15 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
     snprintf(msg, sizeof(msg), "Cache exists for %s", familyName.c_str());
 
     const int boxW = w - 60;
-    const int boxH = 150;
+    const int boxH = 180;
     const int boxX = 30;
     const int boxY = h / 2 - boxH / 2;
     renderer.fillRect(boxX, boxY, boxW, boxH, true);
     renderer.drawRect(boxX, boxY, boxW, boxH);
     renderer.drawCenteredText(UI_12_FONT_ID, boxY + 16, msg, false, EpdFontFamily::BOLD);
 
-    const char* opts[] = {"Regenerate", "Delete Cache", "Back"};
-    for (int i = 0; i < 3; ++i) {
+    const char* opts[] = {"Select", "Regenerate", "Delete Cache", "Back"};
+    for (int i = 0; i < 4; ++i) {
       int y = boxY + 50 + i * 30;
       bool sel = (sizeConfigRow == i);
       if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
@@ -651,42 +681,43 @@ void CustomFontActivity::renderSizeConfig(int w, int h, const ThemeMetrics& metr
   renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + renderer.getLineHeight(UI_10_FONT_ID),
                     "Up/Down: select   Left/Right: adjust size");
 
-  const int rowsTop = contentTop + 2 * renderer.getLineHeight(UI_10_FONT_ID) + metrics.verticalSpacing;
-  const int rowH = renderer.getLineHeight(UI_12_FONT_ID) + 10;
+  const int rowsTop = contentTop + 2 * renderer.getLineHeight(UI_10_FONT_ID) + metrics.verticalSpacing + 10;
+  const int rowH = renderer.getLineHeight(UI_12_FONT_ID) + 16;
 
   const char* hints[] = {"(S)", "(M)", "(L)", "(XL)"};
   for (int i = 0; i < NUM_SIZE_SLOTS; ++i) {
     int y = rowsTop + i * rowH;
     bool sel = (sizeConfigRow == i);
-    if (sel) renderer.fillRect(0, y - 4, w, rowH, false);
 
     char label[64];
     snprintf(label, sizeof(label), "%s  %s", hints[i], SIZE_NAMES[i]);
-    renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding, y, label, sel,
+    renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding, y, label, true,
                       sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 
     // Point size value (right-aligned area)
     char ptStr[16];
-    snprintf(ptStr, sizeof(ptStr), sel ? "< %d pt >" : "%d pt", customPt[i]);
-    renderer.drawText(UI_12_FONT_ID, w - 120, y, ptStr, sel, sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+    snprintf(ptStr, sizeof(ptStr), sel ? "[ %d pt ]" : "%d pt", customPt[i]);
+    renderer.drawText(UI_12_FONT_ID, w - 110, y, ptStr, true, sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
   }
 
   // Generate button
   const int genY = rowsTop + NUM_SIZE_SLOTS * rowH + metrics.verticalSpacing;
   bool genSel = (sizeConfigRow >= NUM_SIZE_SLOTS);
-  if (genSel) renderer.fillRect(w / 2 - 70, genY - 4, 140, rowH, false);
-  renderer.drawCenteredText(UI_12_FONT_ID, genY, "[ Generate ]", genSel,
+  renderer.drawCenteredText(UI_12_FONT_ID, genY, genSel ? ">>  Generate  <<" : "[ Generate ]", true,
                             genSel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 
   // Font Preview Area
+  int previewY = genY + rowH + metrics.verticalSpacing + 25;
+  renderer.drawCenteredText(UI_10_FONT_ID, previewY, "Preview (confirm to generate)", true, EpdFontFamily::BOLD);
+  previewY += renderer.getLineHeight(UI_10_FONT_ID) + 12;
+
   if (previewFamily && renderer.hasFont(PREVIEW_FONT_ID)) {
-    int previewY = genY + rowH + metrics.verticalSpacing + 20;
-    std::string previewString = "The quick brown fox jumps over the lazy dog 0123456789";
-    auto lines = renderer.wrappedText(PREVIEW_FONT_ID, previewString.c_str(), w - metrics.contentSidePadding * 2, 3,
+    const char* previewString = "The quick brown fox jumps over the lazy dog 0123456789";
+    auto lines = renderer.wrappedText(PREVIEW_FONT_ID, previewString, w - metrics.contentSidePadding * 4, 3,
                                       EpdFontFamily::REGULAR);
     for (const auto& line : lines) {
-      renderer.drawText(PREVIEW_FONT_ID, metrics.contentSidePadding, previewY, line.c_str());
-      previewY += renderer.getLineHeight(PREVIEW_FONT_ID) + 5;
+      renderer.drawText(PREVIEW_FONT_ID, metrics.contentSidePadding * 2, previewY, line.c_str(), true);
+      previewY += renderer.getLineHeight(PREVIEW_FONT_ID) + 6;
     }
   }
 
@@ -706,19 +737,12 @@ void CustomFontActivity::renderGenerating(int w, int h, const ThemeMetrics& metr
   int styleIdx = (step < totalSteps) ? step % NUM_STYLES : NUM_STYLES - 1;
 
   char status[128];
-  snprintf(status, sizeof(status), "%s %dpt  (%s)  %d / %d", SIZE_NAMES[slot], customPt[slot], STYLE_SUFFIXES[styleIdx],
-           step, totalSteps);
-  renderer.drawCenteredText(UI_12_FONT_ID, cy - 40, status, true, EpdFontFamily::REGULAR);
+  snprintf(status, sizeof(status), "%s %dpt  (%s)", SIZE_NAMES[slot], customPt[slot], STYLE_SUFFIXES[styleIdx]);
+  renderer.drawCenteredText(UI_12_FONT_ID, cy - 50, status, true, EpdFontFamily::REGULAR);
 
-  const int barW = w - 80, barH = 20, barX = 40, barY = cy - 10;
-  renderer.drawRect(barX, barY, barW, barH);
-  if (totalSteps > 0 && step > 0) {
-    renderer.fillRect(barX, barY, (barW * step) / totalSteps, barH, false);
-  }
+  const int barW = w - 120, barH = 16, barX = 60, barY = cy - 10;
+  GUI.drawProgressBar(renderer, Rect{barX, barY, barW, barH}, step, totalSteps);
 
-  char pct[16];
-  snprintf(pct, sizeof(pct), "%d%%", totalSteps > 0 ? (step * 100 / totalSteps) : 0);
-  renderer.drawCenteredText(UI_10_FONT_ID, cy + 18, pct, false, EpdFontFamily::REGULAR);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 }
 
@@ -731,11 +755,11 @@ void CustomFontActivity::renderDone(int w, int h, const ThemeMetrics& metrics, b
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing * 2;
 
   if (!genError.empty()) {
-    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop, genError.c_str());
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop, genError.c_str(), true);
   }
   if (ok) {
     renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + 28,
-                      "Open a book to preview the new font.");
+                      "Open a book to preview the new font.", true);
   }
 
   const char* opts[] = {"OK", "Delete Cache", "Back"};
@@ -745,8 +769,8 @@ void CustomFontActivity::renderDone(int w, int h, const ThemeMetrics& metrics, b
     int y = optStartY + i * optRowH;
     bool sel = (sizeConfigRow == i);
     if (sel)
-      renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding - 2, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
-    renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, metrics.contentSidePadding + 18, y, opts[i], false,
+      renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding - 2, y, "\xe2\x96\xb6", true, EpdFontFamily::BOLD);
+    renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, metrics.contentSidePadding + 18, y, opts[i], true,
                       sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
   }
 

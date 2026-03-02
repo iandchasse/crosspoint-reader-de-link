@@ -23,6 +23,8 @@ class CustomFontActivity final : public Activity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
+  bool preventAutoSleep() override;
+  bool skipLoopDelay() override;
   void render(RenderLock&&) override;
 
  private:

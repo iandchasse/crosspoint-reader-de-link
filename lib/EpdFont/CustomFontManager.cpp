@@ -14,22 +14,7 @@
 EpdFontFamily* CustomFontManager::customFontFamily = nullptr;
 static const char* NVS_NAMESPACE = "custom_font";
 
-void CustomFontManager::init() {
-  Preferences prefs;
-  prefs.begin(NVS_NAMESPACE, true);
-
-  String path = prefs.getString("path", "");
-  int sizePt = prefs.getInt("size", 10);
-  bool is2Bit = prefs.getBool("is2Bit", true);
-  prefs.end();
-
-  if (path.length() > 0) {
-    LOG_INF("CFM", "Restoring custom font from NVS: %s", path.c_str());
-    setActiveCustomFont(path, sizePt, is2Bit);
-  } else {
-    LOG_DBG("CFM", "No custom font configured in NVS");
-  }
-}
+void CustomFontManager::init() { LOG_DBG("CFM", "CustomFontManager (deprecated) initialized"); }
 
 EpdFontFamily* CustomFontManager::getActiveCustomFont() { return customFontFamily; }
 
@@ -120,15 +105,6 @@ bool CustomFontManager::setActiveCustomFont(const String& ttfPath, int sizePt, b
 
   customFontFamily = newFamily;
 
-  // Save to NVS (only if called from UI/setActive, though we call it from init too...
-  // but init doesn't change anything if it was already there)
-  Preferences prefs;
-  prefs.begin(NVS_NAMESPACE, false);
-  prefs.putString("path", ttfPath);
-  prefs.putInt("size", sizePt);
-  prefs.putBool("is2Bit", is2Bit);
-  prefs.end();
-
   LOG_INF("CFM", "Custom font family successfully loaded and active");
   return true;
 }
@@ -150,11 +126,6 @@ void CustomFontManager::clearCustomFont() {
     heap_caps_free(customFontFamily);
     customFontFamily = nullptr;
   }
-
-  Preferences prefs;
-  prefs.begin(NVS_NAMESPACE, false);
-  prefs.clear();
-  prefs.end();
 }
 
 size_t CustomFontManager::getTotalRamUsage() {
