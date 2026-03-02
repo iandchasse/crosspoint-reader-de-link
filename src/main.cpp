@@ -22,6 +22,9 @@
 #include "activities/ActivityManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#ifdef ENABLE_CUSTOM_FONTS
+#include <EpdFontFileLoader.h>
+#endif
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
 
@@ -221,6 +224,11 @@ void setupDisplayAndFonts() {
   renderer.insertFont(UI_10_FONT_ID, ui10FontFamily);
   renderer.insertFont(UI_12_FONT_ID, ui12FontFamily);
   renderer.insertFont(SMALL_FONT_ID, smallFontFamily);
+
+#ifdef ENABLE_CUSTOM_FONTS
+  EpdFontFileLoader::init();
+#endif
+
   LOG_DBG("MAIN", "Fonts setup");
 }
 
@@ -277,6 +285,24 @@ void setup() {
   LOG_DBG("MAIN", "Starting CrossPoint version " CROSSPOINT_VERSION);
 
   setupDisplayAndFonts();
+
+#ifdef ENABLE_CUSTOM_FONTS
+  // If the user was reading with a custom font, eagerly load it into the renderer
+  // now so the first page render uses it immediately rather than falling back.
+  LOG_DBG("MAIN", "CustomFont pre-load check: fontFamily=%d CUSTOM=%d available=%d", SETTINGS.fontFamily,
+          CrossPointSettings::CUSTOM_FONT, EpdFontFileLoader::isAvailable() ? 1 : 0);
+  if (SETTINGS.fontFamily == CrossPointSettings::CUSTOM_FONT && EpdFontFileLoader::isAvailable()) {
+    auto slot = static_cast<EpdFontFileLoader::SizeSlot>(SETTINGS.fontSize);
+    EpdFontFamily* fam = EpdFontFileLoader::getFamily(slot);
+    if (fam) {
+      renderer.insertFont(SETTINGS.getReaderFontId(), *fam);
+      LOG_INF("MAIN", "Pre-loaded custom font into renderer for boot-to-reader (fontId=%d slot=%d)",
+              SETTINGS.getReaderFontId(), slot);
+    } else {
+      LOG_ERR("MAIN", "Custom font configured but failed to load on boot -- will fall back");
+    }
+  }
+#endif
 
   activityManager.goToBoot();
 

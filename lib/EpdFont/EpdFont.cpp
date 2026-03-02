@@ -75,6 +75,12 @@ void EpdFont::getTextDimensions(const char* string, int* w, int* h) const {
   *h = maxY - minY;
 }
 
+const uint8_t* EpdFont::getBitmap(uint32_t cp) const {
+  const EpdGlyph* glyph = getGlyph(cp);
+  if (!glyph) return nullptr;
+  return &data->bitmap[glyph->dataOffset];
+}
+
 static uint8_t lookupKernClass(const EpdKernClassEntry* entries, const uint16_t count, const uint32_t cp) {
   if (!entries || count == 0 || cp > 0xFFFF) {
     return 0;

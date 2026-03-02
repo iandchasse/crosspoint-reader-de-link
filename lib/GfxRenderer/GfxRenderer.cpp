@@ -3,7 +3,8 @@
 #include <Logging.h>
 #include <Utf8.h>
 
-const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const EpdGlyph* glyph) const {
+const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFont* font, const EpdGlyph* glyph, uint32_t cp) const {
+  const EpdFontData* fontData = font->data;
   if (fontData->groups != nullptr) {
     if (!fontDecompressor) {
       LOG_ERR("GFX", "Compressed font but no FontDecompressor set");
@@ -12,7 +13,7 @@ const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const Ep
     uint16_t glyphIndex = static_cast<uint16_t>(glyph - fontData->glyph);
     return fontDecompressor->getBitmap(fontData, glyph, glyphIndex);
   }
-  return &fontData->bitmap[glyph->dataOffset];
+  return font->getBitmap(cp);
 }
 
 void GfxRenderer::begin() {
@@ -67,20 +68,24 @@ template <TextRotation rotation>
 static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode renderMode,
                            const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
                            const bool pixelState, const EpdFontFamily::Style style) {
-  const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
+  // Resolve the EpdFont* for the requested style — uses fallback (e.g. BOLD → regular if no bold
+  // font registered). This SAME pointer must be used for both glyph lookup AND bitmap fetch to
+  // ensure getGlyphBitmap passes the correct fontData to FontDecompressor.
+  const EpdFont* font = fontFamily.resolveFont(style);
+  const EpdGlyph* glyph = font ? font->getGlyph(cp) : nullptr;
   if (!glyph) {
     LOG_ERR("GFX", "No glyph for codepoint %d", cp);
     return;
   }
 
-  const EpdFontData* fontData = fontFamily.getData(style);
+  const EpdFontData* fontData = font->data;
   const bool is2Bit = fontData->is2Bit;
   const uint8_t width = glyph->width;
   const uint8_t height = glyph->height;
   const int left = glyph->left;
   const int top = glyph->top;
 
-  const uint8_t* bitmap = renderer.getGlyphBitmap(fontData, glyph);
+  const uint8_t* bitmap = renderer.getGlyphBitmap(font, glyph, cp);
 
   if (bitmap != nullptr) {
     // For Normal:  outer loop advances screenY, inner loop advances screenX

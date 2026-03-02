@@ -1,22 +1,13 @@
 #include "EpdFontFamily.h"
 
 const EpdFont* EpdFontFamily::getFont(const Style style) const {
-  // Extract font style bits (ignore UNDERLINE bit for font selection)
-  const bool hasBold = (style & BOLD) != 0;
-  const bool hasItalic = (style & ITALIC) != 0;
-
-  if (hasBold && hasItalic) {
-    if (boldItalic) return boldItalic;
-    if (bold) return bold;
-    if (italic) return italic;
-  } else if (hasBold && bold) {
-    return bold;
-  } else if (hasItalic && italic) {
-    return italic;
-  }
-
+  if (style == BOLD && bold) return bold;
+  if (style == ITALIC && italic) return italic;
+  if (style == BOLD_ITALIC && boldItalic) return boldItalic;
   return regular;
 }
+
+const EpdFont* EpdFontFamily::resolveFont(const Style style) const { return getFont(style); }
 
 void EpdFontFamily::getTextDimensions(const char* string, int* w, int* h, const Style style) const {
   getFont(style)->getTextDimensions(string, w, h);

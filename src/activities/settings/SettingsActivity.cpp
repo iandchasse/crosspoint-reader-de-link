@@ -7,6 +7,7 @@
 #include "CalibreSettingsActivity.h"
 #include "ClearCacheActivity.h"
 #include "CrossPointSettings.h"
+#include "CustomFontActivity.h"
 #include "KOReaderSettingsActivity.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
@@ -16,6 +17,13 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+
+#ifdef ENABLE_CUSTOM_FONTS
+#include <EpdFontFileLoader.h>
+
+#include "FontDownloadActivity.h"
+
+#endif
 
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
                                                               StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
@@ -31,14 +39,28 @@ void SettingsActivity::onEnter() {
 
   for (const auto& setting : getSettingsList()) {
     if (setting.category == StrId::STR_NONE_OPT) continue;
-    if (setting.category == StrId::STR_CAT_DISPLAY) {
-      displaySettings.push_back(setting);
-    } else if (setting.category == StrId::STR_CAT_READER) {
-      readerSettings.push_back(setting);
-    } else if (setting.category == StrId::STR_CAT_CONTROLS) {
-      controlsSettings.push_back(setting);
-    } else if (setting.category == StrId::STR_CAT_SYSTEM) {
-      systemSettings.push_back(setting);
+
+    // Create a local copy so we can modify it (e.g. to filter enum choices)
+    SettingInfo currentSetting = setting;
+#ifdef ENABLE_CUSTOM_FONTS
+    if (currentSetting.nameId == StrId::STR_FONT_FAMILY && !EpdFontFileLoader::isAvailable()) {
+      for (auto it = currentSetting.enumValues.begin(); it != currentSetting.enumValues.end(); ++it) {
+        if (*it == StrId::STR_CUSTOM_FONT) {
+          currentSetting.enumValues.erase(it);
+          break;
+        }
+      }
+    }
+#endif
+
+    if (currentSetting.category == StrId::STR_CAT_DISPLAY) {
+      displaySettings.push_back(currentSetting);
+    } else if (currentSetting.category == StrId::STR_CAT_READER) {
+      readerSettings.push_back(currentSetting);
+    } else if (currentSetting.category == StrId::STR_CAT_CONTROLS) {
+      controlsSettings.push_back(currentSetting);
+    } else if (currentSetting.category == StrId::STR_CAT_SYSTEM) {
+      systemSettings.push_back(currentSetting);
     }
     // Web-only categories (KOReader Sync, OPDS Browser) are skipped for device UI
   }
@@ -51,8 +73,14 @@ void SettingsActivity::onEnter() {
   systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_BROWSER, SettingAction::OPDSBrowser));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
+#ifdef ENABLE_CUSTOM_FONTS
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_DOWNLOAD_FONTS, SettingAction::DownloadFonts));
+#endif
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
+#ifdef ENABLE_CUSTOM_FONTS
+  readerSettings.push_back(SettingInfo::Action(StrId::STR_SELECT_CUSTOM_FONT, SettingAction::SelectCustomFont));
+#endif
 
   // Reset selection to first category
   selectedCategoryIndex = 0;
@@ -150,8 +178,15 @@ void SettingsActivity::toggleCurrentSetting() {
     const bool currentValue = SETTINGS.*(setting.valuePtr);
     SETTINGS.*(setting.valuePtr) = !currentValue;
   } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
-    const uint8_t currentValue = SETTINGS.*(setting.valuePtr);
-    SETTINGS.*(setting.valuePtr) = (currentValue + 1) % static_cast<uint8_t>(setting.enumValues.size());
+    uint8_t nextValue = (SETTINGS.*(setting.valuePtr) + 1) % static_cast<uint8_t>(setting.enumValues.size());
+    // Special case: Skip CUSTOM_FONT if nothing is loaded on SD
+#ifdef ENABLE_CUSTOM_FONTS
+    if (setting.nameId == StrId::STR_FONT_FAMILY &&
+        nextValue == static_cast<uint8_t>(CrossPointSettings::CUSTOM_FONT) && !EpdFontFileLoader::isAvailable()) {
+      nextValue = (nextValue + 1) % static_cast<uint8_t>(setting.enumValues.size());
+    }
+#endif
+    SETTINGS.*(setting.valuePtr) = nextValue;
   } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
     const int8_t currentValue = SETTINGS.*(setting.valuePtr);
     if (currentValue + setting.valueRange.step > setting.valueRange.max) {
@@ -184,6 +219,15 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::CheckForUpdates:
         startActivityForResult(std::make_unique<OtaUpdateActivity>(renderer, mappedInput), resultHandler);
         break;
+#ifdef ENABLE_CUSTOM_FONTS
+      case SettingAction::DownloadFonts:
+        startActivityForResult(std::make_unique<FontDownloadActivity>(renderer, mappedInput, activityManager),
+                               resultHandler);
+        break;
+      case SettingAction::SelectCustomFont:
+        startActivityForResult(std::make_unique<CustomFontActivity>(renderer, mappedInput), resultHandler);
+        break;
+#endif
       case SettingAction::Language:
         startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
         break;
@@ -234,7 +278,20 @@ void SettingsActivity::render(RenderLock&&) {
           valueText = value ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
         } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
           const uint8_t value = SETTINGS.*(setting.valuePtr);
+#ifdef ENABLE_CUSTOM_FONTS
+          if (setting.nameId == StrId::STR_FONT_FAMILY && value == CrossPointSettings::CUSTOM_FONT &&
+              EpdFontFileLoader::isAvailable()) {
+            String name = EpdFontFileLoader::getFamilyName();
+            if (name.length() > 0 && name[0] >= 'a' && name[0] <= 'z') {
+              name[0] = (char)(name[0] - ('a' - 'A'));
+            }
+            valueText = std::string(name.c_str()) + "*";
+          } else {
+            valueText = I18N.get(setting.enumValues[value]);
+          }
+#else
           valueText = I18N.get(setting.enumValues[value]);
+#endif
         } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
           valueText = std::to_string(SETTINGS.*(setting.valuePtr));
         }

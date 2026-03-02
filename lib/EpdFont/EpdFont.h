@@ -7,14 +7,16 @@ class EpdFont {
  public:
   const EpdFontData* data;
   explicit EpdFont(const EpdFontData* data) : data(data) {}
-  ~EpdFont() = default;
+  virtual ~EpdFont() = default;
   void getTextDimensions(const char* string, int* w, int* h) const;
 
   const EpdGlyph* getGlyph(uint32_t cp) const;
 
+  virtual const uint8_t* getBitmap(uint32_t cp) const;
+
   /// Returns the kerning adjustment (4.4 fixed-point in pixels) between two codepoints.
   /// Returns 0 if no kerning data exists for the pair.
-  int8_t getKerning(uint32_t leftCp, uint32_t rightCp) const;
+  int getKerning(uint32_t leftCp, uint32_t rightCp) const;
 
   /// Returns the ligature codepoint for a pair, or 0 if no ligature exists.
   uint32_t getLigature(uint32_t leftCp, uint32_t rightCp) const;

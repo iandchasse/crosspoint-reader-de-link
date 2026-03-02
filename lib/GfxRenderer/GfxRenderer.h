@@ -59,6 +59,8 @@ class GfxRenderer {
   // Setup
   void begin();  // must be called right after display.begin()
   void insertFont(int fontId, EpdFontFamily font);
+  bool hasFont(int fontId) const { return fontMap.count(fontId) > 0; }
+  void removeFont(int fontId) { fontMap.erase(fontId); }
   void setFontDecompressor(FontDecompressor* d) { fontDecompressor = d; }
   void clearFontCache() {
     if (fontDecompressor) fontDecompressor->clearCache();
@@ -142,7 +144,7 @@ class GfxRenderer {
   void cleanupGrayscaleWithFrameBuffer() const;
 
   // Font helpers
-  const uint8_t* getGlyphBitmap(const EpdFontData* fontData, const EpdGlyph* glyph) const;
+  const uint8_t* getGlyphBitmap(const EpdFont* font, const EpdGlyph* glyph, uint32_t cp) const;
 
   // Low level functions
   uint8_t* getFrameBuffer() const;

@@ -16,3 +16,11 @@
 #define UI_10_FONT_ID (-1246724383)
 #define UI_12_FONT_ID (-359249323)
 #define SMALL_FONT_ID (1073217904)
+
+// SD-cached custom font IDs (one per font-size slot)
+#define CUSTOM_SD_FONT_SMALL_ID (-2000000001)
+#define CUSTOM_SD_FONT_MEDIUM_ID (-2000000002)
+#define CUSTOM_SD_FONT_LARGE_ID (-2000000003)
+#define CUSTOM_SD_FONT_XL_ID (-2000000004)
+// Deprecated: kept for reference, no longer inserted into the renderer
+#define CUSTOM_PSRAM_FONT_ID (-2000000000)

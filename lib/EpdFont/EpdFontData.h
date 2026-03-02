@@ -2,6 +2,7 @@
 // https://github.com/vroland/epdiy/blob/c61e9e923ce2418150d54f88cea5d196cdc40c54/src/epd_internals.h
 
 #pragma once
+#include <cstddef>
 #include <cstdint>
 
 /// Font metrics use "fixed-point 4" (4 fractional bits, i.e. 1/16-pixel
@@ -42,7 +43,7 @@ typedef struct {
   int16_t top;          ///< Y dist from cursor pos to UL corner
   uint16_t dataLength;  ///< Size of the font data.
   uint32_t dataOffset;  ///< Pointer into EpdFont->bitmap (or within-group offset for compressed fonts)
-} EpdGlyph;
+} __attribute__((packed)) EpdGlyph;
 
 /// Compressed font group: a DEFLATE-compressed block of glyph bitmaps
 typedef struct {
@@ -51,14 +52,16 @@ typedef struct {
   uint32_t uncompressedSize;  ///< Decompressed size
   uint16_t glyphCount;        ///< Number of glyphs in this group
   uint16_t firstGlyphIndex;   ///< First glyph index in the global glyph array
-} EpdFontGroup;
+} __attribute__((packed)) EpdFontGroup;
+
+static_assert(sizeof(EpdGlyph) == 14, "EpdGlyph must not have padding!");
 
 /// Glyph interval structure
 typedef struct {
   uint32_t first;   ///< The first unicode code point of the interval
   uint32_t last;    ///< The last unicode code point of the interval
   uint32_t offset;  ///< Index of the first code point into the glyph array
-} EpdUnicodeInterval;
+} __attribute__((packed)) EpdUnicodeInterval;
 
 /// Maps a codepoint to a kerning class ID, sorted by codepoint for binary search.
 /// Class IDs are 1-based; codepoints not in the table have implicit class 0 (no kerning).
@@ -95,4 +98,5 @@ typedef struct {
   uint8_t kernRightClassCount;           ///< Number of distinct right classes (matrix cols)
   const EpdLigaturePair* ligaturePairs;  ///< Sorted ligature pair table (nullptr if none)
   uint32_t ligaturePairCount;            ///< Number of entries in ligaturePairs
+  size_t totalAllocatedSize;             ///< For memory tracking
 } EpdFontData;

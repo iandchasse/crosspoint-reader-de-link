@@ -10,6 +10,10 @@
 
 #include "fontIds.h"
 
+#ifdef ENABLE_CUSTOM_FONTS
+#include <EpdFontFileLoader.h>
+#endif
+
 // Initialize the static instance
 CrossPointSettings CrossPointSettings::instance;
 
@@ -226,6 +230,20 @@ bool CrossPointSettings::loadFromBinaryFile() {
 }
 
 float CrossPointSettings::getReaderLineCompression() const {
+#ifdef ENABLE_CUSTOM_FONTS
+  if (fontFamily == CUSTOM_FONT) {
+    switch (lineSpacing) {
+      case TIGHT:
+        return 0.95f;
+      case NORMAL:
+      default:
+        return 1.0f;
+      case WIDE:
+        return 1.1f;
+    }
+  }
+#endif
+  // If fonts are omitted, everything defaults back to Bookerly spacing
   switch (fontFamily) {
     case BOOKERLY:
     default:
@@ -294,6 +312,12 @@ int CrossPointSettings::getRefreshFrequency() const {
 }
 
 int CrossPointSettings::getReaderFontId() const {
+#ifdef ENABLE_CUSTOM_FONTS
+  if (fontFamily == CUSTOM_FONT) {
+    return EpdFontFileLoader::getFontId(static_cast<EpdFontFileLoader::SizeSlot>(fontSize));
+  }
+#endif
+  // Fall back to the only provided bookerly size if fonts are omitted
   switch (fontFamily) {
     case BOOKERLY:
     default:
