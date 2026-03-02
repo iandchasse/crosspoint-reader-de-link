@@ -289,9 +289,9 @@ void CustomFontActivity::onSelectFolder(const std::string& familyDir) {
   std::string dotFontsDir = std::string("/.fonts/") + familyName;
 
   const FolderInfo& info = folders[selectorIndex];
-  isImportMode = info.hasEpd;
+  isImportMode = info.hasEpd && !cacheExists(dotFontsDir);
 
-  if (isImportMode) {
+  if (info.hasEpd) {
     state = State::CONFIRM;
     sizeConfigRow = 0;
     requestUpdate();
@@ -462,10 +462,17 @@ void CustomFontActivity::loop() {
       }
     });
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      const auto& info = folders[selectorIndex];
       if (isImportMode) {
-        // [Import]
-        state = State::GENERATING;
-        genStep = 0;
+        if (sizeConfigRow == 0) {
+          // [Import]
+          state = State::GENERATING;
+          genStep = 0;
+        } else {
+          // [Cancel]
+          state = State::BROWSER;
+          sizeConfigRow = 0;
+        }
         requestUpdate();
       } else if (sizeConfigRow == 0) {
         // [Select]
@@ -490,13 +497,19 @@ void CustomFontActivity::loop() {
         SETTINGS.saveToFile();
         finish();
       } else if (sizeConfigRow == 1) {
-        // [Regenerate]
-        state = State::SIZE_CONFIG;
+        // [Regenerate] or [Re-import]
+        if (info.hasEpd) {
+          isImportMode = true;
+          state = State::GENERATING;
+          genStep = 0;
+        } else {
+          state = State::SIZE_CONFIG;
+          customPt[0] = 12;
+          customPt[1] = 14;
+          customPt[2] = 16;
+          customPt[3] = 18;
+        }
         sizeConfigRow = 0;
-        customPt[0] = 12;
-        customPt[1] = 14;
-        customPt[2] = 16;
-        customPt[3] = 18;
         updatePreview(0);
         requestUpdate();
       } else if (sizeConfigRow == 2) {
@@ -766,7 +779,7 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
     renderer.drawCenteredText(UI_12_FONT_ID, boxY + 16, msg, false, EpdFontFamily::BOLD);
 
     if (isImportMode) {
-      const char* opts[] = {"Import", "Back"};
+      const char* opts[] = {"Import", "Cancel"};
       for (int i = 0; i < 2; ++i) {
         int y = boxY + 50 + i * 30;
         bool sel = (sizeConfigRow == i);
@@ -775,7 +788,9 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
                           sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
       }
     } else {
-      const char* opts[] = {"Select", "Regenerate", "Delete Cache", "Back"};
+      const auto& info = folders[selectorIndex];
+      const char* btn2Name = info.hasEpd ? "Re-import" : "Regenerate";
+      const char* opts[] = {"Select", btn2Name, "Delete Cache", "Back"};
       for (int i = 0; i < 4; ++i) {
         int y = boxY + 50 + i * 30;
         bool sel = (sizeConfigRow == i);

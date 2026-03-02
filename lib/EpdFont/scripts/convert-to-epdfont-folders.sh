@@ -12,7 +12,7 @@ UI_FONT_SIZES=(10 12)
 UI_FONT_STYLES=("Regular" "Bold")
 
 # Output base directory
-OUTPUT_BASE="../../fonts_preconverted"
+OUTPUT_BASE="fonts_preconverted"
 mkdir -p "$OUTPUT_BASE"
 
 convert_family() {

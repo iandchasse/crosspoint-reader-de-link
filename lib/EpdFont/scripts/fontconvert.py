@@ -893,7 +893,7 @@ if kern_map:
     for row in range(kern_left_class_count):
         row_start = row * kern_right_class_count
         row_vals = kern_matrix[row_start:row_start + kern_right_class_count]
-        print("    " + ", ".join(f"{v:4d}" for v in row_vals) + ",")
+        print("    " + ", ".join(f"{max(-128, min(127, round(v))):4d}" for v in row_vals) + ",")
     print("};\n")
 
 if ligature_pairs:
