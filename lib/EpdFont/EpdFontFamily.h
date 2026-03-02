@@ -15,6 +15,10 @@ class EpdFontFamily {
   int8_t getKerning(uint32_t leftCp, uint32_t rightCp, Style style = REGULAR) const;
   uint32_t applyLigatures(uint32_t cp, const char*& text, Style style = REGULAR) const;
 
+  /// Returns the best available EpdFont* for the given style, falling back to regular
+  /// if the requested style has no dedicated font.
+  const EpdFont* resolveFont(Style style) const;
+
   const EpdFont* getFontPtr(Style style) const {
     switch (style) {
       case BOLD:

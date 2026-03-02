@@ -66,13 +66,16 @@ template <TextRotation rotation>
 static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode renderMode,
                            const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
                            const bool pixelState, const EpdFontFamily::Style style) {
-  const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
+  // Resolve the EpdFont* for the requested style — uses fallback (e.g. BOLD → regular if no bold
+  // font registered). This SAME pointer must be used for both glyph lookup AND bitmap fetch to
+  // ensure getGlyphBitmap passes the correct fontData to FontDecompressor.
+  const EpdFont* font = fontFamily.resolveFont(style);
+  const EpdGlyph* glyph = font ? font->getGlyph(cp) : nullptr;
   if (!glyph) {
     LOG_ERR("GFX", "No glyph for codepoint %d", cp);
     return;
   }
 
-  const EpdFont* font = fontFamily.getFontPtr(style);
   const EpdFontData* fontData = font->data;
   const bool is2Bit = fontData->is2Bit;
   const uint8_t width = glyph->width;
@@ -95,6 +98,7 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     }
 
     if (is2Bit) {
+      // Tight packing: bit stream flows continuously across row and byte boundaries
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
         const int outerCoord = outerBase + glyphY;
@@ -129,6 +133,7 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
         }
       }
     } else {
+      // Tight packing: bit stream flows continuously across row and byte boundaries
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
         const int outerCoord = outerBase + glyphY;

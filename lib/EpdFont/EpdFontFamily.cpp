@@ -1,5 +1,7 @@
 #include "EpdFontFamily.h"
 
+const EpdFont* EpdFontFamily::resolveFont(const Style style) const { return getFont(style); }
+
 const EpdFont* EpdFontFamily::getFont(const Style style) const {
   // Extract font style bits (ignore UNDERLINE bit for font selection)
   const bool hasBold = (style & BOLD) != 0;

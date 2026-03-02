@@ -41,12 +41,9 @@ class EpdStreamFont : public EpdFont {
  private:
   explicit EpdStreamFont(EpdFontData* data, const char* path, size_t cacheSize);
 
-  bool ensureFileOpen() const;
-
   // The base class members are loaded into standard heap memory instead of PSRAM.
   EpdFontData* allocatedData_;
 
-  mutable EspFsFile file_;
   std::string path_;
 
   // --- LRU Cache State ---
@@ -62,7 +59,6 @@ class EpdStreamFont : public EpdFont {
   mutable std::vector<CacheNode> cache_;
   mutable uint32_t accessTick_;
 
-  const uint8_t* fetchFromSD(uint32_t cp, const EpdGlyph* g) const;
   void evictOldest() const;
 };
 

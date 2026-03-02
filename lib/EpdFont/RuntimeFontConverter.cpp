@@ -562,34 +562,36 @@ bool RuntimeFontConverter::generateAndSaveToFile(const char* sdTtfPath, int size
         std::vector<uint8_t> tempMask(w * h);
         stbtt_MakeGlyphBitmap(&fontInfo, tempMask.data(), w, h, w, scale, scale, glyphIndex);
 
-        int pixelCount = w * h;
-        uint8_t out_byte = 0;
-        int bit_in_byte = 0;
         std::vector<uint8_t> compiledBitmap;
 
-        for (int p = 0; p < pixelCount; ++p) {
-          uint8_t alpha = tempMask[p];
-          uint8_t val = 0;
-          if (is2Bit) {
-            if (alpha >= 192)
-              val = 3;
-            else if (alpha >= 128)
-              val = 2;
-            else if (alpha >= 64)
-              val = 1;
-            out_byte = (out_byte << 2) | val;
-            bit_in_byte += 2;
-          } else {
-            if (alpha >= 128) val = 1;
-            out_byte = (out_byte << 1) | val;
-            bit_in_byte += 1;
-          }
-          if (bit_in_byte == 8) {
-            compiledBitmap.push_back(out_byte);
-            out_byte = 0;
-            bit_in_byte = 0;
+        uint8_t out_byte = 0;
+        int bit_in_byte = 0;
+        for (int y = 0; y < h; ++y) {
+          for (int x = 0; x < w; ++x) {
+            uint8_t alpha = tempMask[y * w + x];
+            uint8_t val = 0;
+            if (is2Bit) {
+              if (alpha >= 192)
+                val = 3;
+              else if (alpha >= 128)
+                val = 2;
+              else if (alpha >= 64)
+                val = 1;
+              out_byte = (out_byte << 2) | val;
+              bit_in_byte += 2;
+            } else {
+              if (alpha >= 128) val = 1;
+              out_byte = (out_byte << 1) | val;
+              bit_in_byte += 1;
+            }
+            if (bit_in_byte == 8) {
+              compiledBitmap.push_back(out_byte);
+              out_byte = 0;
+              bit_in_byte = 0;
+            }
           }
         }
+        // Flush the partial byte only at the very end of the glyph bitmap
         if (bit_in_byte > 0) {
           out_byte <<= (8 - bit_in_byte);
           compiledBitmap.push_back(out_byte);

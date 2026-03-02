@@ -107,7 +107,6 @@ EpdStreamFont::EpdStreamFont(EpdFontData* data, const char* path, size_t cacheSi
       accessTick_(0) {}
 
 EpdStreamFont::~EpdStreamFont() {
-  if (file_) file_.close();
   if (allocatedData_) {
     if (allocatedData_->intervals) heap_caps_free((void*)allocatedData_->intervals);
     if (allocatedData_->glyph) heap_caps_free((void*)allocatedData_->glyph);
@@ -116,11 +115,6 @@ EpdStreamFont::~EpdStreamFont() {
 }
 
 // ─── loader & cache methods ──────────────────────────────────────────────────
-
-bool EpdStreamFont::ensureFileOpen() const {
-  if (file_) return true;
-  return Storage.openFileForRead("STR", path_.c_str(), file_);
-}
 
 void EpdStreamFont::evictOldest() const {
   if (cache_.empty()) return;
@@ -150,50 +144,43 @@ const uint8_t* EpdStreamFont::getBitmap(uint32_t cp) const {
     }
   }
 
-  // 2. Cache Miss - perform stream fetch
-  if (!ensureFileOpen()) return nullptr;
+  // 2. Cache Miss - open file locally, seek to glyph data, read it, then close immediately.
+  // This avoids persistent file descriptors that exhaust the OS limit between chapter loads.
+  EspFsFile file;
+  if (!Storage.openFileForRead("STR", path_.c_str(), file)) return nullptr;
 
-  // Header = 12 bytes
-  // Intervals = 4 + (intervalCount * 12)
-  // Glyphs = 4 + (glyphCount * 14)
-  // We need to seek past all that to the giant binary block exactly where `g->dataOffset` is.
-
-  // Easier way: The binary starts immediately after Ligatures.
-  // BUT dataOffset in RuntimeFontConverter is 0-indexed against the start of the bitmap table itself.
-  // We need to calculate the exact static offset of the bitmap block.
-
+  // Header = 15 bytes (MAGIC(4), VERSION(1), advanceY(1), ascent(4), descent(4), is2Bit(1))
+  // Intervals = 4 + (intervalCount * 12 bytes each)
   uint32_t intervalBlock = 4 + (allocatedData_->intervalCount * 12);
-  // Let's compute it accurately from file geometry.
-  // Header: 15 bytes (MAGIC(4), VERSION(1), advanceY(1), ascent(4), descent(4), is2Bit(1))
   uint32_t baseOffset = 15 + intervalBlock;
 
-  // To keep it simple, let's fast-forward the file to read the exact static offset.
-  file_.seek(baseOffset);
+  // Fast-forward file to read the exact static offset of the bitmap block.
+  file.seek(baseOffset);
   uint32_t glyphCount;
-  readU32(file_, glyphCount);
+  readU32(file, glyphCount);
   uint32_t curPos = baseOffset + 4 + (glyphCount * sizeof(EpdGlyph));
-  file_.seek(curPos);
+  file.seek(curPos);
 
   // Skip kerning headers
   uint16_t klCount, krCount;
   uint8_t klClasses, krClasses;
-  readU16(file_, klCount);
-  readU16(file_, krCount);
-  readU8(file_, klClasses);
-  readU8(file_, krClasses);
+  readU16(file, klCount);
+  readU16(file, krCount);
+  readU8(file, klClasses);
+  readU8(file, krClasses);
 
   curPos += 6 + (klCount * sizeof(EpdKernClassEntry)) + (krCount * sizeof(EpdKernClassEntry)) + (klClasses * krClasses);
-  file_.seek(curPos);
+  file.seek(curPos);
 
   uint32_t ligatureCount;
-  readU32(file_, ligatureCount);
+  readU32(file, ligatureCount);
   curPos += 4 + (ligatureCount * sizeof(EpdLigaturePair));
-  file_.seek(curPos);
+  file.seek(curPos);
 
   uint32_t bitmapTableSize;
-  readU32(file_, bitmapTableSize);
+  readU32(file, bitmapTableSize);
 
-  uint32_t absoluteBitmapStart = file_.position();
+  uint32_t absoluteBitmapStart = file.position();
 
   // 3. Perform read into Cache Node
   while (currentCacheSize_ + g->dataLength > maxCacheSize_ && !cache_.empty()) {
@@ -205,8 +192,9 @@ const uint8_t* EpdStreamFont::getBitmap(uint32_t cp) const {
   newNode.lastAccessTick = accessTick_;
   newNode.buffer.resize(g->dataLength);
 
-  file_.seek(absoluteBitmapStart + g->dataOffset);
-  file_.read(newNode.buffer.data(), g->dataLength);
+  file.seek(absoluteBitmapStart + g->dataOffset);
+  file.read(newNode.buffer.data(), g->dataLength);
+  file.close();  // Release FD immediately so other components can open files
 
   currentCacheSize_ += newNode.buffer.capacity();
   cache_.push_back(std::move(newNode));
