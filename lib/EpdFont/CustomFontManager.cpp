@@ -21,12 +21,17 @@ EpdFontFamily* CustomFontManager::getActiveCustomFont() { return customFontFamil
 bool CustomFontManager::setActiveCustomFont(const String& ttfPath, int sizePt, bool is2Bit) {
   LOG_INF("CFM", "Setting active custom font: %s (size: %d)", ttfPath.c_str(), sizePt);
 
-  // Determine the base path by stripping extension and any style suffixes
+  // Determine the base path by stripping the dynamic extension and any style suffixes
+  String ext = ".ttf";
+  int dotIdx = ttfPath.lastIndexOf('.');
+  if (dotIdx != -1) {
+    ext = ttfPath.substring(dotIdx);
+  }
+
   String base = ttfPath;
-  if (base.endsWith(".ttf"))
-    base = base.substring(0, base.length() - 4);
-  else if (base.endsWith(".TTF"))
-    base = base.substring(0, base.length() - 4);
+  if (base.endsWith(ext)) {
+    base = base.substring(0, base.length() - ext.length());
+  }
 
   // Common suffixes to strip to find the true family base
   static const char* suffixes[] = {"_reg",    "_bold",       "_italic", "_bolditalic", "-Regular", "-Bold",
@@ -57,8 +62,9 @@ bool CustomFontManager::setActiveCustomFont(const String& ttfPath, int sizePt, b
 
   if (!regular) {
     // If ttfPath failed, try the base + _reg just in case
-    regular = RuntimeFontConverter::generateEpdFontFromPath((base + "_reg.ttf").c_str(), sizePt, is2Bit);
-    if (!regular) regular = RuntimeFontConverter::generateEpdFontFromPath((base + "_reg.TTF").c_str(), sizePt, is2Bit);
+    regular = RuntimeFontConverter::generateEpdFontFromPath((base + "_reg" + ext).c_str(), sizePt, is2Bit);
+    if (!regular)
+      regular = RuntimeFontConverter::generateEpdFontFromPath((base + "-Regular" + ext).c_str(), sizePt, is2Bit);
   }
 
   if (!regular) {
@@ -67,20 +73,16 @@ bool CustomFontManager::setActiveCustomFont(const String& ttfPath, int sizePt, b
   }
 
   // Look for variants based on the family base
-  EpdFont* bold = RuntimeFontConverter::generateEpdFontFromPath((base + "_bold.ttf").c_str(), sizePt, is2Bit);
-  if (!bold) bold = RuntimeFontConverter::generateEpdFontFromPath((base + "_bold.TTF").c_str(), sizePt, is2Bit);
-  if (!bold) bold = RuntimeFontConverter::generateEpdFontFromPath((base + "-Bold.ttf").c_str(), sizePt, is2Bit);
+  EpdFont* bold = RuntimeFontConverter::generateEpdFontFromPath((base + "_bold" + ext).c_str(), sizePt, is2Bit);
+  if (!bold) bold = RuntimeFontConverter::generateEpdFontFromPath((base + "-Bold" + ext).c_str(), sizePt, is2Bit);
 
-  EpdFont* italic = RuntimeFontConverter::generateEpdFontFromPath((base + "_italic.ttf").c_str(), sizePt, is2Bit);
-  if (!italic) italic = RuntimeFontConverter::generateEpdFontFromPath((base + "_italic.TTF").c_str(), sizePt, is2Bit);
-  if (!italic) italic = RuntimeFontConverter::generateEpdFontFromPath((base + "-Italic.ttf").c_str(), sizePt, is2Bit);
+  EpdFont* italic = RuntimeFontConverter::generateEpdFontFromPath((base + "_italic" + ext).c_str(), sizePt, is2Bit);
+  if (!italic) italic = RuntimeFontConverter::generateEpdFontFromPath((base + "-Italic" + ext).c_str(), sizePt, is2Bit);
 
   EpdFont* boldItalic =
-      RuntimeFontConverter::generateEpdFontFromPath((base + "_bolditalic.ttf").c_str(), sizePt, is2Bit);
+      RuntimeFontConverter::generateEpdFontFromPath((base + "_bolditalic" + ext).c_str(), sizePt, is2Bit);
   if (!boldItalic)
-    boldItalic = RuntimeFontConverter::generateEpdFontFromPath((base + "_bolditalic.TTF").c_str(), sizePt, is2Bit);
-  if (!boldItalic)
-    boldItalic = RuntimeFontConverter::generateEpdFontFromPath((base + "-BoldItalic.ttf").c_str(), sizePt, is2Bit);
+    boldItalic = RuntimeFontConverter::generateEpdFontFromPath((base + "-BoldItalic" + ext).c_str(), sizePt, is2Bit);
 
   // Fallbacks
   if (!bold) bold = regular;

@@ -23,7 +23,6 @@
 #include "fontIds.h"
 #include "util/StringUtils.h"
 
-
 // ─── anonymous helpers ────────────────────────────────────────────────────────
 
 namespace {
@@ -248,16 +247,16 @@ bool CustomFontActivity::scanFamilyStyles(const std::string& familyDir) {
     file.close();
     if (isDir) continue;
     std::string fname(name);
-    if (endsWithCI(fname, ".ttf")) ttfFiles.push_back(fname);
+    if (endsWithCI(fname, ".ttf") || endsWithCI(fname, ".otf")) ttfFiles.push_back(fname);
   }
   root.close();
 
-  // For each style suffix, find the first file whose stem (before .ttf) ends with that suffix (CI)
+  // For each style suffix, find the first file whose stem (before .ttf/.otf) ends with that suffix (CI)
   for (int i = 0; i < NUM_STYLES; ++i) {
     std::string suffix(STYLE_SUFFIXES[i]);
     for (const auto& f : ttfFiles) {
-      // Strip .ttf extension
-      std::string stem = f.substr(0, f.size() - 4);
+      // Strip extension (.ttf or .otf)
+      std::string stem = f.substr(0, f.find_last_of('.'));
       std::string stemLower = stem;
       std::transform(stemLower.begin(), stemLower.end(), stemLower.begin(), ::tolower);
       if (stemLower.size() >= suffix.size() && stemLower.substr(stemLower.size() - suffix.size()) == suffix) {
@@ -464,7 +463,15 @@ void CustomFontActivity::loop() {
       }
     });
     buttonNavigator.onNextRelease([this] {
-      if (sizeConfigRow < 3) {
+      const auto& info = folders[selectorIndex];
+      int maxRow = 3;
+      if (isImportMode) {
+        maxRow = (info.hasTtf && info.hasEpd) ? 2 : 1;
+      } else if (info.hasTtf && info.hasEpd) {
+        maxRow = 4;
+      }
+
+      if (sizeConfigRow < maxRow) {
         sizeConfigRow++;
         requestUpdate();
       }
@@ -476,6 +483,16 @@ void CustomFontActivity::loop() {
           // [Import]
           state = State::GENERATING;
           genStep = 0;
+        } else if (info.hasTtf && info.hasEpd && sizeConfigRow == 1) {
+          // [Generate TTF/OTF]
+          isImportMode = false;
+          state = State::SIZE_CONFIG;
+          customPt[0] = 12;
+          customPt[1] = 14;
+          customPt[2] = 16;
+          customPt[3] = 18;
+          sizeConfigRow = 0;
+          updatePreview(0);
         } else {
           // [Cancel]
           state = State::BROWSER;
@@ -504,13 +521,14 @@ void CustomFontActivity::loop() {
         SETTINGS.fontFamily = CrossPointSettings::CUSTOM_FONT;
         SETTINGS.saveToFile();
         finish();
-      } else if (sizeConfigRow == 1) {
+      } else if (sizeConfigRow == 1 || (info.hasTtf && info.hasEpd && sizeConfigRow == 2)) {
         // [Regenerate] or [Re-import]
-        if (info.hasEpd) {
+        if (sizeConfigRow == 1 && info.hasEpd) {
           isImportMode = true;
           state = State::GENERATING;
           genStep = 0;
         } else {
+          isImportMode = false;
           state = State::SIZE_CONFIG;
           customPt[0] = 12;
           customPt[1] = 14;
@@ -520,7 +538,8 @@ void CustomFontActivity::loop() {
         sizeConfigRow = 0;
         updatePreview(0);
         requestUpdate();
-      } else if (sizeConfigRow == 2) {
+      } else if ((info.hasTtf && info.hasEpd && sizeConfigRow == 3) ||
+                 (!(info.hasTtf && info.hasEpd) && sizeConfigRow == 2)) {
         // [Delete cache]
         std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
         std::string dotFontsDir = std::string("/.fonts/") + familyName;
@@ -782,8 +801,10 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
       snprintf(msg, sizeof(msg), "Cache exists for %s", familyName.c_str());
     }
 
+    const auto& info = folders[selectorIndex];
+    const int numOpts = isImportMode ? (info.hasTtf && info.hasEpd ? 3 : 2) : (info.hasTtf && info.hasEpd ? 5 : 4);
     const int boxW = w - 60;
-    const int boxH = isImportMode ? 120 : 180;
+    const int boxH = numOpts * 30 + 60;
     const int boxX = 30;
     const int boxY = h / 2 - boxH / 2;
     renderer.fillRect(boxX, boxY, boxW, boxH, true);
@@ -791,8 +812,12 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
     renderer.drawCenteredText(UI_12_FONT_ID, boxY + 16, msg, false, EpdFontFamily::BOLD);
 
     if (isImportMode) {
-      const char* opts[] = {"Import", "Cancel"};
-      for (int i = 0; i < 2; ++i) {
+      const char* opts[3] = {"Import EPD", "Generate TTF/OTF", "Cancel"};
+      if (!info.hasTtf || !info.hasEpd) {
+        opts[0] = "Import";
+        opts[1] = "Cancel";
+      }
+      for (int i = 0; i < numOpts; ++i) {
         int y = boxY + 50 + i * 30;
         bool sel = (sizeConfigRow == i);
         if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
@@ -800,10 +825,13 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
                           sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
       }
     } else {
-      const auto& info = folders[selectorIndex];
-      const char* btn2Name = info.hasEpd ? "Re-import" : "Regenerate";
-      const char* opts[] = {"Select", btn2Name, "Delete Cache", "Back"};
-      for (int i = 0; i < 4; ++i) {
+      const char* opts[5] = {"Select", "Re-import EPD", "Generate TTF/OTF", "Delete Cache", "Back"};
+      if (!info.hasTtf || !info.hasEpd) {
+        opts[1] = info.hasEpd ? "Re-import" : "Regenerate";
+        opts[2] = "Delete Cache";
+        opts[3] = "Back";
+      }
+      for (int i = 0; i < numOpts; ++i) {
         int y = boxY + 50 + i * 30;
         bool sel = (sizeConfigRow == i);
         if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
