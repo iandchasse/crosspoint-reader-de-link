@@ -238,6 +238,32 @@ bool CrossPointSettings::loadFromBinaryFile() {
 }
 
 float CrossPointSettings::getReaderLineCompression() const {
+#ifdef ENABLE_CUSTOM_FONTS
+  if (fontFamily == CUSTOM_FONT) {
+    switch (lineSpacing) {
+      case TIGHT:
+        return 0.95f;
+      case NORMAL:
+      default:
+        return 1.0f;
+      case WIDE:
+        return 1.1f;
+    }
+  }
+#endif
+
+#ifdef OMIT_FONTS
+  // If fonts are omitted, everything defaults back to Bookerly spacing
+  switch (lineSpacing) {
+    case TIGHT:
+      return 0.95f;
+    case NORMAL:
+    default:
+      return 1.0f;
+    case WIDE:
+      return 1.1f;
+  }
+#else
   switch (fontFamily) {
     case BOOKERLY:
     default:
@@ -270,19 +296,8 @@ float CrossPointSettings::getReaderLineCompression() const {
         case WIDE:
           return 1.0f;
       }
-#ifdef ENABLE_CUSTOM_FONTS
-    case CUSTOM_FONT:
-      switch (lineSpacing) {
-        case TIGHT:
-          return 0.95f;
-        case NORMAL:
-        default:
-          return 1.0f;
-        case WIDE:
-          return 1.1f;
-      }
-#endif
   }
+#endif  // OMIT_FONTS
 }
 
 unsigned long CrossPointSettings::getSleepTimeoutMs() const {
@@ -318,6 +333,16 @@ int CrossPointSettings::getRefreshFrequency() const {
 }
 
 int CrossPointSettings::getReaderFontId() const {
+#ifdef ENABLE_CUSTOM_FONTS
+  if (fontFamily == CUSTOM_FONT) {
+    return EpdFontFileLoader::getFontId(static_cast<EpdFontFileLoader::SizeSlot>(fontSize));
+  }
+#endif
+
+#ifdef OMIT_FONTS
+  // Fall back to the only provided bookerly size if fonts are omitted
+  return BOOKERLY_14_FONT_ID;
+#else
   switch (fontFamily) {
     case BOOKERLY:
     default:
@@ -356,9 +381,6 @@ int CrossPointSettings::getReaderFontId() const {
         case EXTRA_LARGE:
           return OPENDYSLEXIC_14_FONT_ID;
       }
-#ifdef ENABLE_CUSTOM_FONTS
-    case CUSTOM_FONT:
-      return EpdFontFileLoader::getFontId(static_cast<EpdFontFileLoader::SizeSlot>(fontSize));
-#endif
   }
+#endif  // OMIT_FONTS
 }

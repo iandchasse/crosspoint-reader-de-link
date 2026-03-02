@@ -49,8 +49,23 @@ void SettingsActivity::onEnter() {
   controlsSettings.clear();
   systemSettings.clear();
 
-  for (const auto& setting : getSettingsList()) {
-    if (setting.category == StrId::STR_NONE_OPT) continue;
+  for (const auto& baseSetting : getSettingsList()) {
+    if (baseSetting.category == StrId::STR_NONE_OPT) continue;
+
+    // Create a local copy so we can modify it (e.g. to filter enum choices)
+    SettingInfo setting = baseSetting;
+
+#ifdef ENABLE_CUSTOM_FONTS
+    if (setting.nameId == StrId::STR_FONT_FAMILY && !EpdFontFileLoader::isAvailable()) {
+      for (auto it = setting.enumValues.begin(); it != setting.enumValues.end(); ++it) {
+        if (*it == StrId::STR_CUSTOM_FONT) {
+          setting.enumValues.erase(it);
+          break;
+        }
+      }
+    }
+#endif
+
     if (setting.category == StrId::STR_CAT_DISPLAY) {
       displaySettings.push_back(setting);
     } else if (setting.category == StrId::STR_CAT_READER) {

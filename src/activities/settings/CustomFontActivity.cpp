@@ -89,14 +89,55 @@ static bool endsWithCI(const std::string& s, const std::string& suffix) {
   return tail == sfxLower;
 }
 
-// Alphabetical directory-first sort
-static void sortList(std::vector<std::string>& strs) {
-  std::sort(strs.begin(), strs.end(), [](const std::string& a, const std::string& b) {
-    bool da = a.back() == '/';
-    bool db = b.back() == '/';
-    if (da != db) return da;
-    return a < b;
-  });
+static bool copyFile(const std::string& src, const std::string& dst) {
+  EspFsFile s, d;
+  if (!Storage.openFileForRead("COPY", src, s)) return false;
+  if (!Storage.openFileForWrite("COPY", dst, d)) {
+    s.close();
+    return false;
+  }
+  uint8_t buf[1024];
+  int n;
+  while ((n = s.read(buf, sizeof(buf))) > 0) {
+    if (d.write(buf, n) != n) {
+      s.close();
+      d.close();
+      return false;
+    }
+  }
+  s.close();
+  d.close();
+  return true;
+}
+
+static void copyDirectory(const std::string& src, const std::string& dst) {
+  Storage.mkdir(dst.c_str());
+  auto root = Storage.open(src.c_str());
+  if (!root || !root.isDirectory()) {
+    if (root) root.close();
+    return;
+  }
+  char name[256];
+  for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
+    file.getName(name, sizeof(name));
+    std::string s = src + "/" + name;
+    std::string d = dst + "/" + name;
+    if (file.isDirectory()) {
+      file.close();
+      copyDirectory(s, d);
+    } else {
+      file.close();
+      copyFile(s, d);
+    }
+  }
+  root.close();
+}
+
+// Alphabetical sort for FolderInfo
+static void sortList(std::vector<CustomFontActivity::FolderInfo>& folders) {
+  std::sort(
+      folders.begin(), folders.end(),
+      [](const CustomFontActivity::FolderInfo& a, const CustomFontActivity::FolderInfo& b) { return a.name < b.name; });
 }
 
 static const char* SIZE_NAMES[EpdFontFileLoader::SIZE_SLOT_COUNT] = {"Small", "Medium", "Large", "XLarge"};
@@ -123,7 +164,7 @@ void CustomFontActivity::onEnter() {
 void CustomFontActivity::onExit() {
   Activity::onExit();
   cleanupPreview();
-  files.clear();
+  folders.clear();
 }
 
 bool CustomFontActivity::preventAutoSleep() { return state == State::GENERATING; }
@@ -133,7 +174,7 @@ bool CustomFontActivity::skipLoopDelay() { return state == State::GENERATING; }
 // Lists only sub-directories of /fonts — each is a font family candidate.
 
 void CustomFontActivity::loadFolders() {
-  files.clear();
+  folders.clear();
   selectorIndex = 0;
 
   auto root = Storage.open(basepath.c_str());
@@ -142,17 +183,42 @@ void CustomFontActivity::loadFolders() {
     return;
   }
   root.rewindDirectory();
-  char name[500];
+  char name[256];
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(name, sizeof(name));
     bool skip = (name[0] == '.' || strcmp(name, "System Volume Information") == 0);
     bool isDir = file.isDirectory();
     file.close();
     if (skip) continue;
-    if (isDir) files.emplace_back(std::string(name) + "/");
+    if (isDir) {
+      folders.push_back(checkFolderType(name));
+    }
   }
   root.close();
-  sortList(files);
+  sortList(folders);
+}
+
+CustomFontActivity::FolderInfo CustomFontActivity::checkFolderType(const std::string& name) {
+  FolderInfo info{name, false, false};
+  std::string path = basepath + "/" + name;
+  auto dir = Storage.open(path.c_str());
+  if (!dir) return info;
+
+  dir.rewindDirectory();
+  char fname[256];
+  for (auto file = dir.openNextFile(); file; file = dir.openNextFile()) {
+    file.getName(fname, sizeof(fname));
+    file.close();
+    if (fname[0] == '.') continue;
+
+    std::string n(fname);
+    if (endsWithCI(n, ".ttf") || endsWithCI(n, ".otf")) info.hasTtf = true;
+    if (endsWithCI(n, ".epdfont")) info.hasEpd = true;
+
+    if (info.hasTtf && info.hasEpd) break;
+  }
+  dir.close();
+  return info;
 }
 
 // ─── scanFamilyStyles ────────────────────────────────────────────────────────
@@ -210,8 +276,8 @@ bool CustomFontActivity::scanFamilyStyles(const std::string& familyDir) {
 }
 
 size_t CustomFontActivity::findEntry(const std::string& name) const {
-  for (size_t i = 0; i < files.size(); ++i)
-    if (files[i] == name) return i;
+  for (size_t i = 0; i < folders.size(); ++i)
+    if (folders[i].name == name) return i;
   return 0;
 }
 
@@ -222,10 +288,20 @@ void CustomFontActivity::onSelectFolder(const std::string& familyDir) {
   std::string familyName = familyDir.substr(familyDir.rfind('/') + 1);
   std::string dotFontsDir = std::string("/.fonts/") + familyName;
 
-  // Scan for TTF files first so we always have feedback
+  const FolderInfo& info = folders[selectorIndex];
+  isImportMode = info.hasEpd;
+
+  if (isImportMode) {
+    state = State::CONFIRM;
+    sizeConfigRow = 0;
+    requestUpdate();
+    return;
+  }
+
+  // Scan for TTF files if not in import mode
   bool ok = scanFamilyStyles(familyDir);
   if (!ok) {
-    genError = "No TTF files found in " + familyName;
+    genError = "No usable font files found in " + familyName;
     state = State::DONE_ERROR;
     sizeConfigRow = 0;
     requestUpdate();
@@ -333,19 +409,19 @@ void CustomFontActivity::loop() {
     }
 
     buttonNavigator.onPreviousRelease([this] {
-      selectorIndex = ButtonNavigator::previousIndex((int)selectorIndex, (int)files.size());
+      selectorIndex = ButtonNavigator::previousIndex((int)selectorIndex, (int)folders.size());
       requestUpdate();
     });
     buttonNavigator.onNextRelease([this] {
-      selectorIndex = ButtonNavigator::nextIndex((int)selectorIndex, (int)files.size());
+      selectorIndex = ButtonNavigator::nextIndex((int)selectorIndex, (int)folders.size());
       requestUpdate();
     });
     buttonNavigator.onPreviousContinuous([this, pageItems] {
-      selectorIndex = ButtonNavigator::previousPageIndex((int)selectorIndex, (int)files.size(), pageItems);
+      selectorIndex = ButtonNavigator::previousPageIndex((int)selectorIndex, (int)folders.size(), pageItems);
       requestUpdate();
     });
     buttonNavigator.onNextContinuous([this, pageItems] {
-      selectorIndex = ButtonNavigator::nextPageIndex((int)selectorIndex, (int)files.size(), pageItems);
+      selectorIndex = ButtonNavigator::nextPageIndex((int)selectorIndex, (int)folders.size(), pageItems);
       requestUpdate();
     });
 
@@ -355,13 +431,11 @@ void CustomFontActivity::loop() {
     }
 
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      if (!files.empty()) {
-        const std::string& entry = files[selectorIndex];
-        // entry always ends with '/' (folder-only list)
-        std::string folderName = entry.substr(0, entry.size() - 1);
+      if (!folders.empty()) {
+        const auto& info = folders[selectorIndex];
         std::string fullPath = basepath;
         if (fullPath.back() != '/') fullPath += "/";
-        fullPath += folderName;
+        fullPath += info.name;
         onSelectFolder(fullPath);
       }
     }
@@ -388,7 +462,12 @@ void CustomFontActivity::loop() {
       }
     });
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      if (sizeConfigRow == 0) {
+      if (isImportMode) {
+        // [Import]
+        state = State::GENERATING;
+        genStep = 0;
+        requestUpdate();
+      } else if (sizeConfigRow == 0) {
         // [Select]
         std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
         std::string dotFontsDir = std::string("/.fonts/") + familyName;
@@ -492,6 +571,27 @@ void CustomFontActivity::loop() {
 
   // ── GENERATING ───────────────────────────────────────────────────────────
   if (state == State::GENERATING) {
+    if (isImportMode) {
+      std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
+      std::string dotFontsDir = std::string("/.fonts/") + familyName;
+      Storage.mkdir("/.fonts");
+      copyDirectory(selectedFamilyPath, dotFontsDir);
+
+      // Wire up the new font family
+      // Default pts for imported fonts; though we don't know exactly what's inside,
+      // 12, 14, 16, 18 is a safe bet for the loader to at least try.
+      int pts[NUM_SIZE_SLOTS] = {12, 14, 16, 18};
+      String dotFontsBase = String("/.fonts/") + familyName.c_str();
+      EpdFontFileLoader::setFamily(dotFontsBase, pts);
+      SETTINGS.fontFamily = CrossPointSettings::CUSTOM_FONT;
+      SETTINGS.saveToFile();
+      EpdFontFileLoader::clearCache();
+
+      state = State::DONE_OK;
+      requestUpdate();
+      return;
+    }
+
     if (genStep < totalSteps) {
       int slot = genStep / NUM_STYLES;
       int styleIdx = genStep % NUM_STYLES;
@@ -624,15 +724,25 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentH = h - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
 
-  if (files.empty()) {
-    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + 20, "No font folders found in /fonts");
+  if (folders.empty()) {
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + 20, "No font folders found in /fonts",
+                      true);
   } else {
     GUI.drawList(
-        renderer, Rect{0, contentTop, w, contentH}, files.size(), selectorIndex,
+        renderer, Rect{0, contentTop, w, contentH}, folders.size(), selectorIndex,
         [this](int index) {
-          std::string name = files[index];
-          if (!name.empty() && name.back() == '/') name.pop_back();
-          return name;
+          const auto& info = folders[index];
+          char label[128];
+          const char* typeTag = "";
+          if (info.hasTtf && info.hasEpd)
+            typeTag = " [BOTH]";
+          else if (info.hasEpd)
+            typeTag = " [EPD]";
+          else if (info.hasTtf)
+            typeTag = " [TTF]";
+
+          snprintf(label, sizeof(label), "%s%s", info.name.c_str(), typeTag);
+          return std::string(label);
         },
         nullptr, [](int) { return UIIcon::Folder; });
   }
@@ -641,23 +751,38 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
   if (state == State::CONFIRM) {
     std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
     char msg[128];
-    snprintf(msg, sizeof(msg), "Cache exists for %s", familyName.c_str());
+    if (isImportMode) {
+      snprintf(msg, sizeof(msg), "Pre-converted font found");
+    } else {
+      snprintf(msg, sizeof(msg), "Cache exists for %s", familyName.c_str());
+    }
 
     const int boxW = w - 60;
-    const int boxH = 180;
+    const int boxH = isImportMode ? 120 : 180;
     const int boxX = 30;
     const int boxY = h / 2 - boxH / 2;
     renderer.fillRect(boxX, boxY, boxW, boxH, true);
     renderer.drawRect(boxX, boxY, boxW, boxH);
     renderer.drawCenteredText(UI_12_FONT_ID, boxY + 16, msg, false, EpdFontFamily::BOLD);
 
-    const char* opts[] = {"Select", "Regenerate", "Delete Cache", "Back"};
-    for (int i = 0; i < 4; ++i) {
-      int y = boxY + 50 + i * 30;
-      bool sel = (sizeConfigRow == i);
-      if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
-      renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, boxX + 36, y, opts[i], false,
-                        sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+    if (isImportMode) {
+      const char* opts[] = {"Import", "Back"};
+      for (int i = 0; i < 2; ++i) {
+        int y = boxY + 50 + i * 30;
+        bool sel = (sizeConfigRow == i);
+        if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
+        renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, boxX + 36, y, opts[i], false,
+                          sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+      }
+    } else {
+      const char* opts[] = {"Select", "Regenerate", "Delete Cache", "Back"};
+      for (int i = 0; i < 4; ++i) {
+        int y = boxY + 50 + i * 30;
+        bool sel = (sizeConfigRow == i);
+        if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
+        renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, boxX + 36, y, opts[i], false,
+                          sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+      }
     }
   }
 

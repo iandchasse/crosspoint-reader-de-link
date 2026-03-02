@@ -16,6 +16,11 @@
 class CustomFontActivity final : public Activity {
  public:
   enum class State { BROWSER, CONFIRM, SIZE_CONFIG, GENERATING, DONE_OK, DONE_ERROR };
+  struct FolderInfo {
+    std::string name;
+    bool hasTtf;
+    bool hasEpd;
+  };
 
   explicit CustomFontActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : Activity("CustomFont", renderer, mappedInput) {}
@@ -34,9 +39,10 @@ class CustomFontActivity final : public Activity {
 
   // ── Browser state ─────────────────────────────────────────────────────────
   ButtonNavigator buttonNavigator;
-  std::vector<std::string> files;  // only font-family FOLDERS shown
+  std::vector<FolderInfo> folders;  // only font-family FOLDERS shown
   std::string basepath = "/fonts";
   std::string selectedFamilyPath;
+  bool isImportMode = false;
   // Resolved TTF paths for each style (empty = not found / use regular)
   std::string resolvedTtfPaths[4];
   int foundStyleCount = 0;
@@ -66,6 +72,7 @@ class CustomFontActivity final : public Activity {
 
   // ── Private helpers ───────────────────────────────────────────────────────
   void loadFolders();                                   // list only directories in basepath
+  FolderInfo checkFolderType(const std::string& name);  // check contents of a folder
   bool scanFamilyStyles(const std::string& familyDir);  // populate resolvedTtfPaths
   size_t findEntry(const std::string& name) const;
   void onSelectFolder(const std::string& familyDir);
