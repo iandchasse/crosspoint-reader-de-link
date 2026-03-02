@@ -13,8 +13,10 @@
 #include <vector>
 
 #include "EpdFontSerializer.h"
+#include "EpdStreamFont.h"
 #include "esp_heap_caps.h"
 #include "stb_truetype.h"
+
 
 struct EpdUnicodeIntervalBase {
   uint32_t first;
@@ -39,45 +41,17 @@ static const EpdUnicodeIntervalBase baseIntervals[] = {
 
 EpdFont* RuntimeFontConverter::generateEpdFontFromPath(const char* sdPath, int sizePt, bool is2Bit,
                                                        const char* charsets) {
-  LOG_INF("RFC", "Loading font via HalStorage: %s (size: %d, 2-bit: %s, charset: %s)", sdPath, sizePt,
-          is2Bit ? "yes" : "no", charsets ? "subset" : "full");
+  // To avoid RAM bloat, we use the streaming generator which writes directly to SD,
+  // then we return an EpdStreamFont pointing to that file.
+  char tmpEpdPath[256];
+  snprintf(tmpEpdPath, sizeof(tmpEpdPath), "/tmp/runtime_font_%d.epdfont", sizePt);
 
-  EspFsFile file;
-  if (!Storage.openFileForRead("RFC", sdPath, file)) {
-    LOG_ERR("RFC", "Failed to open font file: %s", sdPath);
+  if (!generateAndSaveToFile(sdPath, sizePt, is2Bit, tmpEpdPath, charsets)) {
+    LOG_ERR("RFC", "Failed to generate font to %s", tmpEpdPath);
     return nullptr;
   }
 
-  size_t size = file.size();
-  LOG_DBG("RFC", "File size: %zu bytes", size);
-
-  if (size == 0 || size > 5 * 1024 * 1024) {  // Arbitrary 5MB cap
-    LOG_ERR("RFC", "Invalid font file size: %zu", size);
-    file.close();
-    return nullptr;
-  }
-
-  // Allocate TTF to PSRAM temporarily
-  uint8_t* ttfBuffer = (uint8_t*)heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-  if (!ttfBuffer) {
-    file.close();
-    return nullptr;
-  }
-
-  file.read(ttfBuffer, size);
-  file.close();
-
-  LOG_DBG("RFC", "Rasterizing font...");
-  EpdFont* font = generateEpdFont(ttfBuffer, size, sizePt, is2Bit, charsets);
-
-  if (font) {
-    LOG_INF("RFC", "Successfully generated EpdFont");
-  } else {
-    LOG_ERR("RFC", "Failed to rasterize font");
-  }
-
-  heap_caps_free(ttfBuffer);
-  return font;
+  return EpdStreamFont::load(tmpEpdPath);
 }
 
 EpdFont* RuntimeFontConverter::generateEpdFontFromBuffer(const uint8_t* ttfBuffer, size_t ttfSize, int sizePt,
@@ -195,9 +169,10 @@ EpdFont* RuntimeFontConverter::generateEpdFont(const uint8_t* ttfBuffer, size_t 
   size_t szGlyphs = align4(sizeof(EpdGlyph) * valid_glyph_count);
   size_t total_alloc = szEpdFont + szEpdFontData + szIntervals + szGlyphs + total_bitmap_size;
 
-  uint8_t* memBlock = (uint8_t*)heap_caps_malloc(total_alloc, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  // Allocate EpdFont block in internal SRAM (No PSRAM)
+  uint8_t* memBlock = (uint8_t*)heap_caps_malloc(total_alloc, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   if (!memBlock) {
-    LOG_ERR("RFC", "PSRAM alloc failed for %zu bytes", total_alloc);
+    LOG_ERR("RFC", "Failed to allocate %zu bytes in internal RAM for EpdFont", total_alloc);
     return nullptr;
   }
   memset(memBlock, 0, total_alloc);
@@ -384,8 +359,10 @@ bool RuntimeFontConverter::generateAndSaveToFile(const char* sdTtfPath, int size
     ttfFile.close();
     return false;
   }
-  uint8_t* ttfBuffer = (uint8_t*)heap_caps_malloc(ttfSize, MALLOC_CAP_SPIRAM);
+  // Allocate TTF buffer in internal SRAM (No PSRAM)
+  uint8_t* ttfBuffer = (uint8_t*)heap_caps_malloc(ttfSize, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   if (!ttfBuffer) {
+    LOG_ERR("RFC", "Failed to allocate %zu bytes in internal RAM for TTF buffer", ttfSize);
     ttfFile.close();
     return false;
   }

@@ -6,7 +6,9 @@
 
 #include <cstring>
 
+#include "EpdFontSerializer.h"
 #include "esp_heap_caps.h"
+
 
 // ─── inline helpers ──────────────────────────────────────────────────────────
 
@@ -23,77 +25,32 @@ constexpr uint32_t MAGIC = 0x46445045;  // 'EPDF'
 // ─── loader ──────────────────────────────────────────────────────────────────
 
 EpdStreamFont* EpdStreamFont::load(const char* path, size_t cacheSizeBytes) {
-  EspFsFile file;
-  if (!Storage.openFileForRead("SER", path, file)) {
-    LOG_ERR("STR", "Cannot open stream font: %s", path);
+  // Use EpdFontSerializer to load ONLY metadata (metrics, intervals, glyphs)
+  // EpdFontSerializer::loadFromFile has been refactored to NOT load bitmaps.
+  EpdFont* baseFont = EpdFontSerializer::loadFromFile(path);
+  if (!baseFont) {
+    LOG_ERR("STR", "Failed to load metadata for stream font: %s", path);
     return nullptr;
   }
 
-  uint32_t magic = 0;
-  uint8_t version = 0;
-  if (!readU32(file, magic) || magic != MAGIC) {
-    LOG_ERR("STR", "Bad magic in %s", path);
-    file.close();
-    return nullptr;
-  }
-  if (!readU8(file, version) || version != 1) {
-    LOG_ERR("STR", "Bad version in %s", path);
-    file.close();
-    return nullptr;
-  }
+  // Cast away const because EpdStreamFont takes ownership of the data block
+  EpdFontData* data = const_cast<EpdFontData*>(baseFont->data);
 
-  // Load just the metrics, intervals, and glyph table arrays
-  uint8_t advanceY;
-  int32_t ascender, descender;
-  uint8_t is2Bit;
-  uint32_t intervalCount, glyphCount;
+  // We wrap the base font data. The baseFont itself (the EpdFont wrapper)
+  // will be deleted, but we keep the fd data.
+  EpdStreamFont* streamFont = new EpdStreamFont(data, path, cacheSizeBytes);
 
-  readU8(file, advanceY);
-  readI32(file, ascender);
-  readI32(file, descender);
-  readU8(file, is2Bit);
+  // We only needed the EpdFont wrapper to get the data, but baseFont
+  // was allocated as a single block [EpdFont][EpdFontData][tables...].
+  // Actually, EpdFontSerializer returns a pointer to the start of that block.
+  // EpdStreamFont's destructor will free it via allocatedData_ (which is the same pointer).
+  // So we just return the new wrapper.
 
-  readU32(file, intervalCount);
-  size_t cbIntervals = sizeof(EpdUnicodeInterval) * intervalCount;
-  auto* intervals = (EpdUnicodeInterval*)heap_caps_malloc(cbIntervals, MALLOC_CAP_8BIT);
-  readBytes(file, intervals, cbIntervals);
+  // Note: EpdFontSerializer returns the EpdFont* which is the start of the block.
+  // EpdStreamFont takes that EpdFontData* (which is inside the block).
+  // This is slightly dangerous if we don't manage the pointer correctly.
 
-  readU32(file, glyphCount);
-  size_t cbGlyphs = sizeof(EpdGlyph) * glyphCount;
-  auto* glyphs = (EpdGlyph*)heap_caps_malloc(cbGlyphs, MALLOC_CAP_8BIT);
-  readBytes(file, glyphs, cbGlyphs);
-
-  // Remaining Tables (kerning/ligatures). For C3 we discard them immediately to save RAM.
-  // EpdFont metrics parsing requires nulls if we skip them.
-
-  EpdFontData* d = new EpdFontData();
-  d->advanceY = advanceY;
-  d->ascender = (int)ascender;
-  d->descender = (int)descender;
-  d->is2Bit = (is2Bit != 0);
-
-  d->intervalCount = intervalCount;
-  d->intervals = intervals;
-
-  d->glyph = glyphs;
-  d->bitmap = nullptr;  // Sentinel indicating streaming required
-
-  d->groups = nullptr;
-  d->groupCount = 0;
-  d->kernLeftClasses = nullptr;
-  d->kernRightClasses = nullptr;
-  d->kernMatrix = nullptr;
-  d->kernLeftEntryCount = 0;
-  d->kernRightEntryCount = 0;
-  d->kernLeftClassCount = 0;
-  d->kernRightClassCount = 0;
-  d->ligaturePairs = nullptr;
-  d->ligaturePairCount = 0;
-  d->totalAllocatedSize = sizeof(EpdFontData) + cbIntervals + cbGlyphs;
-
-  file.close();  // We will demand-open it on layout render
-
-  return new EpdStreamFont(d, path, cacheSizeBytes);
+  return streamFont;
 }
 
 // ─── destructor ──────────────────────────────────────────────────────────────

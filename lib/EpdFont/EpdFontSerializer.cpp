@@ -209,13 +209,16 @@ EpdFont* EpdFontSerializer::loadFromFile(const char* path) {
 
     file.close();  // done with SD
 
-    // --- single PSRAM alloc ---
+    // --- metadata-only allocation in internal SRAM (No PSRAM) ---
+    // We NO LONGER allocate space for or load the bitmap here.
+    // This function now returns an EpdFont with EpdFontData->bitmap = nullptr,
+    // which signifies to the renderer that it's a streaming/incomplete font.
     size_t total = szFont + szFontData + align4(intBytes) + align4(glyphBytes) + align4(kernLBytes) +
-                   align4(kernRBytes) + align4(matrixBytes) + align4(ligBytes) + bitmapSize;
+                   align4(kernRBytes) + align4(matrixBytes) + align4(ligBytes);
 
-    uint8_t* mem = (uint8_t*)heap_caps_malloc(total, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    uint8_t* mem = (uint8_t*)heap_caps_malloc(total, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (!mem) {
-      LOG_ERR("SER", "PSRAM alloc failed (%zu bytes) for %s", total, path);
+      LOG_ERR("SER", "Failed to allocate metadata %zu bytes in internal RAM for %s", total, path);
       free(tmpIntervals);
       free(tmpGlyphs);
       free(tmpKernL);
@@ -243,56 +246,9 @@ EpdFont* EpdFontSerializer::loadFromFile(const char* path) {
     auto* pIntervals = (EpdUnicodeInterval*)copyBlock(tmpIntervals, intBytes);
     auto* pGlyphs = (EpdGlyph*)copyBlock(tmpGlyphs, glyphBytes);
     auto* pKernL = (EpdKernClassEntry*)copyBlock(tmpKernL, kernLBytes);
-    auto* pKernR = (EpdKernClassEntry*)copyBlock(tmpKernR, kernRBytes);
+    auto* pKernR = (EpdKernClassEntry*)copyBlock(tmpKernR, krEntries ? kernRBytes : 0);
     auto* pMatrix = (int8_t*)copyBlock(tmpMatrix, matrixBytes);
     auto* pLig = (EpdLigaturePair*)copyBlock(tmpLig, ligBytes);
-    uint8_t* pBitmap = p;
-
-    // Read bitmap directly into PSRAM
-    if (bitmapSize > 0) {
-      EspFsFile f2;
-      if (!Storage.openFileForRead("SER", path, f2)) {
-        heap_caps_free(mem);
-        free(tmpIntervals);
-        free(tmpGlyphs);
-        free(tmpKernL);
-        free(tmpKernR);
-        free(tmpMatrix);
-        free(tmpLig);
-        return nullptr;
-      }
-      // Seek past header to the bitmap payload
-      // Header size = 4+1+1+4+4+1 + 4+(intCount*12) + 4+(glyphCount*14)
-      //             + 2+2+1+1 + kernLBytes + kernRBytes + matrixBytes
-      //             + 4+(ligBytes)
-      //             + 4 (bitmapSize field)
-      size_t skipBytes = 4 + 1 + 1 + 4 + 4 + 1                    // header + metrics
-                         + 4 + intBytes                           // intervals
-                         + 4 + glyphBytes                         // glyphs
-                         + 2 + 2 + 1 + 1                          // kern counts
-                         + kernLBytes + kernRBytes + matrixBytes  // kern data
-                         + 4 + ligBytes                           // ligatures
-                         + 4;                                     // bitmapSize field
-      // Seek is through a simple read
-      uint8_t skipBuf[64];
-      while (skipBytes > 0) {
-        size_t chunk = std::min(skipBytes, sizeof(skipBuf));
-        if (f2.read(skipBuf, chunk) != (int)chunk) {
-          heap_caps_free(mem);
-          free(tmpIntervals);
-          free(tmpGlyphs);
-          free(tmpKernL);
-          free(tmpKernR);
-          free(tmpMatrix);
-          free(tmpLig);
-          f2.close();
-          return nullptr;
-        }
-        skipBytes -= chunk;
-      }
-      f2.read(pBitmap, bitmapSize);
-      f2.close();
-    }
 
     // Free temp buffers
     free(tmpIntervals);
@@ -304,7 +260,7 @@ EpdFont* EpdFontSerializer::loadFromFile(const char* path) {
 
     // Wire up the structs
     new (epdFont) EpdFont(fd);
-    fd->bitmap = pBitmap;
+    fd->bitmap = nullptr;  ///< BITMAP IS NOT LOADED - MUST BE STREAMED
     fd->glyph = pGlyphs;
     fd->intervals = pIntervals;
     fd->intervalCount = intCount;
@@ -325,7 +281,7 @@ EpdFont* EpdFontSerializer::loadFromFile(const char* path) {
     fd->ligaturePairCount = ligCount;
     fd->totalAllocatedSize = total;
 
-    LOG_INF("SER", "Loaded %s (%zu bytes PSRAM, %u glyphs)", path, total, glyphCount);
+    LOG_INF("SER", "Loaded metadata for %s (%zu bytes internal RAM, %u glyphs)", path, total, glyphCount);
     return epdFont;
   }
 

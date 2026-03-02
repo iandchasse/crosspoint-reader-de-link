@@ -89,9 +89,11 @@ bool CustomFontManager::setActiveCustomFont(const String& ttfPath, int sizePt, b
   if (!italic) italic = regular;
   if (!boldItalic) boldItalic = (bold != regular) ? bold : regular;
 
-  // Allocate family structure
-  EpdFontFamily* newFamily = (EpdFontFamily*)heap_caps_malloc(sizeof(EpdFontFamily), MALLOC_CAP_SPIRAM);
+  // Allocate family structure in internal SRAM (No PSRAM)
+  EpdFontFamily* newFamily =
+      (EpdFontFamily*)heap_caps_malloc(sizeof(EpdFontFamily), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   if (!newFamily) {
+    LOG_ERR("CFM", "Failed to allocate EpdFontFamily in internal RAM");
     RuntimeFontConverter::freeEpdFont(regular);
     if (bold != regular) RuntimeFontConverter::freeEpdFont(bold);
     if (italic != regular && italic != bold) RuntimeFontConverter::freeEpdFont(italic);

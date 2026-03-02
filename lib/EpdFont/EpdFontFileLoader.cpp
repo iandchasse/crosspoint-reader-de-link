@@ -136,10 +136,10 @@ EpdFontFamily* EpdFontFileLoader::getFamily(SizeSlot slot) {
   if (!italic) italic = regular;
   if (!boldItalic) boldItalic = (bold != regular) ? bold : regular;
 
-  // Allocate EpdFontFamily in PSRAM
-  EpdFontFamily* fam = (EpdFontFamily*)heap_caps_malloc(sizeof(EpdFontFamily), MALLOC_CAP_SPIRAM);
+  // Allocate EpdFontFamily in internal SRAM (No PSRAM)
+  EpdFontFamily* fam = (EpdFontFamily*)heap_caps_malloc(sizeof(EpdFontFamily), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   if (!fam) {
-    LOG_ERR("FFL", "PSRAM alloc for EpdFontFamily failed");
+    LOG_ERR("FFL", "Failed to allocate EpdFontFamily in internal RAM (size=%zu)", sizeof(EpdFontFamily));
     delete regular;
     if (bold != regular) delete bold;
     if (italic != regular && italic != bold) delete italic;
