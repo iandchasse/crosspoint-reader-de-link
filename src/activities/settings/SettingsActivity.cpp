@@ -10,8 +10,10 @@
 #ifdef FRONTLIGHT_PRESENT
 #include "FrontlightControlActivity.h"
 #endif
+#include "FontDownloadActivity.h"
 #include "KOReaderSettingsActivity.h"
 #include "LanguageSelectActivity.h"
+
 #ifdef ENABLE_CUSTOM_FONTS
 #include "CustomFontActivity.h"
 #include "EpdFontFileLoader.h"
@@ -90,6 +92,7 @@ void SettingsActivity::onEnter() {
 #if CROSSPOINT_OTA_ENABLED
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
 #endif
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_DOWNLOAD_FONTS, SettingAction::DownloadFonts));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
 #ifdef ENABLE_CUSTOM_FONTS
@@ -243,6 +246,9 @@ void SettingsActivity::toggleCurrentSetting() {
 #if CROSSPOINT_OTA_ENABLED
         startActivityForResult(std::make_unique<OtaUpdateActivity>(renderer, mappedInput), resultHandler);
 #endif
+        break;
+      case SettingAction::DownloadFonts:
+        startActivityForResult(std::make_unique<FontDownloadActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::FrontlightControl:
 #ifdef FRONTLIGHT_PRESENT

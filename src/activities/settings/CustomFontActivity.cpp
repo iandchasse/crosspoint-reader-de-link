@@ -12,6 +12,7 @@
 #include "CrossPointSettings.h"
 #include "EpdFontFileLoader.h"
 #include "EpdFontSerializer.h"
+#include "FontDownloadActivity.h"
 #include "GfxRenderer.h"
 #include "HalStorage.h"
 #include "I18n.h"
@@ -21,6 +22,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/StringUtils.h"
+
 
 // ─── anonymous helpers ────────────────────────────────────────────────────────
 
@@ -437,6 +439,12 @@ void CustomFontActivity::loop() {
         if (fullPath.back() != '/') fullPath += "/";
         fullPath += info.name;
         onSelectFolder(fullPath);
+      } else {
+        startActivityForResult(std::make_unique<FontDownloadActivity>(renderer, mappedInput),
+                               [this](const ActivityResult&) {
+                                 loadFolders();
+                                 requestUpdate();
+                               });
       }
     }
     return;
@@ -738,8 +746,12 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
   const int contentH = h - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
 
   if (folders.empty()) {
-    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + 20, "No font folders found in /fonts",
-                      true);
+    renderer.drawCenteredText(UI_10_FONT_ID, contentTop + 20, "No fonts found.");
+    renderer.drawCenteredText(UI_10_FONT_ID, contentTop + 20 + renderer.getLineHeight(UI_10_FONT_ID),
+                              "Fetch collection from GitHub?");
+
+    const auto labels = mappedInput.mapLabels("No", "Yes", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else {
     GUI.drawList(
         renderer, Rect{0, contentTop, w, contentH}, folders.size(), selectorIndex,

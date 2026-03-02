@@ -23,6 +23,7 @@ enum class SettingAction {
   CheckForUpdates,
   Language,
   SyncClock,
+  DownloadFonts,
 #ifdef ENABLE_CUSTOM_FONTS
   SelectCustomFont,
 #endif
