@@ -317,6 +317,24 @@ void setup() {
 
   setupDisplayAndFonts();
 
+#ifdef ENABLE_CUSTOM_FONTS
+  // If the user was reading with a custom font, eagerly load it into the renderer
+  // now so the first page render uses it immediately rather than falling back.
+  LOG_DBG("MAIN", "CustomFont pre-load check: fontFamily=%d CUSTOM=%d available=%d", SETTINGS.fontFamily,
+          CrossPointSettings::CUSTOM_FONT, EpdFontFileLoader::isAvailable() ? 1 : 0);
+  if (SETTINGS.fontFamily == CrossPointSettings::CUSTOM_FONT && EpdFontFileLoader::isAvailable()) {
+    auto slot = static_cast<EpdFontFileLoader::SizeSlot>(SETTINGS.fontSize);
+    EpdFontFamily* fam = EpdFontFileLoader::getFamily(slot);
+    if (fam) {
+      renderer.insertFont(SETTINGS.getReaderFontId(), *fam);
+      LOG_INF("MAIN", "Pre-loaded custom font into renderer for boot-to-reader (fontId=%d slot=%d)",
+              SETTINGS.getReaderFontId(), slot);
+    } else {
+      LOG_ERR("MAIN", "Custom font configured but failed to load on boot -- will fall back");
+    }
+  }
+#endif
+
   activityManager.goToBoot();
 
   APP_STATE.loadFromFile();

@@ -197,14 +197,6 @@ void SettingsActivity::toggleCurrentSetting() {
   } else if (setting.type == SettingType::ENUM && setting.valuePtr != nullptr) {
     uint8_t nextValue = (SETTINGS.*(setting.valuePtr) + 1) % static_cast<uint8_t>(setting.enumValues.size());
 
-#ifdef OMIT_FONTS
-    if (setting.nameId == StrId::STR_FONT_FAMILY) {
-      if (nextValue == CrossPointSettings::NOTOSANS || nextValue == CrossPointSettings::OPENDYSLEXIC) {
-        nextValue = CrossPointSettings::CUSTOM_FONT;
-      }
-    }
-#endif
-
 #ifdef ENABLE_CUSTOM_FONTS
     // Special case: Skip CUSTOM_FONT if nothing is loaded on SD
     if (setting.nameId == StrId::STR_FONT_FAMILY &&

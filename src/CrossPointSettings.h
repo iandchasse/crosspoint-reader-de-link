@@ -93,11 +93,20 @@ class CrossPointSettings {
   enum SIDE_BUTTON_LAYOUT { PREV_NEXT = 0, NEXT_PREV = 1, SIDE_BUTTON_LAYOUT_COUNT };
 
   // Font family options
+  // IMPORTANT: These enum values must match the position of each entry in
+  // SettingsList.h's fontFamily enumValues list, because JsonSettingsIO clamps
+  // the loaded value against enumValues.size(). Under OMIT_FONTS the list is
+  // {BOOKERLY(0), CUSTOM_FONT(1)}; without OMIT_FONTS it is
+  // {BOOKERLY(0), NOTOSANS(1), OPENDYSLEXIC(2), CUSTOM_FONT(3)}.
 #ifdef ENABLE_CUSTOM_FONTS
+#ifdef OMIT_FONTS
+  enum FONT_FAMILY { BOOKERLY = 0, CUSTOM_FONT = 1, FONT_FAMILY_COUNT };
+#else
   enum FONT_FAMILY { BOOKERLY = 0, NOTOSANS = 1, OPENDYSLEXIC = 2, CUSTOM_FONT = 3, FONT_FAMILY_COUNT };
+#endif  // OMIT_FONTS
 #else
   enum FONT_FAMILY { BOOKERLY = 0, NOTOSANS = 1, OPENDYSLEXIC = 2, FONT_FAMILY_COUNT };
-#endif
+#endif  // ENABLE_CUSTOM_FONTS
   // Font size options
   enum FONT_SIZE { SMALL = 0, MEDIUM = 1, LARGE = 2, EXTRA_LARGE = 3, FONT_SIZE_COUNT };
   enum LINE_COMPRESSION { TIGHT = 0, NORMAL = 1, WIDE = 2, LINE_COMPRESSION_COUNT };
