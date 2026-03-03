@@ -259,7 +259,15 @@ bool CustomFontActivity::scanFamilyStyles(const std::string& familyDir) {
       std::string stem = f.substr(0, f.find_last_of('.'));
       std::string stemLower = stem;
       std::transform(stemLower.begin(), stemLower.end(), stemLower.begin(), ::tolower);
-      if (stemLower.size() >= suffix.size() && stemLower.substr(stemLower.size() - suffix.size()) == suffix) {
+      // Match only if the suffix appears at a word boundary (preceded by '-', '_', or the
+      // suffix IS the entire stem). This prevents "BoldItalic" from matching suffix "italic".
+      bool suffixMatch =
+          (stemLower.size() >= suffix.size() && stemLower.substr(stemLower.size() - suffix.size()) == suffix);
+      if (suffixMatch && stemLower.size() > suffix.size()) {
+        char boundary = stemLower[stemLower.size() - suffix.size() - 1];
+        suffixMatch = (boundary == '-' || boundary == '_');
+      }
+      if (suffixMatch) {
         resolvedTtfPaths[i] = familyDir + "/" + f;
         foundStyleCount++;
         break;

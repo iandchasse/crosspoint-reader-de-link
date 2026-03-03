@@ -39,10 +39,14 @@ class EpdStreamFont : public EpdFont {
   const uint8_t* getBitmap(uint32_t cp) const;
 
  private:
-  explicit EpdStreamFont(EpdFontData* data, const char* path, size_t cacheSize);
+  explicit EpdStreamFont(EpdFontData* data, EpdFont* allocatedBlock, const char* path, size_t cacheSize);
 
-  // The base class members are loaded into standard heap memory instead of PSRAM.
+  // The base class font data pointer (points INTO allocatedBlock_).
   EpdFontData* allocatedData_;
+
+  // The start of the unified heap_caps_malloc block from EpdFontSerializer.
+  // This is what must be freed — not allocatedData_ directly.
+  EpdFont* allocatedBlock_;
 
   std::string path_;
 
