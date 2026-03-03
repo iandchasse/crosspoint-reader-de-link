@@ -16,7 +16,6 @@
 #include "esp_heap_caps.h"
 #include "stb_truetype.h"
 
-
 struct EpdUnicodeIntervalBase {
   uint32_t first;
   uint32_t last;
@@ -38,7 +37,8 @@ static const EpdUnicodeIntervalBase baseIntervals[] = {
     {0xFFFD, 0xFFFD}                                       // Replacement
 };
 
-EpdFont* RuntimeFontConverter::generateEpdFontFromPath(const char* sdPath, int sizePt, bool is2Bit) {
+EpdFont* RuntimeFontConverter::generateEpdFontFromPath(const char* sdPath, int sizePt, bool is2Bit,
+                                                       const char* charsets) {
   LOG_INF("RFC", "Loading font via HalStorage: %s (size: %d, 2-bit: %s)", sdPath, sizePt, is2Bit ? "yes" : "no");
 
   EspFsFile file;
@@ -315,7 +315,7 @@ size_t RuntimeFontConverter::countGlyphs(const EpdFont* font) {
 }
 
 bool RuntimeFontConverter::generateAndSaveToFile(const char* sdTtfPath, int sizePt, bool is2Bit,
-                                                 const char* outEpdFontPath) {
+                                                 const char* outEpdFontPath, const char* charsets) {
   LOG_INF("RFC", "generateAndSaveToFile: %s -> %s (pt=%d)", sdTtfPath, outEpdFontPath, sizePt);
 
   EpdFont* font = generateEpdFontFromPath(sdTtfPath, sizePt, is2Bit);

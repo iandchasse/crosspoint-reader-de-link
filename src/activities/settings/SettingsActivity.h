@@ -21,6 +21,7 @@ enum class SettingAction {
   ClearCache,
   FrontlightControl,
   CheckForUpdates,
+  DownloadFonts,
   Language,
   SyncClock,
 #ifdef ENABLE_CUSTOM_FONTS

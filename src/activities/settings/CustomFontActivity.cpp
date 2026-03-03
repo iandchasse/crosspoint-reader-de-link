@@ -1,6 +1,8 @@
-#include "CustomFontActivity.h"
+﻿#include "CustomFontActivity.h"
 
 #ifdef ENABLE_CUSTOM_FONTS
+
+#include <ArduinoJson.h>
 
 #include <algorithm>
 #include <memory>
@@ -9,7 +11,10 @@
 
 #include "CrossPointSettings.h"
 #include "EpdFontFileLoader.h"
+#include "EpdFontSerializer.h"
+#include "FontDownloadActivity.h"
 #include "GfxRenderer.h"
+#include "HalPowerManager.h"
 #include "HalStorage.h"
 #include "I18n.h"
 #include "Logging.h"
@@ -19,7 +24,9 @@
 #include "fontIds.h"
 #include "util/StringUtils.h"
 
-// ─── anonymous helpers ────────────────────────────────────────────────────────
+
+// ΓöÇΓöÇΓöÇ anonymous helpers
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 namespace {
 constexpr unsigned long GO_HOME_MS = 1000;
@@ -86,14 +93,55 @@ static bool endsWithCI(const std::string& s, const std::string& suffix) {
   return tail == sfxLower;
 }
 
-// Alphabetical directory-first sort
-static void sortList(std::vector<std::string>& strs) {
-  std::sort(strs.begin(), strs.end(), [](const std::string& a, const std::string& b) {
-    bool da = a.back() == '/';
-    bool db = b.back() == '/';
-    if (da != db) return da;
-    return a < b;
-  });
+static bool copyFile(const std::string& src, const std::string& dst) {
+  EspFsFile s, d;
+  if (!Storage.openFileForRead("COPY", src, s)) return false;
+  if (!Storage.openFileForWrite("COPY", dst, d)) {
+    s.close();
+    return false;
+  }
+  uint8_t buf[1024];
+  int n;
+  while ((n = s.read(buf, sizeof(buf))) > 0) {
+    if (d.write(buf, n) != n) {
+      s.close();
+      d.close();
+      return false;
+    }
+  }
+  s.close();
+  d.close();
+  return true;
+}
+
+static void copyDirectory(const std::string& src, const std::string& dst) {
+  Storage.mkdir(dst.c_str());
+  auto root = Storage.open(src.c_str());
+  if (!root || !root.isDirectory()) {
+    if (root) root.close();
+    return;
+  }
+  char name[256];
+  for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
+    file.getName(name, sizeof(name));
+    std::string s = src + "/" + name;
+    std::string d = dst + "/" + name;
+    if (file.isDirectory()) {
+      file.close();
+      copyDirectory(s, d);
+    } else {
+      file.close();
+      copyFile(s, d);
+    }
+  }
+  root.close();
+}
+
+// Alphabetical sort for FolderInfo
+static void sortList(std::vector<CustomFontActivity::FolderInfo>& folders) {
+  std::sort(
+      folders.begin(), folders.end(),
+      [](const CustomFontActivity::FolderInfo& a, const CustomFontActivity::FolderInfo& b) { return a.name < b.name; });
 }
 
 static const char* SIZE_NAMES[EpdFontFileLoader::SIZE_SLOT_COUNT] = {"Small", "Medium", "Large", "XLarge"};
@@ -103,7 +151,8 @@ constexpr int NUM_STYLES = 4;
 
 }  // namespace
 
-// ─── lifecycle ───────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ lifecycle
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::onEnter() {
   Activity::onEnter();
@@ -120,14 +169,18 @@ void CustomFontActivity::onEnter() {
 void CustomFontActivity::onExit() {
   Activity::onExit();
   cleanupPreview();
-  files.clear();
+  folders.clear();
 }
 
-// ─── loadFolders ─────────────────────────────────────────────────────────────
-// Lists only sub-directories of /fonts — each is a font family candidate.
+bool CustomFontActivity::preventAutoSleep() { return state == State::GENERATING; }
+bool CustomFontActivity::skipLoopDelay() { return state == State::GENERATING; }
+
+// ΓöÇΓöÇΓöÇ loadFolders
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// Lists only sub-directories of /fonts ΓÇö each is a font family candidate.
 
 void CustomFontActivity::loadFolders() {
-  files.clear();
+  folders.clear();
   selectorIndex = 0;
 
   auto root = Storage.open(basepath.c_str());
@@ -136,22 +189,48 @@ void CustomFontActivity::loadFolders() {
     return;
   }
   root.rewindDirectory();
-  char name[500];
+  char name[256];
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(name, sizeof(name));
     bool skip = (name[0] == '.' || strcmp(name, "System Volume Information") == 0);
     bool isDir = file.isDirectory();
     file.close();
     if (skip) continue;
-    if (isDir) files.emplace_back(std::string(name) + "/");
+    if (isDir) {
+      folders.push_back(checkFolderType(name));
+    }
   }
   root.close();
-  sortList(files);
+  sortList(folders);
 }
 
-// ─── scanFamilyStyles ────────────────────────────────────────────────────────
+CustomFontActivity::FolderInfo CustomFontActivity::checkFolderType(const std::string& name) {
+  FolderInfo info{name, false, false};
+  std::string path = basepath + "/" + name;
+  auto dir = Storage.open(path.c_str());
+  if (!dir) return info;
+
+  dir.rewindDirectory();
+  char fname[256];
+  for (auto file = dir.openNextFile(); file; file = dir.openNextFile()) {
+    file.getName(fname, sizeof(fname));
+    file.close();
+    if (fname[0] == '.') continue;
+
+    std::string n(fname);
+    if (endsWithCI(n, ".ttf") || endsWithCI(n, ".otf")) info.hasTtf = true;
+    if (endsWithCI(n, ".epdfont")) info.hasEpd = true;
+
+    if (info.hasTtf && info.hasEpd) break;
+  }
+  dir.close();
+  return info;
+}
+
+// ΓöÇΓöÇΓöÇ scanFamilyStyles
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // Scans familyDir for TTF files ending in each style suffix (case-insensitive).
-// Populates resolvedTtfPaths[] — empty string = not found (will fall back to regular).
+// Populates resolvedTtfPaths[] ΓÇö empty string = not found (will fall back to regular).
 // Returns true if at least the "regular" style was found.
 
 bool CustomFontActivity::scanFamilyStyles(const std::string& familyDir) {
@@ -174,19 +253,27 @@ bool CustomFontActivity::scanFamilyStyles(const std::string& familyDir) {
     file.close();
     if (isDir) continue;
     std::string fname(name);
-    if (endsWithCI(fname, ".ttf")) ttfFiles.push_back(fname);
+    if (endsWithCI(fname, ".ttf") || endsWithCI(fname, ".otf")) ttfFiles.push_back(fname);
   }
   root.close();
 
-  // For each style suffix, find the first file whose stem (before .ttf) ends with that suffix (CI)
+  // For each style suffix, find the first file whose stem (before .ttf/.otf) ends with that suffix (CI)
   for (int i = 0; i < NUM_STYLES; ++i) {
     std::string suffix(STYLE_SUFFIXES[i]);
     for (const auto& f : ttfFiles) {
-      // Strip .ttf extension
-      std::string stem = f.substr(0, f.size() - 4);
+      // Strip extension (.ttf or .otf)
+      std::string stem = f.substr(0, f.find_last_of('.'));
       std::string stemLower = stem;
       std::transform(stemLower.begin(), stemLower.end(), stemLower.begin(), ::tolower);
-      if (stemLower.size() >= suffix.size() && stemLower.substr(stemLower.size() - suffix.size()) == suffix) {
+      // Match only if the suffix appears at a word boundary (preceded by '-', '_', or the
+      // suffix IS the entire stem). This prevents "BoldItalic" from matching suffix "italic".
+      bool suffixMatch =
+          (stemLower.size() >= suffix.size() && stemLower.substr(stemLower.size() - suffix.size()) == suffix);
+      if (suffixMatch && stemLower.size() > suffix.size()) {
+        char boundary = stemLower[stemLower.size() - suffix.size() - 1];
+        suffixMatch = (boundary == '-' || boundary == '_');
+      }
+      if (suffixMatch) {
         resolvedTtfPaths[i] = familyDir + "/" + f;
         foundStyleCount++;
         break;
@@ -204,22 +291,33 @@ bool CustomFontActivity::scanFamilyStyles(const std::string& familyDir) {
 }
 
 size_t CustomFontActivity::findEntry(const std::string& name) const {
-  for (size_t i = 0; i < files.size(); ++i)
-    if (files[i] == name) return i;
+  for (size_t i = 0; i < folders.size(); ++i)
+    if (folders[i].name == name) return i;
   return 0;
 }
 
-// ─── onSelectFolder ──────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ onSelectFolder
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::onSelectFolder(const std::string& familyDir) {
   selectedFamilyPath = familyDir;
   std::string familyName = familyDir.substr(familyDir.rfind('/') + 1);
   std::string dotFontsDir = std::string("/.fonts/") + familyName;
 
-  // Scan for TTF files first so we always have feedback
+  const FolderInfo& info = folders[selectorIndex];
+  isImportMode = info.hasEpd && !cacheExists(dotFontsDir);
+
+  if (info.hasEpd) {
+    state = State::CONFIRM;
+    sizeConfigRow = 0;
+    requestUpdate();
+    return;
+  }
+
+  // Scan for TTF files if not in import mode
   bool ok = scanFamilyStyles(familyDir);
   if (!ok) {
-    genError = "No TTF files found in " + familyName;
+    genError = "No usable font files found in " + familyName;
     state = State::DONE_ERROR;
     sizeConfigRow = 0;
     requestUpdate();
@@ -241,7 +339,8 @@ void CustomFontActivity::onSelectFolder(const std::string& familyDir) {
   requestUpdate();
 }
 
-// ─── updatePreview / cleanupPreview ──────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ updatePreview / cleanupPreview
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::cleanupPreview() {
   if (renderer.hasFont(PREVIEW_FONT_ID)) {
@@ -272,17 +371,26 @@ void CustomFontActivity::updatePreview(int slot) {
   const std::string& ttfPath = resolvedTtfPaths[0].empty() ? "" : resolvedTtfPaths[0];
   if (ttfPath.empty()) return;
 
-  previewFont =
-      RuntimeFontConverter::generateEpdFontFromPath(ttfPath.c_str(), customPt[slot], SETTINGS.textAntiAliasing);
-  if (previewFont) {
-    previewFamily = new EpdFontFamily(previewFont);
-    renderer.insertFont(PREVIEW_FONT_ID, *previewFamily);
+  const char* PREVIEW_PATH = "/.fonts/preview.epdfont";
+  const char* PREVIEW_CHARSET = "The quick brown fox jumps over the lazy dog 0123456789";
+
+  bool ok = RuntimeFontConverter::generateAndSaveToFile(ttfPath.c_str(), customPt[slot], SETTINGS.textAntiAliasing,
+                                                        PREVIEW_PATH);
+
+  if (ok) {
+    previewFont = EpdFontSerializer::loadFromFile(PREVIEW_PATH);
+    if (previewFont) {
+      previewFamily = new EpdFontFamily(previewFont);
+      renderer.insertFont(PREVIEW_FONT_ID, *previewFamily);
+    }
   }
+
   lastPreviewedPt[slot] = customPt[slot];
   lastPreviewSlot = slot;
 }
 
-// ─── startGeneration ─────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ startGeneration
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::startGeneration() {
   cleanupPreview();
@@ -296,12 +404,15 @@ void CustomFontActivity::startGeneration() {
   totalSteps = NUM_SIZE_SLOTS * NUM_STYLES;
   genOk = true;
   genError = "";
-  // Acquire power lock — keeps CPU at full speed for the duration of generation
+  // Acquire power lock ΓÇö keeps CPU at full speed for the duration of generation
   pwrLock = std::make_unique<HalPowerManager::Lock>();
+  // Small delay for SD card stability after potential deletions
+  delay(100);
   requestUpdate();
 }
 
-// ─── loop ────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ loop
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::loop() {
   // Global input debounce on entry
@@ -309,7 +420,8 @@ void CustomFontActivity::loop() {
 
   const int pageItems = UITheme::getInstance().getNumberOfItemsPerPage(renderer, true, false, true, false);
 
-  // ── BROWSER ──────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ BROWSER
+  // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   if (state == State::BROWSER) {
     if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= GO_HOME_MS) {
       finish();
@@ -317,19 +429,19 @@ void CustomFontActivity::loop() {
     }
 
     buttonNavigator.onPreviousRelease([this] {
-      selectorIndex = ButtonNavigator::previousIndex((int)selectorIndex, (int)files.size());
+      selectorIndex = ButtonNavigator::previousIndex((int)selectorIndex, (int)folders.size());
       requestUpdate();
     });
     buttonNavigator.onNextRelease([this] {
-      selectorIndex = ButtonNavigator::nextIndex((int)selectorIndex, (int)files.size());
+      selectorIndex = ButtonNavigator::nextIndex((int)selectorIndex, (int)folders.size());
       requestUpdate();
     });
     buttonNavigator.onPreviousContinuous([this, pageItems] {
-      selectorIndex = ButtonNavigator::previousPageIndex((int)selectorIndex, (int)files.size(), pageItems);
+      selectorIndex = ButtonNavigator::previousPageIndex((int)selectorIndex, (int)folders.size(), pageItems);
       requestUpdate();
     });
     buttonNavigator.onNextContinuous([this, pageItems] {
-      selectorIndex = ButtonNavigator::nextPageIndex((int)selectorIndex, (int)files.size(), pageItems);
+      selectorIndex = ButtonNavigator::nextPageIndex((int)selectorIndex, (int)folders.size(), pageItems);
       requestUpdate();
     });
 
@@ -339,20 +451,25 @@ void CustomFontActivity::loop() {
     }
 
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      if (!files.empty()) {
-        const std::string& entry = files[selectorIndex];
-        // entry always ends with '/' (folder-only list)
-        std::string folderName = entry.substr(0, entry.size() - 1);
+      if (!folders.empty()) {
+        const auto& info = folders[selectorIndex];
         std::string fullPath = basepath;
         if (fullPath.back() != '/') fullPath += "/";
-        fullPath += folderName;
+        fullPath += info.name;
         onSelectFolder(fullPath);
+      } else {
+        startActivityForResult(std::make_unique<FontDownloadActivity>(renderer, mappedInput),
+                               [this](const ActivityResult&) {
+                                 loadFolders();
+                                 requestUpdate();
+                               });
       }
     }
     return;
   }
 
-  // ── CONFIRM (existing cache) ──────────────────────────────────────────────
+  // ΓöÇΓöÇ CONFIRM (existing cache)
+  // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   if (state == State::CONFIRM) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       state = State::BROWSER;
@@ -366,24 +483,84 @@ void CustomFontActivity::loop() {
       }
     });
     buttonNavigator.onNextRelease([this] {
-      if (sizeConfigRow < 2) {
+      const auto& info = folders[selectorIndex];
+      int maxRow = 3;
+      if (isImportMode) {
+        maxRow = (info.hasTtf && info.hasEpd) ? 2 : 1;
+      } else if (info.hasTtf && info.hasEpd) {
+        maxRow = 4;
+      }
+
+      if (sizeConfigRow < maxRow) {
         sizeConfigRow++;
         requestUpdate();
       }
     });
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      if (sizeConfigRow == 0) {
-        // Regenerate
-        state = State::SIZE_CONFIG;
+      const auto& info = folders[selectorIndex];
+      if (isImportMode) {
+        if (sizeConfigRow == 0) {
+          // [Import]
+          state = State::GENERATING;
+          genStep = 0;
+        } else if (info.hasTtf && info.hasEpd && sizeConfigRow == 1) {
+          // [Generate TTF/OTF]
+          isImportMode = false;
+          state = State::SIZE_CONFIG;
+          customPt[0] = 12;
+          customPt[1] = 14;
+          customPt[2] = 16;
+          customPt[3] = 18;
+          sizeConfigRow = 0;
+          updatePreview(0);
+        } else {
+          // [Cancel]
+          state = State::BROWSER;
+          sizeConfigRow = 0;
+        }
+        requestUpdate();
+      } else if (sizeConfigRow == 0) {
+        // [Select]
+        std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
+        std::string dotFontsDir = std::string("/.fonts/") + familyName;
+
+        // Try to load point sizes from config.json if it's the current family
+        int pts[NUM_SIZE_SLOTS] = {12, 14, 16, 18};
+        if (Storage.exists("/.fonts/config.json")) {
+          String json = Storage.readFile("/.fonts/config.json");
+          JsonDocument doc;
+          if (!deserializeJson(doc, json)) {
+            JsonArray ptsArr = doc["pts"];
+            if (ptsArr.size() == NUM_SIZE_SLOTS) {
+              for (int i = 0; i < NUM_SIZE_SLOTS; i++) pts[i] = ptsArr[i];
+            }
+          }
+        }
+
+        EpdFontFileLoader::setFamily(dotFontsDir.c_str(), pts);
+        SETTINGS.fontFamily = CrossPointSettings::CUSTOM_FONT;
+        SETTINGS.saveToFile();
+        finish();
+      } else if (sizeConfigRow == 1 || (info.hasTtf && info.hasEpd && sizeConfigRow == 2)) {
+        // [Regenerate] or [Re-import]
+        if (sizeConfigRow == 1 && info.hasEpd) {
+          isImportMode = true;
+          state = State::GENERATING;
+          genStep = 0;
+        } else {
+          isImportMode = false;
+          state = State::SIZE_CONFIG;
+          customPt[0] = 12;
+          customPt[1] = 14;
+          customPt[2] = 16;
+          customPt[3] = 18;
+        }
         sizeConfigRow = 0;
-        customPt[0] = 12;
-        customPt[1] = 14;
-        customPt[2] = 16;
-        customPt[3] = 18;
         updatePreview(0);
         requestUpdate();
-      } else if (sizeConfigRow == 1) {
-        // Delete cache
+      } else if ((info.hasTtf && info.hasEpd && sizeConfigRow == 3) ||
+                 (!(info.hasTtf && info.hasEpd) && sizeConfigRow == 2)) {
+        // [Delete cache]
         std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
         std::string dotFontsDir = std::string("/.fonts/") + familyName;
         deleteDirectory(dotFontsDir.c_str());
@@ -399,6 +576,7 @@ void CustomFontActivity::loop() {
         sizeConfigRow = 0;
         requestUpdate();
       } else {
+        // [Back]
         state = State::BROWSER;
         requestUpdate();
       }
@@ -406,7 +584,8 @@ void CustomFontActivity::loop() {
     return;
   }
 
-  // ── SIZE_CONFIG ───────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ SIZE_CONFIG
+  // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   // Up/Down = move between size slots; Left/Right = decrease/increase pt value.
   // Confirm = advance to next row, or start generation if on Generate button.
   // ButtonNavigator is NOT used here to avoid PgFwd/PgBack conflicts.
@@ -451,8 +630,30 @@ void CustomFontActivity::loop() {
     return;
   }
 
-  // ── GENERATING ───────────────────────────────────────────────────────────
+  // ΓöÇΓöÇ GENERATING
+  // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   if (state == State::GENERATING) {
+    if (isImportMode) {
+      std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
+      std::string dotFontsDir = std::string("/.fonts/") + familyName;
+      Storage.mkdir("/.fonts");
+      copyDirectory(selectedFamilyPath, dotFontsDir);
+
+      // Wire up the new font family
+      // Default pts for imported fonts; though we don't know exactly what's inside,
+      // 12, 14, 16, 18 is a safe bet for the loader to at least try.
+      int pts[NUM_SIZE_SLOTS] = {12, 14, 16, 18};
+      String dotFontsBase = String("/.fonts/") + familyName.c_str();
+      EpdFontFileLoader::setFamily(dotFontsBase, pts);
+      SETTINGS.fontFamily = CrossPointSettings::CUSTOM_FONT;
+      SETTINGS.saveToFile();
+      EpdFontFileLoader::clearCache();
+
+      state = State::DONE_OK;
+      requestUpdate();
+      return;
+    }
+
     if (genStep < totalSteps) {
       int slot = genStep / NUM_STYLES;
       int styleIdx = genStep % NUM_STYLES;
@@ -491,7 +692,7 @@ void CustomFontActivity::loop() {
       genStep++;
       requestUpdate();
     } else {
-      // Generation complete — release power lock
+      // Generation complete ΓÇö release power lock
       pwrLock.reset();
       if (genOk) {
         std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
@@ -508,7 +709,8 @@ void CustomFontActivity::loop() {
     return;
   }
 
-  // ── DONE_OK / DONE_ERROR ──────────────────────────────────────────────────
+  // ΓöÇΓöÇ DONE_OK / DONE_ERROR
+  // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   if (state == State::DONE_OK || state == State::DONE_ERROR) {
     if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       finish();
@@ -549,7 +751,8 @@ void CustomFontActivity::loop() {
   }
 }
 
-// ─── render ──────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ render
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::render(RenderLock&& lock) {
   renderer.clearScreen();
@@ -577,7 +780,8 @@ void CustomFontActivity::render(RenderLock&& lock) {
   }
 }
 
-// ─── renderBrowser ───────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ renderBrowser
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, w, metrics.headerHeight}, "Select Font Family");
@@ -585,15 +789,29 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentH = h - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing;
 
-  if (files.empty()) {
-    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + 20, "No font folders found in /fonts");
+  if (folders.empty()) {
+    renderer.drawCenteredText(UI_10_FONT_ID, contentTop + 20, "No fonts found.");
+    renderer.drawCenteredText(UI_10_FONT_ID, contentTop + 20 + renderer.getLineHeight(UI_10_FONT_ID),
+                              "Fetch collection from GitHub?");
+
+    const auto labels = mappedInput.mapLabels("No", "Yes", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else {
     GUI.drawList(
-        renderer, Rect{0, contentTop, w, contentH}, files.size(), selectorIndex,
+        renderer, Rect{0, contentTop, w, contentH}, folders.size(), selectorIndex,
         [this](int index) {
-          std::string name = files[index];
-          if (!name.empty() && name.back() == '/') name.pop_back();
-          return name;
+          const auto& info = folders[index];
+          char label[128];
+          const char* typeTag = "";
+          if (info.hasTtf && info.hasEpd)
+            typeTag = " [BOTH]";
+          else if (info.hasEpd)
+            typeTag = " [EPD]";
+          else if (info.hasTtf)
+            typeTag = " [TTF]";
+
+          snprintf(label, sizeof(label), "%s%s", info.name.c_str(), typeTag);
+          return std::string(label);
         },
         nullptr, [](int) { return UIIcon::Folder; });
   }
@@ -602,23 +820,49 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
   if (state == State::CONFIRM) {
     std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
     char msg[128];
-    snprintf(msg, sizeof(msg), "Cache exists for %s", familyName.c_str());
+    if (isImportMode) {
+      snprintf(msg, sizeof(msg), "Pre-converted font found");
+    } else {
+      snprintf(msg, sizeof(msg), "Cache exists for %s", familyName.c_str());
+    }
 
+    const auto& info = folders[selectorIndex];
+    const int numOpts = isImportMode ? (info.hasTtf && info.hasEpd ? 3 : 2) : (info.hasTtf && info.hasEpd ? 5 : 4);
     const int boxW = w - 60;
-    const int boxH = 150;
+    const int boxH = numOpts * 30 + 60;
     const int boxX = 30;
     const int boxY = h / 2 - boxH / 2;
     renderer.fillRect(boxX, boxY, boxW, boxH, true);
     renderer.drawRect(boxX, boxY, boxW, boxH);
     renderer.drawCenteredText(UI_12_FONT_ID, boxY + 16, msg, false, EpdFontFamily::BOLD);
 
-    const char* opts[] = {"Regenerate", "Delete Cache", "Back"};
-    for (int i = 0; i < 3; ++i) {
-      int y = boxY + 50 + i * 30;
-      bool sel = (sizeConfigRow == i);
-      if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
-      renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, boxX + 36, y, opts[i], false,
-                        sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+    if (isImportMode) {
+      const char* opts[3] = {"Import EPD", "Generate TTF/OTF", "Cancel"};
+      if (!info.hasTtf || !info.hasEpd) {
+        opts[0] = "Import";
+        opts[1] = "Cancel";
+      }
+      for (int i = 0; i < numOpts; ++i) {
+        int y = boxY + 50 + i * 30;
+        bool sel = (sizeConfigRow == i);
+        if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
+        renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, boxX + 36, y, opts[i], false,
+                          sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+      }
+    } else {
+      const char* opts[5] = {"Select", "Re-import EPD", "Generate TTF/OTF", "Delete Cache", "Back"};
+      if (!info.hasTtf || !info.hasEpd) {
+        opts[1] = info.hasEpd ? "Re-import" : "Regenerate";
+        opts[2] = "Delete Cache";
+        opts[3] = "Back";
+      }
+      for (int i = 0; i < numOpts; ++i) {
+        int y = boxY + 50 + i * 30;
+        bool sel = (sizeConfigRow == i);
+        if (sel) renderer.drawText(UI_12_FONT_ID, boxX + 14, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
+        renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, boxX + 36, y, opts[i], false,
+                          sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+      }
     }
   }
 
@@ -627,7 +871,8 @@ void CustomFontActivity::renderBrowser(int w, int h, const ThemeMetrics& metrics
   renderer.displayBuffer();
 }
 
-// ─── renderSizeConfig ────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ renderSizeConfig
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::renderSizeConfig(int w, int h, const ThemeMetrics& metrics) {
   std::string familyName = selectedFamilyPath.substr(selectedFamilyPath.rfind('/') + 1);
@@ -635,49 +880,50 @@ void CustomFontActivity::renderSizeConfig(int w, int h, const ThemeMetrics& metr
 
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
 
-  // Style feedback — two short lines to stay within screen width
+  // Style feedback ΓÇö two short lines to stay within screen width
   char foundLine[48];
   snprintf(foundLine, sizeof(foundLine), "Found %d/%d styles", foundStyleCount, NUM_STYLES);
   renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop, foundLine);
   renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + renderer.getLineHeight(UI_10_FONT_ID),
                     "Up/Down: select   Left/Right: adjust size");
 
-  const int rowsTop = contentTop + 2 * renderer.getLineHeight(UI_10_FONT_ID) + metrics.verticalSpacing;
-  const int rowH = renderer.getLineHeight(UI_12_FONT_ID) + 10;
+  const int rowsTop = contentTop + 2 * renderer.getLineHeight(UI_10_FONT_ID) + metrics.verticalSpacing + 10;
+  const int rowH = renderer.getLineHeight(UI_12_FONT_ID) + 16;
 
   const char* hints[] = {"(S)", "(M)", "(L)", "(XL)"};
   for (int i = 0; i < NUM_SIZE_SLOTS; ++i) {
     int y = rowsTop + i * rowH;
     bool sel = (sizeConfigRow == i);
-    if (sel) renderer.fillRect(0, y - 4, w, rowH, false);
 
     char label[64];
     snprintf(label, sizeof(label), "%s  %s", hints[i], SIZE_NAMES[i]);
-    renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding, y, label, sel,
+    renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding, y, label, true,
                       sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 
     // Point size value (right-aligned area)
     char ptStr[16];
-    snprintf(ptStr, sizeof(ptStr), sel ? "< %d pt >" : "%d pt", customPt[i]);
-    renderer.drawText(UI_12_FONT_ID, w - 120, y, ptStr, sel, sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
+    snprintf(ptStr, sizeof(ptStr), sel ? "[ %d pt ]" : "%d pt", customPt[i]);
+    renderer.drawText(UI_12_FONT_ID, w - 110, y, ptStr, true, sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
   }
 
   // Generate button
   const int genY = rowsTop + NUM_SIZE_SLOTS * rowH + metrics.verticalSpacing;
   bool genSel = (sizeConfigRow >= NUM_SIZE_SLOTS);
-  if (genSel) renderer.fillRect(w / 2 - 70, genY - 4, 140, rowH, false);
-  renderer.drawCenteredText(UI_12_FONT_ID, genY, "[ Generate ]", genSel,
+  renderer.drawCenteredText(UI_12_FONT_ID, genY, genSel ? ">>  Generate  <<" : "[ Generate ]", true,
                             genSel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
 
   // Font Preview Area
+  int previewY = genY + rowH + metrics.verticalSpacing + 25;
+  renderer.drawCenteredText(UI_10_FONT_ID, previewY, "Preview (confirm to generate)", true, EpdFontFamily::BOLD);
+  previewY += renderer.getLineHeight(UI_10_FONT_ID) + 12;
+
   if (previewFamily && renderer.hasFont(PREVIEW_FONT_ID)) {
-    int previewY = genY + rowH + metrics.verticalSpacing + 20;
-    std::string previewString = "The quick brown fox jumps over the lazy dog 0123456789";
-    auto lines = renderer.wrappedText(PREVIEW_FONT_ID, previewString.c_str(), w - metrics.contentSidePadding * 2, 3,
+    const char* previewString = "The quick brown fox jumps over the lazy dog 0123456789";
+    auto lines = renderer.wrappedText(PREVIEW_FONT_ID, previewString, w - metrics.contentSidePadding * 4, 3,
                                       EpdFontFamily::REGULAR);
     for (const auto& line : lines) {
-      renderer.drawText(PREVIEW_FONT_ID, metrics.contentSidePadding, previewY, line.c_str());
-      previewY += renderer.getLineHeight(PREVIEW_FONT_ID) + 5;
+      renderer.drawText(PREVIEW_FONT_ID, metrics.contentSidePadding * 2, previewY, line.c_str(), true);
+      previewY += renderer.getLineHeight(PREVIEW_FONT_ID) + 6;
     }
   }
 
@@ -686,7 +932,8 @@ void CustomFontActivity::renderSizeConfig(int w, int h, const ThemeMetrics& metr
   renderer.displayBuffer();
 }
 
-// ─── renderGenerating ────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ renderGenerating
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::renderGenerating(int w, int h, const ThemeMetrics& metrics) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, w, metrics.headerHeight}, "Generating Fonts");
@@ -697,23 +944,17 @@ void CustomFontActivity::renderGenerating(int w, int h, const ThemeMetrics& metr
   int styleIdx = (step < totalSteps) ? step % NUM_STYLES : NUM_STYLES - 1;
 
   char status[128];
-  snprintf(status, sizeof(status), "%s %dpt  (%s)  %d / %d", SIZE_NAMES[slot], customPt[slot], STYLE_SUFFIXES[styleIdx],
-           step, totalSteps);
-  renderer.drawCenteredText(UI_12_FONT_ID, cy - 40, status, true, EpdFontFamily::REGULAR);
+  snprintf(status, sizeof(status), "%s %dpt  (%s)", SIZE_NAMES[slot], customPt[slot], STYLE_SUFFIXES[styleIdx]);
+  renderer.drawCenteredText(UI_12_FONT_ID, cy - 50, status, true, EpdFontFamily::REGULAR);
 
-  const int barW = w - 80, barH = 20, barX = 40, barY = cy - 10;
-  renderer.drawRect(barX, barY, barW, barH);
-  if (totalSteps > 0 && step > 0) {
-    renderer.fillRect(barX, barY, (barW * step) / totalSteps, barH, false);
-  }
+  const int barW = w - 120, barH = 16, barX = 60, barY = cy - 10;
+  GUI.drawProgressBar(renderer, Rect{barX, barY, barW, barH}, step, totalSteps);
 
-  char pct[16];
-  snprintf(pct, sizeof(pct), "%d%%", totalSteps > 0 ? (step * 100 / totalSteps) : 0);
-  renderer.drawCenteredText(UI_10_FONT_ID, cy + 18, pct, false, EpdFontFamily::REGULAR);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 }
 
-// ─── renderDone ──────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ renderDone
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 void CustomFontActivity::renderDone(int w, int h, const ThemeMetrics& metrics, bool ok) {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, w, metrics.headerHeight},
@@ -722,11 +963,11 @@ void CustomFontActivity::renderDone(int w, int h, const ThemeMetrics& metrics, b
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing * 2;
 
   if (!genError.empty()) {
-    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop, genError.c_str());
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop, genError.c_str(), true);
   }
   if (ok) {
     renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, contentTop + 28,
-                      "Open a book to preview the new font.");
+                      "Open a book to preview the new font.", true);
   }
 
   const char* opts[] = {"OK", "Delete Cache", "Back"};
@@ -736,8 +977,8 @@ void CustomFontActivity::renderDone(int w, int h, const ThemeMetrics& metrics, b
     int y = optStartY + i * optRowH;
     bool sel = (sizeConfigRow == i);
     if (sel)
-      renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding - 2, y, "\xe2\x96\xb6", false, EpdFontFamily::BOLD);
-    renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, metrics.contentSidePadding + 18, y, opts[i], false,
+      renderer.drawText(UI_12_FONT_ID, metrics.contentSidePadding - 2, y, "\xe2\x96\xb6", true, EpdFontFamily::BOLD);
+    renderer.drawText(sel ? UI_12_FONT_ID : UI_10_FONT_ID, metrics.contentSidePadding + 18, y, opts[i], true,
                       sel ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR);
   }
 

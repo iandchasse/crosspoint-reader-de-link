@@ -318,47 +318,58 @@ int CrossPointSettings::getRefreshFrequency() const {
 }
 
 int CrossPointSettings::getReaderFontId() const {
+  if (fontFamily == CUSTOM_FONT) {
+#ifdef ENABLE_CUSTOM_FONTS
+    return EpdFontFileLoader::getFontId(static_cast<EpdFontFileLoader::SizeSlot>(fontSize));
+#else
+    return UI_14_FONT_ID;
+#endif
+  }
+
+#ifdef OMIT_FONTS
+  return UI_14_FONT_ID;
+#else
+  // Internal fixed fonts
   switch (fontFamily) {
     case BOOKERLY:
-    default:
       switch (fontSize) {
         case SMALL:
           return BOOKERLY_12_FONT_ID;
         case MEDIUM:
-        default:
           return BOOKERLY_14_FONT_ID;
         case LARGE:
           return BOOKERLY_16_FONT_ID;
         case EXTRA_LARGE:
           return BOOKERLY_18_FONT_ID;
       }
+      break;
     case NOTOSANS:
       switch (fontSize) {
         case SMALL:
           return NOTOSANS_12_FONT_ID;
         case MEDIUM:
-        default:
           return NOTOSANS_14_FONT_ID;
         case LARGE:
           return NOTOSANS_16_FONT_ID;
         case EXTRA_LARGE:
           return NOTOSANS_18_FONT_ID;
       }
+      break;
     case OPENDYSLEXIC:
       switch (fontSize) {
         case SMALL:
           return OPENDYSLEXIC_8_FONT_ID;
         case MEDIUM:
-        default:
           return OPENDYSLEXIC_10_FONT_ID;
         case LARGE:
           return OPENDYSLEXIC_12_FONT_ID;
         case EXTRA_LARGE:
           return OPENDYSLEXIC_14_FONT_ID;
       }
-#ifdef ENABLE_CUSTOM_FONTS
-    case CUSTOM_FONT:
-      return EpdFontFileLoader::getFontId(static_cast<EpdFontFileLoader::SizeSlot>(fontSize));
-#endif
+      break;
+    default:
+      break;
   }
+  return BOOKERLY_14_FONT_ID;
+#endif  // OMIT_FONTS
 }

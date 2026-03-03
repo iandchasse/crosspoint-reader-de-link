@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "../Activity.h"
-#include "./MyLibraryActivity.h"
+#include "./FileBrowserActivity.h"
 #include "util/ButtonNavigator.h"
 
 struct RecentBook;

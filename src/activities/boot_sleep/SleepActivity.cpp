@@ -7,12 +7,16 @@
 #include <Txt.h>
 #include <Xtc.h>
 
+#include <string>
+#include <vector>
+
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "images/Logo120.h"
 #include "util/StringUtils.h"
+
 
 void SleepActivity::onEnter() {
   Activity::onEnter();
@@ -43,78 +47,71 @@ void SleepActivity::onEnter() {
 }
 
 void SleepActivity::renderCustomSleepScreen() const {
-  // Check if we have a /sleep directory
-  auto dir = Storage.open("/sleep");
+  // Check if we have a /.sleep (preferred) or /sleep directory
+  const char* sleepDir = nullptr;
+  auto dir = Storage.open("/.sleep");
   if (dir && dir.isDirectory()) {
+    sleepDir = "/.sleep";
+  } else {
+    if (dir) dir.close();
+    dir = Storage.open("/sleep");
+    if (dir && dir.isDirectory()) {
+      sleepDir = "/sleep";
+    }
+  }
+
+  if (sleepDir) {
     std::vector<std::string> files;
     char name[500];
     // collect all valid BMP files
-    for (auto file = dir.openNextFile(); file; file = dir.openNextFile()) {
-      if (file.isDirectory()) {
-        file.close();
-        continue;
+    dir.rewindDirectory();
+    for (auto f = dir.openNextFile(); f; f = dir.openNextFile()) {
+      f.getName(name, sizeof(name));
+      std::string filename(name);
+      if (filename.length() > 4 && filename.substr(filename.length() - 4) == ".bmp") {
+        files.push_back(filename);
       }
-      file.getName(name, sizeof(name));
-      auto filename = std::string(name);
-      if (filename[0] == '.') {
-        file.close();
-        continue;
-      }
-
-      if (filename.substr(filename.length() - 4) != ".bmp") {
-        LOG_DBG("SLP", "Skipping non-.bmp file name: %s", name);
-        file.close();
-        continue;
-      }
-      Bitmap bitmap(file);
-      if (bitmap.parseHeaders() != BmpReaderError::Ok) {
-        LOG_DBG("SLP", "Skipping invalid BMP file: %s", name);
-        file.close();
-        continue;
-      }
-      files.emplace_back(filename);
-      file.close();
+      f.close();
     }
-    const auto numFiles = files.size();
-    if (numFiles > 0) {
-      // Generate a random number between 1 and numFiles
-      auto randomFileIndex = random(numFiles);
-      // If we picked the same image as last time, reroll
-      while (numFiles > 1 && randomFileIndex == APP_STATE.lastSleepImage) {
-        randomFileIndex = random(numFiles);
+    dir.close();
+
+    if (!files.empty()) {
+      int randomFileIndex = 0;
+      if (files.size() > 1) {
+        do {
+          randomFileIndex = rand() % files.size();
+        } while (randomFileIndex == APP_STATE.lastSleepImage);
       }
       APP_STATE.lastSleepImage = randomFileIndex;
       APP_STATE.saveToFile();
-      const auto filename = "/sleep/" + files[randomFileIndex];
       EspFsFile file;
+      const auto filename = std::string(sleepDir) + "/" + files[randomFileIndex];
       if (Storage.openFileForRead("SLP", filename, file)) {
-        LOG_DBG("SLP", "Randomly loading: /sleep/%s", files[randomFileIndex].c_str());
+        LOG_DBG("SLP", "Randomly loading: %s/%s", sleepDir, files[randomFileIndex].c_str());
         delay(100);
         Bitmap bitmap(file, true);
         if (bitmap.parseHeaders() == BmpReaderError::Ok) {
           renderBitmapSleepScreen(bitmap);
           file.close();
-          dir.close();
           return;
         }
         file.close();
       }
     }
-  }
-  if (dir) dir.close();
-
-  // Look for sleep.bmp on the root of the sd card to determine if we should
-  // render a custom sleep screen instead of the default.
-  EspFsFile file;
-  if (Storage.openFileForRead("SLP", "/sleep.bmp", file)) {
-    Bitmap bitmap(file, true);
-    if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-      LOG_DBG("SLP", "Loading: /sleep.bmp");
-      renderBitmapSleepScreen(bitmap);
+  } else {
+    // If no custom directory found, check for root sleep.bmp
+    if (dir) dir.close();
+    EspFsFile file;
+    if (Storage.openFileForRead("SLP", "/sleep.bmp", file)) {
+      Bitmap bitmap(file, true);
+      if (bitmap.parseHeaders() == BmpReaderError::Ok) {
+        LOG_DBG("SLP", "Loading: /sleep.bmp");
+        renderBitmapSleepScreen(bitmap);
+        file.close();
+        return;
+      }
       file.close();
-      return;
     }
-    file.close();
   }
 
   renderDefaultSleepScreen();
