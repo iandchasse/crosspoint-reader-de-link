@@ -27,14 +27,8 @@ inline uint8_t applyBayerDither4Level(uint8_t gray, int x, int y) {
   return 3;
 }
 
-// Draw a pixel respecting the current render mode for grayscale support
+// Draw a pixel using the native 2bpp index
 inline void drawPixelWithRenderMode(GfxRenderer& renderer, int x, int y, uint8_t pixelValue) {
-  GfxRenderer::RenderMode renderMode = renderer.getRenderMode();
-  if (renderMode == GfxRenderer::BW && pixelValue < 3) {
-    renderer.drawPixel(x, y, true);
-  } else if (renderMode == GfxRenderer::GRAYSCALE_MSB && (pixelValue == 1 || pixelValue == 2)) {
-    renderer.drawPixel(x, y, false);
-  } else if (renderMode == GfxRenderer::GRAYSCALE_LSB && pixelValue == 1) {
-    renderer.drawPixel(x, y, false);
-  }
+  if (pixelValue == 0) return;  // white/bg
+  renderer.drawPixel(x, y, 3 - pixelValue);
 }

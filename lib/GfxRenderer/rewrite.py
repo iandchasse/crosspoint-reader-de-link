@@ -1,4 +1,6 @@
-#include "GfxRenderer.h"
+import os
+
+new_cpp = """#include "GfxRenderer.h"
 
 #include <Logging.h>
 #include <Utf8.h>
@@ -16,7 +18,7 @@ const uint8_t* GfxRenderer::getGlyphBitmap(const EpdFontData* fontData, const Ep
 }
 
 void GfxRenderer::begin() {
-  // Initialization handled by HalDisplay::begin()
+  // Initialization done in display.begin()
 }
 
 void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) { fontMap.insert({fontId, font}); }
@@ -24,26 +26,19 @@ void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) { fontMap.ins
 void GfxRenderer::setOrientation(const Orientation o) {
   orientation = o;
   switch (o) {
-    case LandscapeCounterClockwise:
-      display.setRotation(0);
-      break;
-    case PortraitInverted:
-      display.setRotation(270);
-      break;
-    case LandscapeClockwise:
-      display.setRotation(180);
-      break;
-    case Portrait:
-      display.setRotation(90);
-      break;
+    case LandscapeCounterClockwise: display.setRotation(0); break;
+    case PortraitInverted:          display.setRotation(1); break;
+    case LandscapeClockwise:        display.setRotation(2); break;
+    case Portrait:                  display.setRotation(3); break;
   }
 }
 
 enum class TextRotation { None, Rotated90CW };
 
 template <TextRotation rotation>
-static void renderCharImpl(const GfxRenderer& renderer, const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX,
-                           int cursorY, Color color, const EpdFontFamily::Style style) {
+static void renderCharImpl(const GfxRenderer& renderer,
+                           const EpdFontFamily& fontFamily, const uint32_t cp, int cursorX, int cursorY,
+                           Color color, const EpdFontFamily::Style style) {
   const EpdGlyph* glyph = fontFamily.getGlyph(cp, style);
   if (!glyph) {
     LOG_ERR("GFX", "No glyph for codepoint %d", cp);
@@ -85,18 +80,19 @@ static void renderCharImpl(const GfxRenderer& renderer, const EpdFontFamily& fon
 
           const uint8_t byte = bitmap[pixelPosition >> 2];
           const uint8_t bit_index = (3 - (pixelPosition & 3)) * 2;
+          // Font encoding: 0->white, 1->light gray, 2->dark gray, 3->black
+          // Native encoding map: White=0, LightGray=1, DarkGray=2, Black=3 (if black is passed, we draw shaded)
+          // Wait, actually font encoding is: 3 - ((byte >> bit_index) & 0x3) -> 0=black, 1=dark, 2=light, 3=white.
           const uint8_t bmpVal = 3 - ((byte >> bit_index) & 0x3);
 
-          if (bmpVal < 3) {  // not white
+          if (bmpVal < 3) { // not white
             Color drawColor = color;
             if (color == Color::Black) {
-              if (bmpVal == 0)
-                drawColor = Color::Black;
-              else if (bmpVal == 1)
-                drawColor = Color::DarkGray;
-              else if (bmpVal == 2)
-                drawColor = Color::LightGray;
+              if (bmpVal == 0) drawColor = Color::Black;
+              else if (bmpVal == 1) drawColor = Color::DarkGray;
+              else if (bmpVal == 2) drawColor = Color::LightGray;
             }
+            // For now, respect the requested color if it replaces Black.
             renderer.drawPixel(screenX, screenY, drawColor);
           }
         }
@@ -165,7 +161,7 @@ void GfxRenderer::drawText(const int fontId, const int x, const int y, const cha
   int lastBaseAdvanceFP = 0;
   int lastBaseTop = 0;
 
-  if (text == nullptr || *text == '\0') return;
+  if (text == nullptr || *text == '\\0') return;
 
   const auto fontIt = fontMap.find(fontId);
   if (fontIt == fontMap.end()) {
@@ -233,6 +229,7 @@ void GfxRenderer::drawArc(const int maxRadius, const int cx, const int cy, const
 
 void GfxRenderer::drawArc(const int maxRadius, const int cx, const int cy, const int xDir, const int yDir,
                           const int lineWidth, Color color) const {
+  // Can't delegate easily to primitive since bb_epaper mostly does full circles, so map down to pixels:
   const int stroke = std::min(lineWidth, maxRadius);
   const int innerRadius = std::max(maxRadius - stroke, 0);
   const int outerRadiusSq = maxRadius * maxRadius;
@@ -264,7 +261,7 @@ void GfxRenderer::drawRect(const int x, const int y, const int width, const int 
 void GfxRenderer::drawRect(const int x, const int y, const int width, const int height, const int lineWidth,
                            Color color) const {
   for (int i = 0; i < lineWidth; i++) {
-    drawRect(x + i, y + i, width - i * 2, height - i * 2, color);
+    drawRect(x + i, y + i, width - i*2, height - i*2, color);
   }
 }
 
@@ -281,8 +278,7 @@ void GfxRenderer::drawRoundedRect(const int x, const int y, const int width, con
 void GfxRenderer::drawRoundedRect(const int x, const int y, const int width, const int height, const int lineWidth,
                                   const int cornerRadius, bool roundTopLeft, bool roundTopRight, bool roundBottomLeft,
                                   bool roundBottomRight, bool state) const {
-  drawRoundedRect(x, y, width, height, lineWidth, cornerRadius, roundTopLeft, roundTopRight, roundBottomLeft,
-                  roundBottomRight, state ? Color::Black : Color::White);
+  drawRoundedRect(x, y, width, height, lineWidth, cornerRadius, roundTopLeft, roundTopRight, roundBottomLeft, roundBottomRight, state ? Color::Black : Color::White);
 }
 
 void GfxRenderer::drawRoundedRect(const int x, const int y, const int width, const int height, const int lineWidth,
@@ -300,8 +296,7 @@ void GfxRenderer::drawRoundedRect(const int x, const int y, const int width, con
   const int horizontalWidth = width - 2 * maxRadius;
   if (horizontalWidth > 0) {
     if (roundTopLeft || roundTopRight) fillRect(x + maxRadius, y, horizontalWidth, stroke, color);
-    if (roundBottomLeft || roundBottomRight)
-      fillRect(x + maxRadius, bottom - stroke + 1, horizontalWidth, stroke, color);
+    if (roundBottomLeft || roundBottomRight) fillRect(x + maxRadius, bottom - stroke + 1, horizontalWidth, stroke, color);
   }
   const int verticalHeight = height - 2 * maxRadius;
   if (verticalHeight > 0) {
@@ -323,6 +318,7 @@ void GfxRenderer::fillRect(const int x, const int y, const int width, const int 
 }
 
 void GfxRenderer::fillRectDither(const int x, const int y, const int width, const int height, Color color) const {
+  // Dithering no longer necessary since we use 4 native gray levels!
   if (color != Color::Clear) {
     fillRect(x, y, width, height, color);
   }
@@ -344,10 +340,12 @@ void GfxRenderer::fillRoundedRect(const int x, const int y, const int width, con
     return;
   }
   if (roundTopLeft && roundTopRight && roundBottomLeft && roundBottomRight) {
+    // bb_epaper provides native filled round rect
     display.fillRoundRect(x, y, width, height, maxRadius, static_cast<uint8_t>(color));
     return;
   }
 
+  // Fallback for partial rounded rect
   const int horizontalWidth = width - 2 * maxRadius;
   if (horizontalWidth > 0) fillRect(x + maxRadius + 1, y, horizontalWidth - 2, height, color);
   const int leftFillTop = y + (roundTopLeft ? (maxRadius + 1) : 0);
@@ -355,8 +353,7 @@ void GfxRenderer::fillRoundedRect(const int x, const int y, const int width, con
   if (leftFillBottom >= leftFillTop) fillRect(x, leftFillTop, maxRadius + 1, leftFillBottom - leftFillTop + 1, color);
   const int rightFillTop = y + (roundTopRight ? (maxRadius + 1) : 0);
   const int rightFillBottom = y + height - 1 - (roundBottomRight ? (maxRadius + 1) : 0);
-  if (rightFillBottom >= rightFillTop)
-    fillRect(x + width - maxRadius - 1, rightFillTop, maxRadius + 1, rightFillBottom - rightFillTop + 1, color);
+  if (rightFillBottom >= rightFillTop) fillRect(x + width - maxRadius - 1, rightFillTop, maxRadius + 1, rightFillBottom - rightFillTop + 1, color);
 
   auto fillArcFn = [this](int maxRadius, int cx, int cy, int xDir, int yDir, Color color) {
     const int radiusSq = maxRadius * maxRadius;
@@ -445,14 +442,10 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
       if (screenX < 0) continue;
 
       const uint8_t val = outputRow[bmpX / 4] >> (6 - ((bmpX * 2) % 8)) & 0x3;
-      if (val == 0)
-        drawPixel(screenX, screenY, Color::Black);
-      else if (val == 1)
-        drawPixel(screenX, screenY, Color::DarkGray);
-      else if (val == 2)
-        drawPixel(screenX, screenY, Color::LightGray);
-      else
-        drawPixel(screenX, screenY, Color::White);
+      if (val == 0) drawPixel(screenX, screenY, Color::Black);
+      else if (val == 1) drawPixel(screenX, screenY, Color::DarkGray);
+      else if (val == 2) drawPixel(screenX, screenY, Color::LightGray);
+      else drawPixel(screenX, screenY, Color::White);
     }
   }
 
@@ -561,14 +554,13 @@ static unsigned long start_ms = 0;
 
 void GfxRenderer::clearScreen(const uint8_t color) const {
   start_ms = millis();
-  display.clearScreen(color == 0xFF ? HalDisplay::White : color);
+  display.clearScreen(color);
 }
 
 void GfxRenderer::invertScreen() const {
-  // To implement invertScreen efficiently without frame buffer access,
-  // we could just draw a large white-on-black or do it properly if needed.
-  // GDEQ0426T82 doesn't have an invert command usually, but we no longer manage the PB.
-  // Left as no-op until bb_epaper has invert.
+  // To implement invertScreen efficiently, bb_epaper doesn't have an invert method natively exposed.
+  // We can just skip or write a no-op since it's rarely used on grayscale displays, 
+  // or use bb_epaper internal framebuffer iteration if absolutely needed.
 }
 
 void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const {
@@ -577,7 +569,9 @@ void GfxRenderer::displayBuffer(const HalDisplay::RefreshMode refreshMode) const
   display.displayBuffer(refreshMode, fadingFix);
 }
 
-void GfxRenderer::displayGrayBuffer() const { display.refreshDisplay(HalDisplay::FAST_REFRESH, fadingFix); }
+void GfxRenderer::displayGrayBuffer() const { 
+  display.refreshDisplay(HalDisplay::FAST_REFRESH, fadingFix); 
+}
 
 std::string GfxRenderer::truncatedText(const int fontId, const char* text, const int maxWidth,
                                        const EpdFontFamily::Style style) const {
@@ -724,7 +718,7 @@ int GfxRenderer::getTextHeight(const int fontId) const {
 
 void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y, const char* text, const bool black,
                                       const EpdFontFamily::Style style) const {
-  if (text == nullptr || *text == '\0') return;
+  if (text == nullptr || *text == '\\0') return;
   const auto fontIt = fontMap.find(fontId);
   if (fontIt == fontMap.end()) return;
   const auto& font = fontIt->second;
@@ -746,8 +740,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
       }
       const int combiningX = x - raiseBy;
       const int combiningY = lastBaseY - fp4::toPixel(lastBaseAdvanceFP / 2);
-      renderCharImpl<TextRotation::Rotated90CW>(*this, font, cp, combiningX, combiningY,
-                                                black ? Color::Black : Color::White, style);
+      renderCharImpl<TextRotation::Rotated90CW>(*this, font, cp, combiningX, combiningY, black ? Color::Black : Color::White, style);
       continue;
     }
     cp = font.applyLigatures(cp, text, style);
@@ -756,8 +749,7 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
     const EpdGlyph* glyph = font.getGlyph(cp, style);
     lastBaseAdvanceFP = glyph ? glyph->advanceX : 0;
     lastBaseTop = glyph ? glyph->top : 0;
-    renderCharImpl<TextRotation::Rotated90CW>(*this, font, cp, x, lastBaseY, black ? Color::Black : Color::White,
-                                              style);
+    renderCharImpl<TextRotation::Rotated90CW>(*this, font, cp, x, lastBaseY, black ? Color::Black : Color::White, style);
     if (glyph) yPosFP -= glyph->advanceX;
     prevCp = cp;
   }
@@ -791,3 +783,7 @@ void GfxRenderer::getOrientedViewableTRBL(int* outTop, int* outRight, int* outBo
       break;
   }
 }
+"""
+
+with open(r"c:\Users\iandc\.gemini\antigravity\scratch\crosspoint-reader\lib\GfxRenderer\GfxRenderer.cpp", "w") as f:
+    f.write(new_cpp)

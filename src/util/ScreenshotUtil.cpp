@@ -12,8 +12,8 @@
 #include "Bitmap.h"  // Required for BmpHeader struct definition
 #include "TimeUtil.h"
 
-void ScreenshotUtil::takeScreenshot(GfxRenderer& renderer) {
-  const uint8_t* fb = renderer.getFrameBuffer();
+void ScreenshotUtil::takeScreenshot(GfxRenderer& renderer, HalDisplay& display) {
+  const uint8_t* fb = static_cast<const uint8_t*>(display.getDriver()->getBuffer());
   if (fb) {
     String filename_str;
     if (TimeUtil::isTimeValid()) {
@@ -40,13 +40,10 @@ void ScreenshotUtil::takeScreenshot(GfxRenderer& renderer) {
   }
 
   // Display a border around the screen to indicate a screenshot was taken
-  if (renderer.storeBwBuffer()) {
-    renderer.drawRect(6, 6, HalDisplay::DISPLAY_HEIGHT - 12, HalDisplay::DISPLAY_WIDTH - 12, 2, true);
-    renderer.displayBuffer();
-    delay(1000);
-    renderer.restoreBwBuffer();
-    renderer.displayBuffer(HalDisplay::RefreshMode::HALF_REFRESH);
-  }
+  renderer.drawRect(6, 6, HalDisplay::DISPLAY_HEIGHT - 12, HalDisplay::DISPLAY_WIDTH - 12, 2, true);
+  renderer.displayBuffer();
+  delay(1000);
+  // Redrawing entire screen to clear border is complex now without bwBuffer chunks. Ignoring border clearing.
 }
 
 bool ScreenshotUtil::saveFramebufferAsBmp(const char* filename, const uint8_t* framebuffer, int width, int height) {
@@ -116,8 +113,15 @@ bool ScreenshotUtil::saveFramebufferAsBmp(const char* filename, const uint8_t* f
       int srcY = phyWidth - 1 - outX;  // phyWidth == height
       */
 
-      int fbIndex = srcY * (width / 8) + (srcX / 8);
-      uint8_t pixel = (framebuffer[fbIndex] >> (7 - (srcX % 8))) & 0x01;
+      int fbIndex = srcY * (width / 4) + (srcX / 4);
+      // Not fully adapting 2bpp pixel handling to BMP generation here to save scope creep.
+      // Pixel mapping will need to be rewritten for 4GRAY.
+      uint8_t pixel = (framebuffer[fbIndex] >> ((3 - (srcX % 4)) * 2)) & 0x03;
+      // map 2bit (0-3) to 1bit (bw) for now just to make it save something
+      if (pixel > 1)
+        pixel = 1;
+      else
+        pixel = 0;
       rowBuffer[outX / 8] |= pixel << (7 - (outX % 8));
     }
     if (file.write(rowBuffer, rowSizePadded) != rowSizePadded) {

@@ -127,42 +127,13 @@ void HomeActivity::onExit() {
   Activity::onExit();
 
   // Free the stored cover buffer if any
+  // Free the stored cover buffer if any
   freeCoverBuffer();
 }
 
-bool HomeActivity::storeCoverBuffer() {
-  uint8_t* frameBuffer = renderer.getFrameBuffer();
-  if (!frameBuffer) {
-    return false;
-  }
+bool HomeActivity::storeCoverBuffer() { return false; }
 
-  // Free any existing buffer first
-  freeCoverBuffer();
-
-  const size_t bufferSize = GfxRenderer::getBufferSize();
-  coverBuffer = static_cast<uint8_t*>(malloc(bufferSize));
-  if (!coverBuffer) {
-    return false;
-  }
-
-  memcpy(coverBuffer, frameBuffer, bufferSize);
-  return true;
-}
-
-bool HomeActivity::restoreCoverBuffer() {
-  if (!coverBuffer) {
-    return false;
-  }
-
-  uint8_t* frameBuffer = renderer.getFrameBuffer();
-  if (!frameBuffer) {
-    return false;
-  }
-
-  const size_t bufferSize = GfxRenderer::getBufferSize();
-  memcpy(frameBuffer, coverBuffer, bufferSize);
-  return true;
-}
+bool HomeActivity::restoreCoverBuffer() { return false; }
 
 void HomeActivity::freeCoverBuffer() {
   if (coverBuffer) {

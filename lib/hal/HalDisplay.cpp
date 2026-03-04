@@ -3,56 +3,118 @@
 
 #define SD_SPI_MISO 7
 
-HalDisplay::HalDisplay() : einkDisplay(EPD_SCLK, EPD_MOSI, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY) {}
+HalDisplay::HalDisplay() {}
 
 HalDisplay::~HalDisplay() {}
 
-void HalDisplay::begin() { einkDisplay.begin(); }
+static const uint8_t custom_epd426g_init[] PROGMEM = {
+    0x01, 0x12,                                // MACRO SSD1608_SW_RESET (0x12)
+    255,                                       // MACRO BUSY_WAIT (255)
+    0x02, 0x18, 0x80,                          // read built-in temp sensor
+    0x06, 0x0c, 0xae, 0xc7, 0xc3, 0xc0, 0x80,  // set soft start
+    0x04, 0x01, 0xdf, 0x01, 0x02,              // driver output control: 0x02 is TB=0 (non-flipped)
+    0x02, 0x3c, 0x00,                          // border waveform
+    0x02, 0x11, 0x01,                          // data entry mode: 0x01 (X-increment, Y-decrement)
+    0x05, 0x44, 0x00, 0x00, 0x1f, 0x03,        // ram X start/end (0 to 799)
+    0x05, 0x45, 0xdf, 0x01, 0x00, 0x00,        // ram Y start/end (479 to 0)
+    0x03, 0x4e, 0x00, 0x00,                    // X counter = 0
+    0x03, 0x4f, 0xdf, 0x01,                    // Y counter = 479
+    255,                                       // BUSY_WAIT
+    106,  0x32,                                // VCOM LUT
+    0x55, 0x55, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0x00, 0x00, 0x55, 0x55, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0x50,
+    0x00, 0x00, 0x55, 0x55, 0xaa, 0xaa, 0x55, 0x55, 0x55, 0xa0, 0x00, 0x00, 0x55, 0x55, 0xaa, 0xaa, 0x55, 0x55,
+    0x55, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
+    0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01,
+    0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x22, 0x22, 0x22, 0x22, 0x22, 0x02, 0x03, 0x17,  // VGH
+    0x4,  0x04, 0x41, 0xa8, 0x32,  // VSH1,VSH2,VSL
+    0x2,  0x2c, 0x30,              // VCOM voltage
+    0                              // end
+};
 
-void HalDisplay::clearScreen(uint8_t color) const { einkDisplay.clearScreen(color); }
+static const uint8_t custom_epd426g_init_fast[] PROGMEM = {
+    0x01, 0x12,                                // SW RESET
+    255,                                       // BUSY_WAIT
+    0x02, 0x18, 0x80,                          // read built-in temp sensor
+    0x06, 0x0c, 0xae, 0xc7, 0xc3, 0xc0, 0x80,  // set soft start
+    0x04, 0x01, 0xdf, 0x01, 0x02,              // driver output control: 0x02
+    0x02, 0x3c, 0x00,                          // border waveform
+    0x02, 0x11, 0x01,                          // data entry mode: 0x01
+    0x05, 0x44, 0x00, 0x00, 0x1f, 0x03,        // ram X start/end (0 to 799)
+    0x05, 0x45, 0xdf, 0x01, 0x00, 0x00,        // ram Y start/end (479 to 0)
+    0x03, 0x4e, 0x00, 0x00, 0x03, 0x4f, 0xdf, 0x01,
+    255,         // BUSY_WAIT
+    106,  0x32,  // VCOM LUT
+    0xaa, 0xaa, 0xaa, 0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xaa, 0xaa, 0xaa, 0x50, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x55, 0x55, 0x55, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x55, 0x55, 0x55, 0x50, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
+    0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x22, 0x22, 0x22, 0x22, 0x22, 0x02, 0x03, 0x17,  // VGH
+    0x4,  0x04, 0x41, 0xa8, 0x32,  // VSH1,VSH2,VSL
+    0x2,  0x2c, 0x30,              // VCOM voltage
+    0                              // end
+};
+
+void HalDisplay::begin() {
+  bbep.setPanelType(EP426_800x480_4GRAY);
+
+  // Override the init sequences to enforce hardware vertical layout match with old driver (TB=1)
+  bbep._bbep.pInitFull = custom_epd426g_init;
+  bbep._bbep.pInitFast = custom_epd426g_init_fast;
+
+  // initIO args: iDC, iReset, iBusy, iCS, iMOSI, iSCLK, u32Speed
+  bbep.initIO(EPD_DC, EPD_RST, EPD_BUSY, EPD_CS, EPD_MOSI, EPD_SCLK, 40000000);
+  bbep.allocBuffer();
+}
+
+void HalDisplay::clearScreen(uint8_t color) const { const_cast<BBEPAPER*>(&bbep)->fillScreen(color); }
 
 void HalDisplay::drawImage(const uint8_t* imageData, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                            bool fromProgmem) const {
-  einkDisplay.drawImage(imageData, x, y, w, h, fromProgmem);
+  // Optional: implement if needed by reading image bytes into bbep
 }
 
 void HalDisplay::drawImageTransparent(const uint8_t* imageData, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                                       bool fromProgmem) const {
-  einkDisplay.drawImageTransparent(imageData, x, y, w, h, fromProgmem);
-}
-
-EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
-  switch (mode) {
-    case HalDisplay::FULL_REFRESH:
-      return EInkDisplay::FULL_REFRESH;
-    case HalDisplay::HALF_REFRESH:
-      return EInkDisplay::HALF_REFRESH;
-    case HalDisplay::FAST_REFRESH:
-    default:
-      return EInkDisplay::FAST_REFRESH;
-  }
+  // Optional: implement if needed
 }
 
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
-  einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
+  bbep.writePlane();
+  bbep.refresh(mode);
+  if (turnOffScreen) deepSleep();
 }
 
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {
-  einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
+  displayBuffer(mode, turnOffScreen);
 }
 
-void HalDisplay::deepSleep() { einkDisplay.deepSleep(); }
+void HalDisplay::deepSleep() { bbep.sleep(1); }
 
-uint8_t* HalDisplay::getFrameBuffer() const { return einkDisplay.getFrameBuffer(); }
-
-void HalDisplay::copyGrayscaleBuffers(const uint8_t* lsbBuffer, const uint8_t* msbBuffer) {
-  einkDisplay.copyGrayscaleBuffers(lsbBuffer, msbBuffer);
+// Graphical Primitives delegated to bb_epaper
+void HalDisplay::drawPixel(int16_t x, int16_t y, uint8_t color) { bbep.drawPixel(x, y, color); }
+void HalDisplay::drawLine(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint8_t color) {
+  bbep.drawLine(x1, y1, x2, y2, color);
 }
-
-void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t* lsbBuffer) { einkDisplay.copyGrayscaleLsbBuffers(lsbBuffer); }
-
-void HalDisplay::copyGrayscaleMsbBuffers(const uint8_t* msbBuffer) { einkDisplay.copyGrayscaleMsbBuffers(msbBuffer); }
-
-void HalDisplay::cleanupGrayscaleBuffers(const uint8_t* bwBuffer) { einkDisplay.cleanupGrayscaleBuffers(bwBuffer); }
-
-void HalDisplay::displayGrayBuffer(bool turnOffScreen) { einkDisplay.displayGrayBuffer(turnOffScreen); }
+void HalDisplay::drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t color) {
+  bbep.drawRect(x, y, w, h, color);
+}
+void HalDisplay::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t color) {
+  bbep.fillRect(x, y, w, h, color);
+}
+void HalDisplay::drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint8_t color) {
+  bbep.drawRoundRect(x, y, w, h, r, color);
+}
+void HalDisplay::fillRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint8_t color) {
+  bbep.fillRoundRect(x, y, w, h, r, color);
+}
+void HalDisplay::drawCircle(int32_t x, int32_t y, int32_t r, uint8_t color) { bbep.drawCircle(x, y, r, color); }
+void HalDisplay::fillCircle(int32_t x, int32_t y, int32_t r, uint8_t color) { bbep.fillCircle(x, y, r, color); }
+void HalDisplay::drawEllipse(int16_t x, int16_t y, int32_t rx, int32_t ry, uint8_t color) {
+  bbep.drawEllipse(x, y, rx, ry, color);
+}
+void HalDisplay::fillEllipse(int16_t x, int16_t y, int32_t rx, int32_t ry, uint8_t color) {
+  bbep.fillEllipse(x, y, rx, ry, color);
+}
+void HalDisplay::setRotation(int rotation) { bbep.setRotation(rotation); }

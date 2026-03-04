@@ -31,7 +31,7 @@
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
 #include "util/TimeUtil.h"
-
+#define OMIT_FONTS
 HalDisplay display;
 HalGPIO gpio;
 MappedInputManager mappedInputManager(gpio);
@@ -351,9 +351,9 @@ void loop() {
       String cmd = line.substring(4);
       cmd.trim();
       if (cmd == "SCREENSHOT") {
-        logSerial.printf("SCREENSHOT_START:%d\n", HalDisplay::BUFFER_SIZE);
-        uint8_t* buf = display.getFrameBuffer();
-        logSerial.write(buf, HalDisplay::BUFFER_SIZE);
+        logSerial.printf("SCREENSHOT_START:%d\n", HalDisplay::DISPLAY_WIDTH * HalDisplay::DISPLAY_HEIGHT / 4);
+        uint8_t* buf = static_cast<uint8_t*>(display.getDriver()->getBuffer());
+        logSerial.write(buf, HalDisplay::DISPLAY_WIDTH * HalDisplay::DISPLAY_HEIGHT / 4);
         logSerial.printf("SCREENSHOT_END\n");
       }
     }
@@ -372,7 +372,7 @@ void loop() {
       screenshotButtonsReleased = false;
       {
         RenderLock lock;
-        ScreenshotUtil::takeScreenshot(renderer);
+        ScreenshotUtil::takeScreenshot(renderer, display);
       }
     }
     return;

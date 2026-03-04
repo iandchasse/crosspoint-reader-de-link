@@ -414,7 +414,7 @@ void TxtReaderActivity::renderPage() {
   renderStatusBar();
 
   if (pagesUntilFullRefresh <= 1) {
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
   } else {
     renderer.displayBuffer();
@@ -423,24 +423,9 @@ void TxtReaderActivity::renderPage() {
 
   // Grayscale rendering pass (for anti-aliased fonts)
   if (SETTINGS.textAntiAliasing) {
-    // Save BW buffer for restoration after grayscale pass
-    renderer.storeBwBuffer();
-
     renderer.clearScreen(0x00);
-    renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
     renderLines();
-    renderer.copyGrayscaleLsbBuffers();
-
-    renderer.clearScreen(0x00);
-    renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
-    renderLines();
-    renderer.copyGrayscaleMsbBuffers();
-
-    renderer.displayGrayBuffer();
-    renderer.setRenderMode(GfxRenderer::BW);
-
-    // Restore BW buffer
-    renderer.restoreBwBuffer();
+    renderer.displayBuffer();
   }
 }
 

@@ -21,19 +21,37 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
   const auto sideLayout = static_cast<CrossPointSettings::SIDE_BUTTON_LAYOUT>(SETTINGS.sideButtonLayout);
   const auto& side = kSideLayouts[sideLayout];
 
+  // Helper lambda to flip front buttons if the device is held upside down physically
+  // Native orientation (0 deg/CCW) and PortraitInverted (270 deg) mean the buttons are on the right/bottom
+  // Portrait (90 deg) and CCW (180 deg) mean the buttons are physically rotated 180 degrees.
+  auto getPhysicalButton = [&](uint8_t logicalHwBtn) -> uint8_t {
+    const bool isFlipped = (SETTINGS.orientation == CrossPointSettings::PORTRAIT ||
+                            SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CW);
+    if (!isFlipped) return logicalHwBtn;
+
+    switch (logicalHwBtn) {
+      case HalGPIO::BTN_BACK:
+        return HalGPIO::BTN_RIGHT;
+      case HalGPIO::BTN_CONFIRM:
+        return HalGPIO::BTN_LEFT;
+      case HalGPIO::BTN_LEFT:
+        return HalGPIO::BTN_CONFIRM;
+      case HalGPIO::BTN_RIGHT:
+        return HalGPIO::BTN_BACK;
+      default:
+        return logicalHwBtn;
+    }
+  };
+
   switch (button) {
     case Button::Back:
-      // Logical Back maps to user-configured front button.
-      return (gpio.*fn)(SETTINGS.frontButtonBack);
+      return (gpio.*fn)(getPhysicalButton(SETTINGS.frontButtonBack));
     case Button::Confirm:
-      // Logical Confirm maps to user-configured front button.
-      return (gpio.*fn)(SETTINGS.frontButtonConfirm);
+      return (gpio.*fn)(getPhysicalButton(SETTINGS.frontButtonConfirm));
     case Button::Left:
-      // Logical Left maps to user-configured front button.
-      return (gpio.*fn)(SETTINGS.frontButtonLeft);
+      return (gpio.*fn)(getPhysicalButton(SETTINGS.frontButtonLeft));
     case Button::Right:
-      // Logical Right maps to user-configured front button.
-      return (gpio.*fn)(SETTINGS.frontButtonRight);
+      return (gpio.*fn)(getPhysicalButton(SETTINGS.frontButtonRight));
     case Button::Up:
       // Both side-button combos trigger Up (BTN_UP = combo 1, BTN_UNKNOWN_1 = combo 2).
       return (gpio.*fn)(HalGPIO::BTN_UP) || (gpio.*fn)(HalGPIO::BTN_UNKNOWN_1);
@@ -90,16 +108,36 @@ MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const
   // Build the label order based on the configured hardware mapping.
   auto labelForHardware = [&](uint8_t hw) -> const char* {
     // Compare against configured logical roles and return the matching label.
-    if (hw == SETTINGS.frontButtonBack) {
+    // Helper lambda to flip front buttons if the device is held upside down physically
+    auto getPhysicalButton = [&](uint8_t logicalHwBtn) -> uint8_t {
+      const bool isFlipped = (SETTINGS.orientation == CrossPointSettings::PORTRAIT ||
+                              SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CW);
+      if (!isFlipped) return logicalHwBtn;
+
+      switch (logicalHwBtn) {
+        case HalGPIO::BTN_BACK:
+          return HalGPIO::BTN_RIGHT;
+        case HalGPIO::BTN_CONFIRM:
+          return HalGPIO::BTN_LEFT;
+        case HalGPIO::BTN_LEFT:
+          return HalGPIO::BTN_CONFIRM;
+        case HalGPIO::BTN_RIGHT:
+          return HalGPIO::BTN_BACK;
+        default:
+          return logicalHwBtn;
+      }
+    };
+
+    if (hw == getPhysicalButton(SETTINGS.frontButtonBack)) {
       return back;
     }
-    if (hw == SETTINGS.frontButtonConfirm) {
+    if (hw == getPhysicalButton(SETTINGS.frontButtonConfirm)) {
       return confirm;
     }
-    if (hw == SETTINGS.frontButtonLeft) {
+    if (hw == getPhysicalButton(SETTINGS.frontButtonLeft)) {
       return previous;
     }
-    if (hw == SETTINGS.frontButtonRight) {
+    if (hw == getPhysicalButton(SETTINGS.frontButtonRight)) {
       return next;
     }
     return "";
