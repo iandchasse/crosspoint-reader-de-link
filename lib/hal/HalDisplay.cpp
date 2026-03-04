@@ -8,10 +8,19 @@ HalDisplay::HalDisplay() {}
 HalDisplay::~HalDisplay() {}
 
 void HalDisplay::begin() {
+#if defined(PANEL_GDEY075)
+  // GDEY075T7 7.5" 4-gray panel using UC8179 (UC81xx family)
+  // EP75_800x480_4GRAY: original init with stronger LUT values (better contrast) and
+  // epd75_old_gray_init_fast available for FAST_REFRESH (faster page turns).
+  // V2 was faded ("too light output") and had NULL fast init so everything was slow full-refresh.
+  // UC8179 SPI max clock = 20MHz; running at 40MHz causes communication failures.
+  bbep.setPanelType(EP75_800x480_4GRAY_V2);
+  bbep.initIO(EPD_DC, EPD_RST, EPD_BUSY, EPD_CS, EPD_MOSI, EPD_SCLK, 20000000);
+#else
+  // Default: XteinkX4 SSD16xx-based 4-gray panel
   bbep.setPanelType(EP426_800x480_4GRAY);
-
-  // initIO args: iDC, iReset, iBusy, iCS, iMOSI, iSCLK, u32Speed
   bbep.initIO(EPD_DC, EPD_RST, EPD_BUSY, EPD_CS, EPD_MOSI, EPD_SCLK, 40000000);
+#endif
   bbep.allocBuffer();
 }
 

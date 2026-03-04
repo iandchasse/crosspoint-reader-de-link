@@ -66,7 +66,13 @@ class GfxRenderer {
   Orientation getOrientation() const { return orientation; }
 
   // Fading fix control (legacy API retained for compat, functionality handled natively by bb_epaper)
-  void setFadingFix(const bool enabled) { fadingFix = enabled; }
+  void setFadingFix(const bool enabled) {
+#if defined(PANEL_GDEY075)
+    fadingFix = false;  // GDEY075 requires hold voltage, deep sleep causes instant fading
+#else
+    fadingFix = enabled;
+#endif
+  }
 
   // Screen ops
   int getScreenWidth() const;

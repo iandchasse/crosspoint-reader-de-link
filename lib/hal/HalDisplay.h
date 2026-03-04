@@ -22,7 +22,9 @@ class HalDisplay {
   // Initialize the display hardware and driver
   void begin();
 
-  // Display dimensions
+  // Display dimensions — always expressed in the native hardware pixel dimensions.
+  // GfxRenderer handles logical orientation (portrait vs landscape) via setOrientation/setRotation.
+  // Both panels are physically 800x480 pixels.
   static constexpr uint16_t DISPLAY_WIDTH = 800;
   static constexpr uint16_t DISPLAY_HEIGHT = 480;
 
