@@ -449,13 +449,13 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
 
       const uint8_t val = outputRow[bmpX / 4] >> (6 - ((bmpX * 2) % 8)) & 0x3;
       if (val == 0)
-        drawPixel(screenX, screenY, Color::Black);
-      else if (val == 1)
-        drawPixel(screenX, screenY, Color::DarkGray);
-      else if (val == 2)
-        drawPixel(screenX, screenY, Color::LightGray);
-      else
         drawPixel(screenX, screenY, Color::White);
+      else if (val == 1)
+        drawPixel(screenX, screenY, Color::LightGray);
+      else if (val == 2)
+        drawPixel(screenX, screenY, Color::DarkGray);
+      else
+        drawPixel(screenX, screenY, Color::Black);
     }
   }
 
@@ -496,7 +496,7 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
       if (screenX < 0) continue;
 
       const uint8_t val = outputRow[bmpX / 4] >> (6 - ((bmpX * 2) % 8)) & 0x3;
-      if (val < 3) drawPixel(screenX, screenY, Color::Black);
+      if (val >= 3) drawPixel(screenX, screenY, Color::Black);
     }
   }
 

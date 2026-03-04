@@ -235,32 +235,28 @@ void XtcReaderActivity::renderPage() {
     LOG_DBG("XTR", "Pixel distribution: White=%lu, DarkGrey=%lu, LightGrey=%lu, Black=%lu", pixelCounts[0],
             pixelCounts[1], pixelCounts[2], pixelCounts[3]);
 
-    // Pass 1: BW buffer - draw all non-white pixels as black
+    // Render natively direct to 4-gray buffer
     for (uint16_t y = 0; y < pageHeight; y++) {
       for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) >= 1) {
-          renderer.drawPixel(x, y, true);
-        }
+        uint8_t val = getPixelValue(x, y);
+        if (val == 0)
+          renderer.drawPixel(x, y, Color::White);
+        else if (val == 1)
+          renderer.drawPixel(x, y, Color::LightGray);
+        else if (val == 2)
+          renderer.drawPixel(x, y, Color::DarkGray);
+        else
+          renderer.drawPixel(x, y, Color::Black);
       }
     }
 
-    // Display BW with conditional refresh based on pagesUntilFullRefresh
+    // Display
     if (pagesUntilFullRefresh <= 1) {
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
       pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
     } else {
       renderer.displayBuffer();
       pagesUntilFullRefresh--;
-    }
-
-    // Re-render BW to framebuffer has been replaced as part of bb_epaper 2bpp cleanup.
-    renderer.clearScreen();
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) >= 1) {
-          renderer.drawPixel(x, y, true);
-        }
-      }
     }
 
     free(pageBuffer);
@@ -280,8 +276,11 @@ void XtcReaderActivity::renderPage() {
         const size_t srcBit = 7 - (srcX % 8);
         const bool isBlack = !((pageBuffer[srcByte] >> srcBit) & 1);  // XTC: 0 = black, 1 = white
 
+        // 0 = black, 1 = white
         if (isBlack) {
-          renderer.drawPixel(srcX, srcY, true);
+          renderer.drawPixel(srcX, srcY, Color::Black);
+        } else {
+          renderer.drawPixel(srcX, srcY, Color::White);
         }
       }
     }

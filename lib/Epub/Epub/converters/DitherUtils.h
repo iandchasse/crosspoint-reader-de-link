@@ -29,6 +29,11 @@ inline uint8_t applyBayerDither4Level(uint8_t gray, int x, int y) {
 
 // Draw a pixel using the native 2bpp index
 inline void drawPixelWithRenderMode(GfxRenderer& renderer, int x, int y, uint8_t pixelValue) {
-  if (pixelValue == 0) return;  // white/bg
-  renderer.drawPixel(x, y, 3 - pixelValue);
+  if (pixelValue == 3) return;  // white/bg
+  if (pixelValue == 1)
+    renderer.drawPixel(x, y, LightGray);
+  else if (pixelValue == 2)
+    renderer.drawPixel(x, y, DarkGray);
+  else if (pixelValue == 0)
+    renderer.drawPixel(x, y, Black);
 }
