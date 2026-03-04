@@ -379,8 +379,11 @@ void GfxRenderer::drawImage(const uint8_t bitmap[], const int x, const int y, co
   for (int r = 0; r < height; r++) {
     int rowIdx = r * (width / 8);
     for (int c = 0; c < width; c++) {
-      bool isBlack = (bitmap[rowIdx + (c / 8)] & (0x80 >> (c % 8))) == 0;
-      drawPixel(x + height - 1 - r, y + c, isBlack ? Color::Black : Color::White);
+      if ((bitmap[rowIdx + (c / 8)] & (0x80 >> (c % 8))) == 0) {
+        drawPixel(x + c, y + r, Color::Black);
+      } else {
+        drawPixel(x + c, y + r, Color::White);
+      }
     }
   }
 }

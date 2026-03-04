@@ -420,13 +420,6 @@ void TxtReaderActivity::renderPage() {
     renderer.displayBuffer();
     pagesUntilFullRefresh--;
   }
-
-  // Grayscale rendering pass (for anti-aliased fonts)
-  if (SETTINGS.textAntiAliasing) {
-    renderer.clearScreen(0x00);
-    renderLines();
-    renderer.displayBuffer();
-  }
 }
 
 void TxtReaderActivity::renderStatusBar() const {
