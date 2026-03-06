@@ -33,6 +33,8 @@ EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
   }
 }
 
+void HalDisplay::storeBwBase(const uint8_t* bwBuffer) { einkDisplay.storeBwBase(bwBuffer); }
+
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
 }

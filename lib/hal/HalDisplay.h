@@ -42,7 +42,7 @@ class HalDisplay {
 
   void displayBuffer(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
   void refreshDisplay(RefreshMode mode = RefreshMode::FAST_REFRESH, bool turnOffScreen = false);
-
+  void storeBwBase(const uint8_t* bwBuffer);
   // Power management
   void deepSleep();
 

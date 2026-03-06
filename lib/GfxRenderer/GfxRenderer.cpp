@@ -116,7 +116,7 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
           if (renderMode == GfxRenderer::BW && bmpVal < 3) {
             // Black (also paints over the grays in BW mode)
             renderer.drawPixel(screenX, screenY, pixelState);
-          } else if (renderMode == GfxRenderer::GRAYSCALE_MSB && (bmpVal == 1 || bmpVal == 2)) {
+          } else if (renderMode == GfxRenderer::GRAYSCALE_MSB && bmpVal == 2) {
             // Light gray (also mark the MSB if it's going to be a dark gray too)
             // We have to flag pixels in reverse for the gray buffers, as 0 leave alone, 1 update
             renderer.drawPixel(screenX, screenY, false);
@@ -649,7 +649,7 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
 
       if (renderMode == BW && val < 3) {
         drawPixel(screenX, screenY);
-      } else if (renderMode == GRAYSCALE_MSB && (val == 1 || val == 2)) {
+      } else if (renderMode == GRAYSCALE_MSB && val == 2) {
         drawPixel(screenX, screenY, false);
       } else if (renderMode == GRAYSCALE_LSB && val == 1) {
         drawPixel(screenX, screenY, false);
@@ -875,9 +875,6 @@ std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* 
     } else {
       if (!currentLine.empty()) {
         lines.push_back(currentLine);
-        // If the carried-over word itself exceeds maxWidth, truncate it and
-        // push it as a complete line immediately — storing it in currentLine
-        // would allow a subsequent short word to be appended after the ellipsis.
         if (getTextWidth(fontId, word.c_str(), style) > maxWidth) {
           lines.push_back(truncatedText(fontId, word.c_str(), maxWidth, style));
           currentLine.clear();
@@ -886,9 +883,6 @@ std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* 
           currentLine = word;
         }
       } else {
-        // Single word wider than maxWidth: truncate and stop to avoid complicated
-        // splitting rules (different between languages). Results in an aesthetically
-        // pleasing end.
         lines.push_back(truncatedText(fontId, word.c_str(), maxWidth, style));
         return lines;
       }
@@ -907,11 +901,9 @@ int GfxRenderer::getScreenWidth() const {
   switch (orientation) {
     case Portrait:
     case PortraitInverted:
-      // 480px wide in portrait logical coordinates
       return HalDisplay::DISPLAY_HEIGHT;
     case LandscapeClockwise:
     case LandscapeCounterClockwise:
-      // 800px wide in landscape logical coordinates
       return HalDisplay::DISPLAY_WIDTH;
   }
   return HalDisplay::DISPLAY_HEIGHT;
@@ -921,11 +913,9 @@ int GfxRenderer::getScreenHeight() const {
   switch (orientation) {
     case Portrait:
     case PortraitInverted:
-      // 800px tall in portrait logical coordinates
       return HalDisplay::DISPLAY_WIDTH;
     case LandscapeClockwise:
     case LandscapeCounterClockwise:
-      // 480px tall in landscape logical coordinates
       return HalDisplay::DISPLAY_HEIGHT;
   }
   return HalDisplay::DISPLAY_WIDTH;
@@ -939,7 +929,7 @@ int GfxRenderer::getSpaceWidth(const int fontId, const EpdFontFamily::Style styl
   }
 
   const EpdGlyph* spaceGlyph = fontIt->second.getGlyph(' ', style);
-  return spaceGlyph ? fp4::toPixel(spaceGlyph->advanceX) : 0;  // snap 12.4 fixed-point to nearest pixel
+  return spaceGlyph ? fp4::toPixel(spaceGlyph->advanceX) : 0;
 }
 
 int GfxRenderer::getSpaceKernAdjust(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
@@ -947,16 +937,16 @@ int GfxRenderer::getSpaceKernAdjust(const int fontId, const uint32_t leftCp, con
   const auto fontIt = fontMap.find(fontId);
   if (fontIt == fontMap.end()) return 0;
   const auto& font = fontIt->second;
-  const int kernFP = font.getKerning(leftCp, ' ', style) + font.getKerning(' ', rightCp, style);  // 4.4 fixed-point
-  return fp4::toPixel(kernFP);  // snap 4.4 fixed-point to nearest pixel
+  const int kernFP = font.getKerning(leftCp, ' ', style) + font.getKerning(' ', rightCp, style);
+  return fp4::toPixel(kernFP);
 }
 
 int GfxRenderer::getKerning(const int fontId, const uint32_t leftCp, const uint32_t rightCp,
                             const EpdFontFamily::Style style) const {
   const auto fontIt = fontMap.find(fontId);
   if (fontIt == fontMap.end()) return 0;
-  const int kernFP = fontIt->second.getKerning(leftCp, rightCp, style);  // 4.4 fixed-point
-  return fp4::toPixel(kernFP);                                           // snap 4.4 fixed-point to nearest pixel
+  const int kernFP = fontIt->second.getKerning(leftCp, rightCp, style);
+  return fp4::toPixel(kernFP);
 }
 
 int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFamily::Style style) const {
@@ -968,7 +958,7 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
 
   uint32_t cp;
   uint32_t prevCp = 0;
-  int32_t widthFP = 0;  // 12.4 fixed-point accumulator
+  int32_t widthFP = 0;
   const auto& font = fontIt->second;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
     if (utf8IsCombiningMark(cp)) {
@@ -976,13 +966,13 @@ int GfxRenderer::getTextAdvanceX(const int fontId, const char* text, EpdFontFami
     }
     cp = font.applyLigatures(cp, text, style);
     if (prevCp != 0) {
-      widthFP += font.getKerning(prevCp, cp, style);  // 4.4 fixed-point kern
+      widthFP += font.getKerning(prevCp, cp, style);
     }
     const EpdGlyph* glyph = font.getGlyph(cp, style);
-    if (glyph) widthFP += glyph->advanceX;  // 12.4 fixed-point advance
+    if (glyph) widthFP += glyph->advanceX;
     prevCp = cp;
   }
-  return fp4::toPixel(widthFP);  // snap 12.4 fixed-point to nearest pixel
+  return fp4::toPixel(widthFP);
 }
 
 int GfxRenderer::getFontAscenderSize(const int fontId) const {
@@ -1016,7 +1006,6 @@ int GfxRenderer::getTextHeight(const int fontId) const {
 
 void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y, const char* text, const bool black,
                                       const EpdFontFamily::Style style) const {
-  // Cannot draw a NULL / empty string
   if (text == nullptr || *text == '\0') {
     return;
   }
@@ -1029,9 +1018,9 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
   const auto& font = fontIt->second;
 
-  int32_t yPosFP = fp4::fromPixel(y);  // 12.4 fixed-point accumulator
+  int32_t yPosFP = fp4::fromPixel(y);
   int lastBaseY = y;
-  int lastBaseAdvanceFP = 0;  // 12.4 fixed-point
+  int lastBaseAdvanceFP = 0;
   int lastBaseTop = 0;
   constexpr int MIN_COMBINING_GAP_PX = 1;
 
@@ -1056,18 +1045,18 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 
     cp = font.applyLigatures(cp, text, style);
     if (prevCp != 0) {
-      yPosFP -= font.getKerning(prevCp, cp, style);  // 4.4 fixed-point kern (subtract for rotated)
+      yPosFP -= font.getKerning(prevCp, cp, style);
     }
 
-    lastBaseY = fp4::toPixel(yPosFP);  // snap 12.4 fixed-point to nearest pixel
+    lastBaseY = fp4::toPixel(yPosFP);
     const EpdGlyph* glyph = font.getGlyph(cp, style);
 
-    lastBaseAdvanceFP = glyph ? glyph->advanceX : 0;  // 12.4 fixed-point
+    lastBaseAdvanceFP = glyph ? glyph->advanceX : 0;
     lastBaseTop = glyph ? glyph->top : 0;
 
     renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, x, lastBaseY, black, style);
     if (glyph) {
-      yPosFP -= glyph->advanceX;  // 12.4 fixed-point advance (subtract for rotated)
+      yPosFP -= glyph->advanceX;
     }
     prevCp = cp;
   }
@@ -1076,9 +1065,6 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
 uint8_t* GfxRenderer::getFrameBuffer() const { return frameBuffer; }
 
 size_t GfxRenderer::getBufferSize() { return HalDisplay::BUFFER_SIZE; }
-
-// unused
-// void GfxRenderer::grayscaleRevert() const { display.grayscaleRevert(); }
 
 void GfxRenderer::copyGrayscaleLsbBuffers() const { display.copyGrayscaleLsbBuffers(frameBuffer); }
 
@@ -1095,16 +1081,8 @@ void GfxRenderer::freeBwBufferChunks() {
   }
 }
 
-/**
- * This should be called before grayscale buffers are populated.
- * A `restoreBwBuffer` call should always follow the grayscale render if this method was called.
- * Uses chunked allocation to avoid needing 48KB of contiguous memory.
- * Returns true if buffer was stored successfully, false if allocation failed.
- */
 bool GfxRenderer::storeBwBuffer() {
-  // Allocate and copy each chunk
   for (size_t i = 0; i < BW_BUFFER_NUM_CHUNKS; i++) {
-    // Check if any chunks are already allocated
     if (bwBufferChunks[i]) {
       LOG_ERR("GFX", "!! BW buffer chunk %zu already stored - this is likely a bug, freeing chunk", i);
       free(bwBufferChunks[i]);
@@ -1116,7 +1094,6 @@ bool GfxRenderer::storeBwBuffer() {
 
     if (!bwBufferChunks[i]) {
       LOG_ERR("GFX", "!! Failed to allocate BW buffer chunk %zu (%zu bytes)", i, BW_BUFFER_CHUNK_SIZE);
-      // Free previously allocated chunks
       freeBwBufferChunks();
       return false;
     }
@@ -1124,17 +1101,16 @@ bool GfxRenderer::storeBwBuffer() {
     memcpy(bwBufferChunks[i], frameBuffer + offset, BW_BUFFER_CHUNK_SIZE);
   }
 
+  // Snapshot the BW page into the driver's compositing base BEFORE clearScreen(0x00)
+  // destroys frameBuffer for the gray render passes. This is the only reliable
+  // moment where frameBuffer contains the actual rendered BW page.
+  display.storeBwBase(frameBuffer);
+
   LOG_DBG("GFX", "Stored BW buffer in %zu chunks (%zu bytes each)", BW_BUFFER_NUM_CHUNKS, BW_BUFFER_CHUNK_SIZE);
   return true;
 }
 
-/**
- * This can only be called if `storeBwBuffer` was called prior to the grayscale render.
- * It should be called to restore the BW buffer state after grayscale rendering is complete.
- * Uses chunked restoration to match chunked storage.
- */
 void GfxRenderer::restoreBwBuffer() {
-  // Check if all chunks are allocated
   bool missingChunks = false;
   for (const auto& bwBufferChunk : bwBufferChunks) {
     if (!bwBufferChunk) {
@@ -1159,10 +1135,6 @@ void GfxRenderer::restoreBwBuffer() {
   LOG_DBG("GFX", "Restored and freed BW buffer chunks");
 }
 
-/**
- * Cleanup grayscale buffers using the current frame buffer.
- * Use this when BW buffer was re-rendered instead of stored/restored.
- */
 void GfxRenderer::cleanupGrayscaleWithFrameBuffer() const {
   if (frameBuffer) {
     display.cleanupGrayscaleBuffers(frameBuffer);
