@@ -1,6 +1,13 @@
 #pragma once
 #include <Arduino.h>
+
+#ifdef USE_UC8179_DISPLAY
+#include <EInkDisplay_UC8179.h>
+using EInkDisplay = EInkDisplay_UC8179;
+#else
 #include <EInkDisplay.h>
+using EInkDisplay = EInkDisplay;
+#endif
 
 class HalDisplay {
  public:
