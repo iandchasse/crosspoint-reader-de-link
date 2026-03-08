@@ -9,6 +9,7 @@
 #include <HalGPIO.h>
 #include <HalPowerManager.h>
 #include <HalStorage.h>
+#include <HalSystem.h>
 #include <I18n.h>
 #include <Logging.h>
 #include <SPI.h>
@@ -241,6 +242,7 @@ void setupDisplayAndFonts() {
 void setup() {
   t1 = millis();
 
+  HalSystem::begin();
   gpio.begin();
   powerManager.begin();
 
@@ -262,6 +264,9 @@ void setup() {
     activityManager.goToFullScreenMessage("SD card error", EpdFontFamily::BOLD);
     return;
   }
+
+  HalSystem::checkPanic();
+  HalSystem::clearPanic();  // TODO: move this to an activity when we have one to display the panic info
 
   SETTINGS.loadFromFile();
   TimeUtil::reconfigure();
