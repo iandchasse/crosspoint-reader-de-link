@@ -42,8 +42,15 @@ void IRAM_ATTR __wrap_panic_print_backtrace(const void* frame, int core) {
     panicStack[i].sp = 0;
   }
 
-  // Copied from components/esp_system/port/arch/riscv/panic_arch.c
+  // Copied from components/esp_system/port/arch/riscv/panic_arch.c (RISC-V)
+  // and components/esp_system/port/arch/xtensa/panic_arch.c (Xtensa)
+#if defined(__riscv)
   uint32_t sp = (uint32_t)((RvExcFrame*)frame)->sp;
+#elif defined(__xtensa__)
+  uint32_t sp = (uint32_t)((XtExcFrame*)frame)->a1;
+#else
+#error "Unsupported architecture for panic backtrace"
+#endif
   const int per_line = 8;
   int depth = 0;
   for (int x = 0; x < 1024; x += per_line * sizeof(uint32_t)) {
@@ -90,7 +97,7 @@ void begin() {
 void checkPanic() {
   if (isRebootFromPanic()) {
     auto panicInfo = getPanicInfo(true);
-    auto file = Storage.open("/crash_report.txt", O_WRITE | O_CREAT | O_TRUNC);
+    auto file = Storage.open("/crash_report.txt", O_WRONLY | O_CREAT | O_TRUNC);
     if (file) {
       file.write(panicInfo.c_str(), panicInfo.size());
       file.close();

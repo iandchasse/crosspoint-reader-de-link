@@ -26,6 +26,8 @@ constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
 // Cache file magic and version
 constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
 constexpr uint8_t CACHE_VERSION = 2;          // Increment when cache format changes
+constexpr unsigned long skipPageMs = 700;
+constexpr unsigned long goHomeMs = 1000;
 }  // namespace
 
 void TxtReaderActivity::onEnter() {

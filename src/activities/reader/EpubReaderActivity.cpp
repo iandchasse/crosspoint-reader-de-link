@@ -27,7 +27,6 @@
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 
-
 #ifdef FRONTLIGHT_PRESENT
 #include "activities/settings/FrontlightControlActivity.h"
 #endif
@@ -38,6 +37,8 @@
 namespace {
 // pagesPerRefresh now comes from SETTINGS.getRefreshFrequency()
 constexpr unsigned long skipChapterMs = 700;
+constexpr unsigned long skipPageMs = 700;
+constexpr unsigned long goHomeMs = 1000;
 // pages per minute, first item is 1 to prevent division by zero if accessed
 const std::vector<int> PAGE_TURN_LABELS = {1, 1, 3, 6, 12};
 
