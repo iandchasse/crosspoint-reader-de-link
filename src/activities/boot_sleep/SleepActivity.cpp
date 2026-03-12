@@ -90,14 +90,13 @@ void SleepActivity::renderCustomSleepScreen() const {
       files.emplace_back(filename);
       file.close();
     }
-    dir.close();
-
-    if (!files.empty()) {
-      int randomFileIndex = 0;
-      if (files.size() > 1) {
-        do {
-          randomFileIndex = rand() % files.size();
-        } while (randomFileIndex == APP_STATE.lastSleepImage);
+    const auto numFiles = files.size();
+    if (numFiles > 0) {
+      // Generate a random number between 1 and numFiles
+      auto randomFileIndex = random(numFiles);
+      // If we picked the same image as last time, reroll
+      while (numFiles > 1 && APP_STATE.lastSleepImage != UINT8_MAX && randomFileIndex == APP_STATE.lastSleepImage) {
+        randomFileIndex = random(numFiles);
       }
       APP_STATE.lastSleepImage = randomFileIndex;
       APP_STATE.saveToFile();

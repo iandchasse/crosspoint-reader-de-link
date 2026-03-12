@@ -1,5 +1,6 @@
 ﻿#include "TxtReaderActivity.h"
 
+#include <FontCacheManager.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
@@ -29,6 +30,8 @@ constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
 // Cache file magic and version
 constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
 constexpr uint8_t CACHE_VERSION = 2;          // Increment when cache format changes
+constexpr unsigned long skipPageMs = 700;
+constexpr unsigned long goHomeMs = 1000;
 }  // namespace
 
 void TxtReaderActivity::onEnter() {
@@ -364,7 +367,6 @@ void TxtReaderActivity::render(RenderLock&&) {
 
   renderer.clearScreen();
   renderPage();
-  renderer.clearFontCache();
 
   // Save progress
   saveProgress();
@@ -409,7 +411,13 @@ void TxtReaderActivity::renderPage() {
     }
   };
 
-  // First pass: BW rendering
+  // Font prewarm: scan pass accumulates text, then prewarm, then real render
+  auto* fcm = renderer.getFontCacheManager();
+  auto scope = fcm->createPrewarmScope();
+  renderLines();  // scan pass — text accumulated, no drawing
+  scope.endScanAndPrewarm();
+
+  // BW rendering
   renderLines();
   renderStatusBar();
 
@@ -418,6 +426,7 @@ void TxtReaderActivity::renderPage() {
   if (SETTINGS.textAntiAliasing) {
     ReaderUtils::renderAntiAliased(renderer, [&renderLines]() { renderLines(); });
   }
+  // scope destructor clears font cache via FontCacheManager
 }
 
 void TxtReaderActivity::renderStatusBar() const {

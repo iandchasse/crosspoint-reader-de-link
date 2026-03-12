@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Epub.h>
+#include <FontCacheManager.h>
 #include <FontDecompressor.h>
 #ifdef FRONTLIGHT_PRESENT
 #include <FrontlightManager.h>
@@ -45,6 +46,7 @@ FrontlightManager frontlightManager;
 #endif
 ActivityManager activityManager(renderer, mappedInputManager);
 FontDecompressor fontDecompressor;
+FontCacheManager fontCacheManager(renderer.getFontMap());
 
 // Fonts
 EpdFont bookerly14RegularFont(&bookerly_14_regular);
@@ -220,7 +222,8 @@ void setupDisplayAndFonts() {
   if (!fontDecompressor.init()) {
     LOG_ERR("MAIN", "Font decompressor init failed");
   }
-  renderer.setFontDecompressor(&fontDecompressor);
+  fontCacheManager.setFontDecompressor(&fontDecompressor);
+  renderer.setFontCacheManager(&fontCacheManager);
   renderer.insertFont(BOOKERLY_14_FONT_ID, bookerly14FontFamily);
 #ifndef OMIT_FONTS
   renderer.insertFont(BOOKERLY_12_FONT_ID, bookerly12FontFamily);
