@@ -250,14 +250,14 @@ void setup() {
   powerManager.begin();
 
   // Only start serial if USB connected
-  // if (gpio.isUsbConnected()) {
-  Serial.begin(115200);
-  // Wait up to 3 seconds for Serial to be ready to catch early logs
-  unsigned long start = millis();
-  while (!Serial && (millis() - start) < 3000) {
-    delay(10);
+  if (gpio.isUsbConnected()) {
+    Serial.begin(115200);
+    // Wait up to 3 seconds for Serial to be ready to catch early logs
+    unsigned long start = millis();
+    while (!Serial && (millis() - start) < 3000) {
+      delay(10);
+    }
   }
-  // }
 
   // SD Card Initialization
   // We need 6 open files concurrently when parsing a new chapter
