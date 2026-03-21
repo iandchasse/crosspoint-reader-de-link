@@ -442,11 +442,9 @@ void loop() {
     return;
   }
 
-  // Refresh the battery icon when USB is plugged or unplugged.
-  // Placed after sleep guards so we never queue a render that won't be processed.
-  if (gpio.wasUsbStateChanged()) {
-    activityManager.requestUpdate();
-  }
+  // Note: battery charging icon updates naturally on the next user-triggered screen refresh.
+  // We intentionally do NOT force a redraw on USB state change because full e-ink refreshes
+  // are slow/disruptive and usb_serial_jtag_is_connected() can bounce during plug/unplug.
 
   const unsigned long activityStartTime = millis();
   activityManager.loop();
