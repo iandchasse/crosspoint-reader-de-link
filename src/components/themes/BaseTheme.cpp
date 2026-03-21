@@ -39,7 +39,7 @@ void drawBatteryIcon(const GfxRenderer& renderer, int x, int y, int battWidth, i
   renderer.drawPixel(x + battWidth - 1, y + rectHeight - 4);
   renderer.drawLine(x + battWidth - 0, y + 4, x + battWidth - 0, y + rectHeight - 5);
 
-  const bool charging = gpio.isUsbConnected();
+  const bool charging = gpio.isCharging();
 
   // The +1 is to round up, so that we always fill at least one pixel
   const int maxFillWidth = battWidth - 5;

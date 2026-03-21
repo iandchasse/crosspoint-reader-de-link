@@ -1,10 +1,11 @@
 #include <HalGPIO.h>
 #include <SPI.h>
+#include <driver/usb_serial_jtag.h>
 
 void HalGPIO::begin() {
   inputMgr.begin();
   SPI.begin(EPD_SCLK, SPI_MISO, EPD_MOSI, EPD_CS);
-  pinMode(UART0_RXD, INPUT);
+  pinMode(BAT_CHECK, INPUT_PULLUP);  // MCP73832 STAT pin (open-drain)
 }
 
 void HalGPIO::update() {
@@ -29,8 +30,13 @@ bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
 unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
 
 bool HalGPIO::isUsbConnected() const {
-  // U0RXD/GPIO20 reads HIGH when USB is connected
-  return digitalRead(UART0_RXD) == HIGH;
+  // Native ESP-IDF API: detects SOF packets from a connected USB host
+  return usb_serial_jtag_is_connected();
+}
+
+bool HalGPIO::isCharging() const {
+  // MCP73832 STAT pin (GPIO8): LOW = charging, Hi-Z = not charging/complete
+  return digitalRead(BAT_CHECK) == LOW;
 }
 
 HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {

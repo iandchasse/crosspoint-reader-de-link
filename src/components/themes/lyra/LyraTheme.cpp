@@ -61,7 +61,7 @@ void drawLyraBatteryIcon(const GfxRenderer& renderer, int x, int y, int battWidt
   renderer.drawPixel(x + battWidth - 1, y + rectHeight - 4);
   renderer.drawLine(x + battWidth - 0, y + 4, x + battWidth - 0, y + rectHeight - 5);
 
-  const bool charging = gpio.isUsbConnected();
+  const bool charging = gpio.isCharging();
 
   // Draw bars
   if (percentage > 10 || charging) {

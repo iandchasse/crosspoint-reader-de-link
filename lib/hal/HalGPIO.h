@@ -42,8 +42,11 @@ class HalGPIO {
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
 
-  // Check if USB is connected
+  // Check if USB is connected (uses native ESP-IDF USB Serial/JTAG API)
   bool isUsbConnected() const;
+
+  // Check if battery is actively charging (MCP73832 STAT pin, GPIO8)
+  bool isCharging() const;
 
   // Returns true once per edge (plug or unplug) since the last update()
   bool wasUsbStateChanged() const;
