@@ -18,6 +18,7 @@
 #include "fontIds.h"
 #include "util/TimeUtil.h"
 
+
 // Internal constants
 namespace {
 constexpr int batteryPercentSpacing = 4;
