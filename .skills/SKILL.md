@@ -317,8 +317,8 @@ Constraint: Physical button positions are fixed on hardware, but their logical f
    - `Button::Up` → Always `HalGPIO::BTN_UP`
    - `Button::Down` → Always `HalGPIO::BTN_DOWN`
    - S3 specific platform has two additional buttons that are extra sets of up/down
-   - `Button::Up2` → Always `HalGPIO::BTN_UNKNOWN_1`
-   - `Button::Down2` → Always `HalGPIO::BTN_UNKNOWN_2
+   - `Button::Up2` → Always `HalGPIO::BTN_UP_2`
+   - `Button::Down2` → Always `HalGPIO::BTN_DOWN_2
    - these extra buttons will be used only for s3-specific functions
 
 2. **User Remappable** (Front buttons):

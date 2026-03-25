@@ -85,6 +85,8 @@ inline const std::vector<SettingInfo>& getSettingsList() {
                         {StrId::STR_PREV_NEXT, StrId::STR_NEXT_PREV}, "sideButtonLayout", StrId::STR_CAT_CONTROLS),
       SettingInfo::Toggle(StrId::STR_LONG_PRESS_SKIP, &CrossPointSettings::longPressChapterSkip, "longPressChapterSkip",
                           StrId::STR_CAT_CONTROLS),
+      SettingInfo::Toggle(StrId::STR_DISABLE_SIDE_PAGE_TURN, &CrossPointSettings::disableSidePageTurn,
+                          "disableSidePageTurn", StrId::STR_CAT_CONTROLS),
       SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
 #ifdef FRONTLIGHT_PRESENT
                         {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_TOGGLE_FRONTLIGHT},

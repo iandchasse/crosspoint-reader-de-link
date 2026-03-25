@@ -63,9 +63,9 @@ class HalGPIO {
   static constexpr uint8_t BTN_UP = 4;
   static constexpr uint8_t BTN_DOWN = 5;
   // Second ADC combo group — physical duplicates of BTN_UP/BTN_DOWN on this board.
-  static constexpr uint8_t BTN_UNKNOWN_1 = 6;  // Same logical action as BTN_UP
-  static constexpr uint8_t BTN_UNKNOWN_2 = 7;  // Same logical action as BTN_DOWN
-  static constexpr uint8_t BTN_POWER = 8;      // Matches InputManager::BTN_POWER
+  static constexpr uint8_t BTN_UP_2 = 6;    // Same logical action as BTN_UP
+  static constexpr uint8_t BTN_DOWN_2 = 7;  // Same logical action as BTN_DOWN
+  static constexpr uint8_t BTN_POWER = 8;   // Matches InputManager::BTN_POWER
 };
 
 extern HalGPIO gpio;  // Singleton

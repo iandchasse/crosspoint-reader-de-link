@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <cstdint>
 #include <iosfwd>
 
@@ -208,6 +208,8 @@ class CrossPointSettings {
   uint8_t use24HourClock = 1;
   // Long-press chapter skip on side buttons
   uint8_t longPressChapterSkip = 1;
+  // Disable page-turn on left side button combo (BTN_UP_2/BTN_DOWN_2)
+  uint8_t disableSidePageTurn = 0;
   // UI Theme
   uint8_t uiTheme = LYRA;
   // Sunlight fading compensation
