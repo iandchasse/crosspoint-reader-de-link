@@ -12,6 +12,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TimeUtil.h"
 
 namespace {
 void syncTimeWithNTP() {
@@ -71,6 +72,7 @@ void KOReaderSyncActivity::onWifiSelectionComplete(const bool success) {
 
   // Sync time with NTP before making API requests
   syncTimeWithNTP();
+  TimeUtil::onNtpSynced();
 
   {
     RenderLock lock(*this);

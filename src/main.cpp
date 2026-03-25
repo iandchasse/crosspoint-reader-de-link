@@ -199,6 +199,7 @@ void enterDeepSleep() {
   frontlightManager.disable();
 #endif
   APP_STATE.saveToFile();
+  TimeUtil::recordSleepEntry();
 
   activityManager.goToSleep();
 
@@ -273,6 +274,7 @@ void setup() {
 
   SETTINGS.loadFromFile();
   TimeUtil::reconfigure();
+  TimeUtil::correctTimeOnWake();
   I18N.loadSettings();
   KOREADER_STORE.loadFromFile();
   UITheme::getInstance().reload();

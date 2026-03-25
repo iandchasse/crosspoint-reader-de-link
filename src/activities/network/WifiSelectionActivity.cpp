@@ -261,6 +261,19 @@ void WifiSelectionActivity::checkConnectionStatus() {
     // Trigger SNTP time sync now that we have network
     TimeUtil::reconfigure();
 
+    // Wait for NTP sync to complete so we can calibrate RTC drift
+    {
+      int retry = 0;
+      const int maxRetries = 50;  // 5 seconds max
+      while (!TimeUtil::isSynced() && retry < maxRetries) {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        retry++;
+      }
+      if (retry < maxRetries) {
+        TimeUtil::onNtpSynced();
+      }
+    }
+
     // Save this as the last connected network - SD card operations need lock as
     // we use SPI for both
     {
