@@ -18,6 +18,7 @@
 #include "fontIds.h"
 #include "util/TimeUtil.h"
 
+
 // Internal constants
 namespace {
 constexpr int batteryPercentSpacing = 4;
@@ -56,24 +57,38 @@ void drawBatteryIcon(const GfxRenderer& renderer, int x, int y, int battWidth, i
   constexpr int minFillForBolt = 8;
   if (charging && filledWidth < minFillForBolt) {
     filledWidth = std::min(minFillForBolt, maxFillWidth);
-  }
+    const int maxFillWidth = battWidth - 5;
+    const int fillHeight = rectHeight - 4;
+    if (maxFillWidth <= 0 || fillHeight <= 0) {
+      return;
+    }
+    int filledWidth = percentage * maxFillWidth / 100 + 1;
+    if (filledWidth > maxFillWidth) {
+      filledWidth = maxFillWidth;
+    }
 
-  renderer.fillRect(x + 2, y + 2, filledWidth, fillHeight);
+    // When charging, ensure minimum fill so lightning bolt is fully visible
+    constexpr int minFillForBolt = 8;
+    if (charging && filledWidth < minFillForBolt) {
+      filledWidth = std::min(minFillForBolt, maxFillWidth);
+    }
 
-  // Draw lightning bolt when charging (white/inverted on black fill for visibility)
-  if (charging) {
-    const int boltX = x + 4;
-    const int boltY = y + 2;
-    renderer.drawLine(boltX + 4, boltY + 0, boltX + 5, boltY + 0, false);
-    renderer.drawLine(boltX + 3, boltY + 1, boltX + 4, boltY + 1, false);
-    renderer.drawLine(boltX + 2, boltY + 2, boltX + 5, boltY + 2, false);
-    renderer.drawLine(boltX + 3, boltY + 3, boltX + 4, boltY + 3, false);
-    renderer.drawLine(boltX + 2, boltY + 4, boltX + 3, boltY + 4, false);
-    renderer.drawLine(boltX + 1, boltY + 5, boltX + 4, boltY + 5, false);
-    renderer.drawLine(boltX + 2, boltY + 6, boltX + 3, boltY + 6, false);
-    renderer.drawLine(boltX + 1, boltY + 7, boltX + 2, boltY + 7, false);
+    renderer.fillRect(x + 2, y + 2, filledWidth, fillHeight);
+
+    // Draw lightning bolt when charging (white/inverted on black fill for visibility)
+    if (charging) {
+      const int boltX = x + 4;
+      const int boltY = y + 2;
+      renderer.drawLine(boltX + 4, boltY + 0, boltX + 5, boltY + 0, false);
+      renderer.drawLine(boltX + 3, boltY + 1, boltX + 4, boltY + 1, false);
+      renderer.drawLine(boltX + 2, boltY + 2, boltX + 5, boltY + 2, false);
+      renderer.drawLine(boltX + 3, boltY + 3, boltX + 4, boltY + 3, false);
+      renderer.drawLine(boltX + 2, boltY + 4, boltX + 3, boltY + 4, false);
+      renderer.drawLine(boltX + 1, boltY + 5, boltX + 4, boltY + 5, false);
+      renderer.drawLine(boltX + 2, boltY + 6, boltX + 3, boltY + 6, false);
+      renderer.drawLine(boltX + 1, boltY + 7, boltX + 2, boltY + 7, false);
+    }
   }
-}
 }  // namespace
 
 void BaseTheme::drawBatteryLeft(const GfxRenderer& renderer, Rect rect, const bool showPercentage) const {
