@@ -244,7 +244,7 @@ void formatTime(char* buf, size_t bufSize, bool use24h) {
   } else {
     int hour = timeinfo.tm_hour % 12;
     if (hour == 0) hour = 12;
-    const char* ampm = timeinfo.tm_hour < 12 ? "am" : "pm";
+    const char* ampm = timeinfo.tm_hour < 12 ? "AM" : "PM";
     snprintf(buf, bufSize, "%s%d:%02d%s", prefix, hour, timeinfo.tm_min, ampm);
   }
 }

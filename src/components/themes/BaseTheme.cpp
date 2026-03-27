@@ -734,9 +734,17 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
 
   // Draw Battery / Clock
   const auto battSetting = SETTINGS.hideBatteryPercentage;
-  const bool showBatteryIcon = (battSetting != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS);
-  const bool showBatteryPercentage = (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER);
-  const bool showClock = SETTINGS.statusBarClock && HalClock::isSynced();
+  const bool showBatteryIcon =
+      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
+       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 == 0)));
+  const bool showBatteryPercentage =
+      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
+       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 == 0)));
+
+  const bool showClock =
+      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK ||
+       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 != 0))) &&
+      HalClock::isSynced();
 
   if (SETTINGS.statusBarBattery && (showBatteryIcon || showBatteryPercentage)) {
     GUI.drawBatteryLeft(renderer,

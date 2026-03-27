@@ -34,7 +34,7 @@ inline const std::vector<SettingInfo>& getSettingsList() {
                         "sleepScreenCoverFilter", StrId::STR_CAT_DISPLAY),
       SettingInfo::Enum(
           StrId::STR_HIDE_BATTERY, &CrossPointSettings::hideBatteryPercentage,
-          {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS},
+          {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS, StrId::STR_CLOCK, StrId::STR_HYBRID},
           "hideBatteryPercentage", StrId::STR_CAT_DISPLAY),
       SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat12h, {StrId::STR_24H, StrId::STR_12H},
                         "clockFormat12h", StrId::STR_CAT_SYSTEM),

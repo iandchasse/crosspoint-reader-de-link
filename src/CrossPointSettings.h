@@ -134,6 +134,8 @@ class CrossPointSettings {
     HIDE_NEVER = 0,
     HIDE_READER = 1,
     HIDE_ALWAYS = 2,
+    SHOW_CLOCK = 3,
+    SHOW_CLOCK_HYBRID = 4,
     HIDE_BATTERY_PERCENTAGE_COUNT
   };
 

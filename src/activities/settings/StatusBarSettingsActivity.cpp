@@ -28,8 +28,9 @@ const StrId progressBarThicknessNames[PROGRESS_BAR_THICKNESS_ITEMS] = {
 constexpr int TITLE_ITEMS = 3;
 const StrId titleNames[TITLE_ITEMS] = {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE};
 
-constexpr int BATTERY_ITEMS = 3;
-const StrId batteryNames[BATTERY_ITEMS] = {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS};
+constexpr int BATTERY_ITEMS = 5;
+const StrId batteryNames[BATTERY_ITEMS] = {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS, StrId::STR_CLOCK,
+                                           StrId::STR_HYBRID};
 
 const char* translatedShow = tr(STR_SHOW);
 const char* translatedHide = tr(STR_HIDE);
