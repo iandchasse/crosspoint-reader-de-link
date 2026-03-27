@@ -48,6 +48,13 @@ void SettingsActivity::onEnter() {
 
   for (const auto& setting : getSettingsList()) {
     if (setting.category == StrId::STR_NONE_OPT) continue;
+    
+    // Filter out clock settings from main menu (they are in the Clock Settings sub-menu)
+    if (setting.nameId == StrId::STR_CLOCK_FORMAT || setting.nameId == StrId::STR_TIMEZONE ||
+        setting.nameId == StrId::STR_USE_CLOCK) {
+      continue;
+    }
+
     if (setting.category == StrId::STR_CAT_DISPLAY) {
       displaySettings.push_back(setting);
     } else if (setting.category == StrId::STR_CAT_READER) {

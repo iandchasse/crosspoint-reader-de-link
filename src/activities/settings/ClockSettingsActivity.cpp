@@ -12,9 +12,8 @@
 #include "fontIds.h"
 
 namespace {
-// Removed "Use Clock" toggle (index 0 in PR) since always-on on S3
-constexpr int MENU_ITEMS = 4;
-const StrId menuNames[MENU_ITEMS] = {StrId::STR_CLOCK_FORMAT, StrId::STR_TIMEZONE,
+constexpr int MENU_ITEMS = 5;
+const StrId menuNames[MENU_ITEMS] = {StrId::STR_USE_CLOCK, StrId::STR_CLOCK_FORMAT, StrId::STR_TIMEZONE,
                                      StrId::STR_SYNC_TIME, StrId::STR_DETECT_TIMEZONE};
 
 const StrId timeZoneNames[CrossPointSettings::TIMEZONE_COUNT] = {
@@ -67,19 +66,23 @@ void ClockSettingsActivity::loop() {
 
 void ClockSettingsActivity::handleSelection() {
   if (selectedIndex == 0) {
+    // Use Clock
+    SETTINGS.useClock = (SETTINGS.useClock + 1) % 2;
+    SETTINGS.saveToFile();
+  } else if (selectedIndex == 1) {
     // Clock Format
     SETTINGS.clockFormat12h = (SETTINGS.clockFormat12h + 1) % 2;
     SETTINGS.saveToFile();
-  } else if (selectedIndex == 1) {
+  } else if (selectedIndex == 2) {
     // Timezone
     SETTINGS.timeZone = (SETTINGS.timeZone + 1) % CrossPointSettings::TIMEZONE_COUNT;
     HalClock::applyTimezone(SETTINGS.timeZone);
     SETTINGS.saveToFile();
-  } else if (selectedIndex == 2) {
+  } else if (selectedIndex == 3) {
     // Sync Time
     auto resultHandler = [](const ActivityResult&) { SETTINGS.saveToFile(); };
     startActivityForResult(std::make_unique<SyncTimeActivity>(renderer, mappedInput), resultHandler);
-  } else if (selectedIndex == 3) {
+  } else if (selectedIndex == 4) {
     // Detect Timezone
     auto resultHandler = [](const ActivityResult&) { SETTINGS.saveToFile(); };
     startActivityForResult(std::make_unique<DetectTimezoneActivity>(renderer, mappedInput), resultHandler);
@@ -105,9 +108,12 @@ void ClockSettingsActivity::render(RenderLock&&) {
       [](int index) { return std::string(I18N.get(menuNames[index])); }, nullptr, nullptr,
       [](int index) {
         if (index == 0) {
-          return std::string(SETTINGS.clockFormat12h ? tr(STR_12H) : tr(STR_24H));
+          return std::string(SETTINGS.useClock ? tr(STR_STATE_ON) : tr(STR_STATE_OFF));
         }
         if (index == 1) {
+          return std::string(SETTINGS.clockFormat12h ? tr(STR_12H) : tr(STR_24H));
+        }
+        if (index == 2) {
           const auto tzIndex = static_cast<size_t>(SETTINGS.timeZone);
           if (tzIndex < (sizeof(timeZoneNames) / sizeof(timeZoneNames[0]))) {
             return std::string(I18N.get(timeZoneNames[tzIndex]));
