@@ -134,8 +134,6 @@ class CrossPointSettings {
     HIDE_NEVER = 0,
     HIDE_READER = 1,
     HIDE_ALWAYS = 2,
-    SHOW_CLOCK = 3,
-    SHOW_CLOCK_HYBRID = 4,
     HIDE_BATTERY_PERCENTAGE_COUNT
   };
 
@@ -144,6 +142,27 @@ class CrossPointSettings {
 
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
+
+  // Timezone options (POSIX TZ rules for DST support)
+  enum TIMEZONE {
+    TZ_UTC = 0,
+    TZ_CET = 1,
+    TZ_EET = 2,
+    TZ_MSK = 3,
+    TZ_UTC_PLUS4 = 4,
+    TZ_IST = 5,
+    TZ_UTC_PLUS7 = 6,
+    TZ_UTC_PLUS8 = 7,
+    TZ_UTC_PLUS9 = 8,
+    TZ_AEST = 9,
+    TZ_NZST = 10,
+    TZ_UTC_MINUS3 = 11,
+    TZ_EST = 12,
+    TZ_CST = 13,
+    TZ_MST = 14,
+    TZ_PST = 15,
+    TIMEZONE_COUNT
+  };
 
   // Sleep screen settings
   uint8_t sleepScreen = DARK;
@@ -202,10 +221,6 @@ class CrossPointSettings {
   char opdsPassword[64] = "";
   // Hide battery percentage
   uint8_t hideBatteryPercentage = HIDE_NEVER;
-  // User selected timezone offset hours (stored as 0-26, where 12 = UTC)
-  uint8_t timezoneOffsetHours = 12;
-  // Use 24-hour clock (1 = enabled, 0 = disabled)
-  uint8_t use24HourClock = 1;
   // Long-press chapter skip on side buttons
   uint8_t longPressChapterSkip = 1;
   // Disable page-turn on left side button combo (BTN_UP_2/BTN_DOWN_2)
@@ -220,6 +235,15 @@ class CrossPointSettings {
   uint8_t showHiddenFiles = 0;
   // Image rendering mode in EPUB reader
   uint8_t imageRendering = IMAGES_DISPLAY;
+  // Show clock in the reader status bar
+  uint8_t statusBarClock = 0;
+  // Clock format: 0 = 24h (14:00), 1 = 12h (2:00pm)
+  uint8_t clockFormat12h = 0;
+  // Timezone selection (applies POSIX TZ rules for DST)
+  uint8_t timeZone = TZ_UTC;
+  // Use clock and keep the LP timer running during deep sleep
+  // Always enabled on S3 hardware (kept for merge compatibility with PR #1510)
+  uint8_t useClock = 1;
 
   ~CrossPointSettings() = default;
 

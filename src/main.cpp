@@ -6,6 +6,7 @@
 #include <FrontlightManager.h>
 #endif
 #include <GfxRenderer.h>
+#include <HalClock.h>
 #include <HalDisplay.h>
 #include <HalGPIO.h>
 #include <HalPowerManager.h>
@@ -199,6 +200,7 @@ void enterDeepSleep() {
   frontlightManager.disable();
 #endif
   APP_STATE.saveToFile();
+  HalClock::saveBeforeSleep(true);  // S3 LP timer always runs
   TimeUtil::recordSleepEntry();
 
   activityManager.goToSleep();
@@ -273,6 +275,8 @@ void setup() {
   HalSystem::clearPanic();  // TODO: move this to an activity when we have one to display the panic info
 
   SETTINGS.loadFromFile();
+  HalClock::applyTimezone(SETTINGS.timeZone);
+  HalClock::restore();
   TimeUtil::reconfigure();
   TimeUtil::correctTimeOnWake();
   I18N.loadSettings();

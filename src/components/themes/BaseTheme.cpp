@@ -1,4 +1,4 @@
-﻿#include "BaseTheme.h"
+#include "BaseTheme.h"
 
 #include <GfxRenderer.h>
 #include <HalPowerManager.h>
@@ -12,11 +12,11 @@
 #include <string>
 
 #include "CrossPointSettings.h"
+#include "HalClock.h"
 #include "I18n.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "util/TimeUtil.h"
 
 
 // Internal constants
@@ -322,10 +322,11 @@ void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
     renderer.drawCenteredText(UI_12_FONT_ID, rect.y + 5, truncatedTitle.c_str(), true, EpdFontFamily::BOLD);
   }
 
-  // Draw clock in the top-left corner using centralized TimeUtil
-  std::string timeStr = TimeUtil::getFormattedTime();
-  if (!timeStr.empty()) {
-    renderer.drawText(SMALL_FONT_ID, rect.x + BaseMetrics::values.contentSidePadding, rect.y + 5, timeStr.c_str());
+  // Draw clock in the top-left corner using HalClock
+  char timeStr[16];
+  HalClock::formatTime(timeStr, sizeof(timeStr), !SETTINGS.clockFormat12h);
+  if (timeStr[0] != '-') {  // Not "--:--" unsynced placeholder
+    renderer.drawText(SMALL_FONT_ID, rect.x + BaseMetrics::values.contentSidePadding, rect.y + 5, timeStr);
   }
 
   if (subtitle) {
@@ -733,40 +734,27 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
 
   // Draw Battery / Clock
   const auto battSetting = SETTINGS.hideBatteryPercentage;
-  const bool showBatteryIcon =
-      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
-       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 == 0)));
-  const bool showBatteryPercentage =
-      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
-       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 == 0)));
+  const bool showBatteryIcon = (battSetting != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS);
+  const bool showBatteryPercentage = (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER);
+  const bool showClock = SETTINGS.statusBarClock && HalClock::isSynced();
 
-  const bool showClock =
-      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK ||
-       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 != 0)));
+  if (SETTINGS.statusBarBattery && (showBatteryIcon || showBatteryPercentage)) {
+    GUI.drawBatteryLeft(renderer,
+                        Rect{metrics.statusBarHorizontalMargin + orientedMarginLeft + 1, textY, metrics.batteryWidth,
+                             metrics.batteryHeight},
+                        showBatteryPercentage);
+  }
 
-  if (SETTINGS.statusBarBattery) {
-    if (showClock) {
-      time_t now;
-      ::time(&now);
-      struct tm timeinfo;
-      localtime_r(&now, &timeinfo);
-      if (timeinfo.tm_year > (2020 - 1900)) {
-        char timeStr[16];
-        if (SETTINGS.use24HourClock) {
-          snprintf(timeStr, sizeof(timeStr), "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-        } else {
-          int hour = timeinfo.tm_hour % 12;
-          if (hour == 0) hour = 12;
-          snprintf(timeStr, sizeof(timeStr), "%d:%02d %s", hour, timeinfo.tm_min,
-                   (timeinfo.tm_hour >= 12) ? "PM" : "AM");
-        }
-        renderer.drawText(SMALL_FONT_ID, metrics.statusBarHorizontalMargin + orientedMarginLeft + 1, textY, timeStr);
-      }
-    } else if (showBatteryIcon || showBatteryPercentage) {
-      GUI.drawBatteryLeft(renderer,
-                          Rect{metrics.statusBarHorizontalMargin + orientedMarginLeft + 1, textY, metrics.batteryWidth,
-                               metrics.batteryHeight},
-                          showBatteryPercentage);
+  // Draw clock in reader status bar (after battery, on the right of it or alone)
+  if (showClock) {
+    char clockStr[16];
+    HalClock::formatTime(clockStr, sizeof(clockStr), !SETTINGS.clockFormat12h);
+    if (clockStr[0] != '-') {
+      const int clockX = SETTINGS.statusBarBattery && showBatteryIcon
+                             ? metrics.statusBarHorizontalMargin + orientedMarginLeft + 1 +
+                                   metrics.batteryWidth + batteryPercentSpacing + 30
+                             : metrics.statusBarHorizontalMargin + orientedMarginLeft + 1;
+      renderer.drawText(SMALL_FONT_ID, clockX, textY, clockStr);
     }
   }
 

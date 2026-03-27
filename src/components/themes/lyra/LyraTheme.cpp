@@ -1,4 +1,4 @@
-﻿#include "LyraTheme.h"
+#include "LyraTheme.h"
 
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
@@ -30,7 +30,7 @@
 #include "components/icons/transfer.h"
 #include "components/icons/wifi.h"
 #include "fontIds.h"
-#include "util/TimeUtil.h"
+#include "HalClock.h"
 
 // Internal constants
 namespace {
@@ -182,10 +182,11 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
     renderer.drawLine(rect.x, rect.y + rect.height - 3, rect.x + rect.width - 1, rect.y + rect.height - 3, 3, true);
   }
 
-  // Draw clock in the top-left corner using centralized TimeUtil
-  std::string timeStr = TimeUtil::getFormattedTime();
-  if (!timeStr.empty()) {
-    renderer.drawText(SMALL_FONT_ID, rect.x + LyraMetrics::values.contentSidePadding, rect.y + 5, timeStr.c_str());
+  // Draw clock in the top-left corner using HalClock
+  char timeStr[16];
+  HalClock::formatTime(timeStr, sizeof(timeStr), !SETTINGS.clockFormat12h);
+  if (timeStr[0] != '-') {  // Not "--:--" unsynced placeholder
+    renderer.drawText(SMALL_FONT_ID, rect.x + LyraMetrics::values.contentSidePadding, rect.y + 5, timeStr);
   }
 
   if (subtitle) {

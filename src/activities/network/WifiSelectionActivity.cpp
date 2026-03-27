@@ -14,6 +14,7 @@
 #include "components/UITheme.h"
 #include "esp_wifi.h"
 #include "fontIds.h"
+#include <HalClock.h>
 #include "util/TimeUtil.h"
 
 void WifiSelectionActivity::onEnter() {
@@ -258,20 +259,10 @@ void WifiSelectionActivity::checkConnectionStatus() {
     connectedIP = ipStr;
     autoConnecting = false;
 
-    // Trigger SNTP time sync now that we have network
-    TimeUtil::reconfigure();
-
-    // Wait for NTP sync to complete so we can calibrate RTC drift
-    {
-      int retry = 0;
-      const int maxRetries = 50;  // 5 seconds max
-      while (!TimeUtil::isSynced() && retry < maxRetries) {
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        retry++;
-      }
-      if (retry < maxRetries) {
-        TimeUtil::onNtpSynced();
-      }
+    // Trigger NTP time sync via HalClock now that we have network
+    if (HalClock::syncNtp()) {
+      // Sync succeeded, record the calibration data for RTC drift
+      TimeUtil::onNtpSynced();
     }
 
     // Save this as the last connected network - SD card operations need lock as

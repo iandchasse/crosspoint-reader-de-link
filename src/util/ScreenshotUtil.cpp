@@ -1,4 +1,4 @@
-﻿#include "ScreenshotUtil.h"
+#include "ScreenshotUtil.h"
 
 #include <Arduino.h>
 #include <BitmapHelpers.h>
@@ -10,13 +10,13 @@
 #include <string>
 
 #include "Bitmap.h"  // Required for BmpHeader struct definition
-#include "TimeUtil.h"
+#include "HalClock.h"
 
 void ScreenshotUtil::takeScreenshot(GfxRenderer& renderer) {
   const uint8_t* fb = renderer.getFrameBuffer();
   if (fb) {
     String filename_str;
-    if (TimeUtil::isTimeValid()) {
+    if (HalClock::isSynced()) {
       time_t now;
       ::time(&now);
       struct tm timeinfo;

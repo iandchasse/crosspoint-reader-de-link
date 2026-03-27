@@ -1,11 +1,13 @@
 #include "SettingsActivity.h"
 
 #include <GfxRenderer.h>
+#include <HalClock.h>
 #include <Logging.h>
 
 #include "ButtonRemapActivity.h"
 #include "CalibreSettingsActivity.h"
 #include "ClearCacheActivity.h"
+#include "ClockSettingsActivity.h"
 #include "CrossPointSettings.h"
 #ifdef FRONTLIGHT_PRESENT
 #include "FrontlightControlActivity.h"
@@ -31,7 +33,6 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "util/TimeUtil.h"
 
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
                                                               StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
@@ -73,6 +74,7 @@ void SettingsActivity::onEnter() {
 #endif
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_CLOCK_SETTINGS, SettingAction::ClockSettings));
 
   // Reset selection to first category
   selectedCategoryIndex = 0;
@@ -219,13 +221,12 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::Language:
         startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
         break;
-      case SettingAction::SyncClock:
-        if (WiFi.status() == WL_CONNECTED) {
-          TimeUtil::reconfigure();
-        } else {
-          // If not connected, give some feedback? For now just trigger network activity
-          startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false), resultHandler);
-        }
+      case SettingAction::ClockSettings:
+        startActivityForResult(std::make_unique<ClockSettingsActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::SyncTime:
+      case SettingAction::DetectTimezone:
+        // Handled from within ClockSettingsActivity
         break;
       case SettingAction::None:
         // Do nothing
@@ -237,9 +238,8 @@ void SettingsActivity::toggleCurrentSetting() {
   }
 
   SETTINGS.saveToFile();
-  // Always trigger a time sync update when settings are changed to apply timezone offset immediately.
-  // TimeUtil handles the case where WiFi is disconnected by still updating the local offset.
-  TimeUtil::reconfigure();
+  // Apply timezone immediately when settings change
+  HalClock::applyTimezone(SETTINGS.timeZone);
 }
 
 void SettingsActivity::render(RenderLock&&) {
