@@ -164,33 +164,11 @@ void restore() {
   const bool lpValid = (rtcClockFlags & CLOCK_RTC_FLAG_LP_VALID) != 0;
   if (rtcValid() && lpValid) {
     // RTC memory survived — we woke from deep sleep.
-    // Use the LP timer to compute how much time elapsed during sleep.
-    // Apply calibration correction: the slow-clock frequency may have
-    // drifted (temperature) between when we captured and now.  The fresh
-    // boot-time calibration (calNow) is our best estimate of the actual
-    // frequency during sleep.
-    uint64_t lpNow = esp_clk_rtc_time();
-    time_t estimated = rtcEpoch;
-    if (lpNow > rtcLpTimeUs) {
-      uint32_t calNow = esp_clk_slowclk_cal_get();
-      uint64_t elapsedUs;
-      if (rtcSlowCal != 0 && calNow != 0) {
-        // rtcLpTimeUs was computed with rtcSlowCal; convert it to the
-        // current calibration basis so the subtraction is consistent.
-        uint64_t lpThenCorrected = (uint64_t)((double)rtcLpTimeUs * calNow / rtcSlowCal);
-        elapsedUs = lpNow - lpThenCorrected;
-      } else {
-        elapsedUs = lpNow - rtcLpTimeUs;
-      }
-      estimated += (time_t)(elapsedUs / 1000000LL);
-    }
-    setSystemClock(estimated);
-    // Re-capture with current LP baseline
-    rtcEpoch = estimated;
-    rtcLpTimeUs = lpNow;
-    rtcSlowCal = esp_clk_slowclk_cal_get();
+    // The ESP32-S3 natively preserves `gettimeofday()` across deep sleep using the RTC timer.
+    // The existing TimeUtil::correctTimeOnWake() will apply exact calibration for the internal RC oscillator drift.
+    // Therefore, we do NOT attempt to manually calculate elapsed time here (which was causing a 2-hour drift).
     clockApproximate = true;
-    LOG_INF("CLK", "Restored from RTC + LP timer, epoch %lld", (long long)estimated);
+    LOG_INF("CLK", "Restored from Native ESP-IDF RTC (TimeUtil will calibrate)");
     return;
   }
 
@@ -212,7 +190,7 @@ void restore() {
     clockApproximate = true;
     LOG_INF("CLK", "Restored from NVS, epoch %lld (no elapsed correction)", (long long)epoch);
   }
-}
+}  
 
 time_t now() {
   if (!isSynced()) {
