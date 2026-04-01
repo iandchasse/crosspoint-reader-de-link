@@ -32,12 +32,13 @@ struct DirectPixelWriter {
 
     switch (renderer.getOrientation()) {
       case GfxRenderer::Portrait:
-        // phyX = y, phyY = (DISPLAY_HEIGHT-1) - x
-        phyXBase = 0;
-        phyYBase = HalDisplay::DISPLAY_HEIGHT - 1;
+        // Logical portrait (480x800) → panel (800x480) - Inverted for specific physical mount
+        // phyX = (DISPLAY_WIDTH-1) - y, phyY = x
+        phyXBase = HalDisplay::DISPLAY_WIDTH - 1;
+        phyYBase = 0;
         phyXStepX = 0;
-        phyYStepX = -1;
-        phyXStepY = 1;
+        phyYStepX = 1;
+        phyXStepY = -1;
         phyYStepY = 0;
         break;
       case GfxRenderer::LandscapeClockwise:
@@ -50,12 +51,13 @@ struct DirectPixelWriter {
         phyYStepY = -1;
         break;
       case GfxRenderer::PortraitInverted:
-        // phyX = (DISPLAY_WIDTH-1) - y, phyY = x
-        phyXBase = HalDisplay::DISPLAY_WIDTH - 1;
-        phyYBase = 0;
+        // Logical portrait (480x800) → panel (800x480) - Standard orientation
+        // phyX = y, phyY = (DISPLAY_HEIGHT-1) - x
+        phyXBase = 0;
+        phyYBase = HalDisplay::DISPLAY_HEIGHT - 1;
         phyXStepX = 0;
-        phyYStepX = 1;
-        phyXStepY = -1;
+        phyYStepX = -1;
+        phyXStepY = 1;
         phyYStepY = 0;
         break;
       case GfxRenderer::LandscapeCounterClockwise:
