@@ -93,9 +93,9 @@ inline const std::vector<SettingInfo>& getSettingsList() {
                           "disableSidePageTurn", StrId::STR_CAT_CONTROLS),
       SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
 #ifdef FRONTLIGHT_PRESENT
-                        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_TOGGLE_FRONTLIGHT},
+                        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_TOGGLE_FRONTLIGHT, StrId::STR_FORCE_REFRESH},
 #else
-                        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN},
+                        {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH},
 #endif
                         "shortPwrBtn", StrId::STR_CAT_CONTROLS),
 
