@@ -1,4 +1,4 @@
-﻿#include "SleepActivity.h"
+#include "SleepActivity.h"
 
 #include <Epub.h>
 #include <FsHelpers.h>
