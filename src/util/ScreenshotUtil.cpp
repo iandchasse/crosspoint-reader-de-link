@@ -85,6 +85,7 @@ bool ScreenshotUtil::saveFramebufferAsBmp(const char* filename, const uint8_t* f
   }
 
   if (write_error) {
+    // Explicitly close() file before calling Storage.remove()
     file.close();
     Storage.remove(filename);
     return false;
@@ -95,6 +96,7 @@ bool ScreenshotUtil::saveFramebufferAsBmp(const char* filename, const uint8_t* f
   constexpr size_t kMaxRowSize = 64;
   if (rowSizePadded > kMaxRowSize) {
     LOG_ERR("SCR", "Row size %u exceeds buffer capacity", rowSizePadded);
+    // Explicitly close() file before calling Storage.remove()
     file.close();
     Storage.remove(filename);
     return false;
@@ -127,6 +129,7 @@ bool ScreenshotUtil::saveFramebufferAsBmp(const char* filename, const uint8_t* f
     memset(rowBuffer, 0, rowSizePadded);  // Clear the buffer for the next row
   }
 
+  // Explicitly close() file before calling Storage.remove()
   file.close();
 
   if (write_error) {
