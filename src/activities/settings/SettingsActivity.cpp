@@ -5,7 +5,6 @@
 #include <Logging.h>
 
 #include "ButtonRemapActivity.h"
-#include "CalibreSettingsActivity.h"
 #include "ClearCacheActivity.h"
 #include "ClockSettingsActivity.h"
 #include "CrossPointSettings.h"
@@ -28,11 +27,13 @@
 // ---------------------------------------------------------------------------
 #include <WiFi.h>
 
+#include "OpdsServerListActivity.h"
 #include "SettingsList.h"
 #include "StatusBarSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+
 
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
                                                               StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
@@ -48,7 +49,7 @@ void SettingsActivity::onEnter() {
 
   for (const auto& setting : getSettingsList()) {
     if (setting.category == StrId::STR_NONE_OPT) continue;
-    
+
     // Filter out clock settings from main menu (they are in the Clock Settings sub-menu)
     if (setting.nameId == StrId::STR_CLOCK_FORMAT || setting.nameId == StrId::STR_TIMEZONE ||
         setting.nameId == StrId::STR_USE_CLOCK) {
@@ -74,7 +75,7 @@ void SettingsActivity::onEnter() {
                           SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_KOREADER_SYNC, SettingAction::KOReaderSync));
-  systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_BROWSER, SettingAction::OPDSBrowser));
+  systemSettings.push_back(SettingInfo::Action(StrId::STR_OPDS_SERVERS, SettingAction::OPDSBrowser));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CLEAR_READING_CACHE, SettingAction::ClearCache));
 #if CROSSPOINT_OTA_ENABLED
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
@@ -207,7 +208,7 @@ void SettingsActivity::toggleCurrentSetting() {
         startActivityForResult(std::make_unique<KOReaderSettingsActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::OPDSBrowser:
-        startActivityForResult(std::make_unique<CalibreSettingsActivity>(renderer, mappedInput), resultHandler);
+        startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false), resultHandler);
