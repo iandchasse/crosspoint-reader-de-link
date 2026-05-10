@@ -50,6 +50,51 @@ class HalStorage {
 
 #define Storage HalStorage::getInstance()
 
+class HalFile : public Print {
+  friend class HalStorage;
+  class Impl;
+  std::unique_ptr<Impl> impl;
+  explicit HalFile(std::unique_ptr<Impl> impl);
+
+ public:
+  HalFile();
+  ~HalFile();
+  HalFile(HalFile&&);
+  HalFile& operator=(HalFile&&);
+  HalFile(const HalFile&) = delete;
+  HalFile& operator=(const HalFile&) = delete;
+
+  void flush();
+  size_t getName(char* name, size_t len);
+  size_t size();
+  size_t fileSize();
+  uint64_t fileSize64();
+  bool seek(size_t pos);
+  bool seek64(uint64_t pos);
+  bool seekCur(int64_t offset);
+  bool seekSet(size_t offset);
+  int available() const;
+  size_t position() const;
+  int read(void* buf, size_t count);
+  int read();  // read a single byte
+  size_t write(const void* buf, size_t count);
+  size_t write(uint8_t b) override;
+  bool rename(const char* newPath);
+  bool isDirectory() const;
+  void rewindDirectory();
+  bool close();
+  HalFile openNextFile();
+  bool isOpen() const;
+  operator bool() const;
+};
+
+// Only do renaming FsFile to HalFile if this header is included by downstream code
+// The renaming is to allow using the thread-safe HalFile instead of the raw FsFile, without needing to change the
+// downstream code
+#ifndef HAL_STORAGE_IMPL
+using FsFile = HalFile;
+#endif
+
 // Downstream code must use Storage instead of SdMan
 #ifdef SdMan
 #undef SdMan

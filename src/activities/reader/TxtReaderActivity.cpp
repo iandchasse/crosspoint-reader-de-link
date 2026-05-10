@@ -1,4 +1,4 @@
-﻿#include "TxtReaderActivity.h"
+#include "TxtReaderActivity.h"
 
 #include <FontCacheManager.h>
 #include <GfxRenderer.h>
@@ -9,15 +9,9 @@
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
-#include "FrontlightGlobal.h"
 #include "MappedInputManager.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
-#ifdef FRONTLIGHT_PRESENT
-#include "activities/settings/FrontlightControlActivity.h"
-#endif
-#include <time.h>
-
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -25,9 +19,7 @@ namespace {
 constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
 // Cache file magic and version
 constexpr uint32_t CACHE_MAGIC = 0x54585449;  // "TXTI"
-constexpr uint8_t CACHE_VERSION = 2;          // Increment when cache format changes
-constexpr unsigned long skipPageMs = 700;
-constexpr unsigned long goHomeMs = 1000;
+constexpr uint8_t CACHE_VERSION = 3;          // Increment when cache format changes
 }  // namespace
 
 void TxtReaderActivity::onEnter() {
@@ -66,21 +58,12 @@ void TxtReaderActivity::onExit() {
 }
 
 void TxtReaderActivity::loop() {
-#ifdef FRONTLIGHT_PRESENT
-  // Long press CONFIRM (1s+) opens frontlight control
-  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= goHomeMs) {
-    startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
-                           [this](const ActivityResult& result) {
-                             // After returning from frontlight control, request screen update
-                           });
-    return;
-  }
-#endif
   // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
     activityManager.goToFileBrowser(txt ? txt->getPath() : "");
     return;
   }
+
   // Short press BACK goes directly to home
   if (mappedInput.wasReleased(MappedInputManager::Button::Back) &&
       mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
@@ -88,7 +71,7 @@ void TxtReaderActivity::loop() {
     return;
   }
 
-  auto [prevTriggered, nextTriggered] = ReaderUtils::detectPageTurn(mappedInput);
+  const auto [prevTriggered, nextTriggered, fromTilt] = ReaderUtils::detectPageTurn(mappedInput);
   if (!prevTriggered && !nextTriggered) {
     return;
   }
@@ -240,8 +223,14 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
     // Track position within this source line (in bytes from pos)
     size_t lineBytePos = 0;
 
-    // Word wrap if needed
-    while (!line.empty() && static_cast<int>(outLines.size()) < linesPerPage) {
+    // Emit at least one visual line for each source line (including blank lines),
+    // then continue with wrapping when needed.
+    do {
+      if (line.empty()) {
+        outLines.emplace_back();
+        break;
+      }
+
       int lineWidth = renderer.getTextWidth(cachedFontId, line.c_str());
 
       if (lineWidth <= viewportWidth) {
@@ -281,7 +270,7 @@ bool TxtReaderActivity::loadPageAtOffset(size_t offset, std::vector<std::string>
       }
       lineBytePos += skipChars;
       line = line.substr(skipChars);
-    }
+    } while (!line.empty() && static_cast<int>(outLines.size()) < linesPerPage);
 
     // Determine how much of the source buffer we consumed
     if (line.empty()) {
@@ -414,7 +403,7 @@ void TxtReaderActivity::renderStatusBar() const {
 }
 
 void TxtReaderActivity::saveProgress() const {
-  EspFsFile f;
+  FsFile f;
   if (Storage.openFileForWrite("TRS", txt->getCachePath() + "/progress.bin", f)) {
     uint8_t data[4];
     data[0] = currentPage & 0xFF;
@@ -426,7 +415,7 @@ void TxtReaderActivity::saveProgress() const {
 }
 
 void TxtReaderActivity::loadProgress() {
-  EspFsFile f;
+  FsFile f;
   if (Storage.openFileForRead("TRS", txt->getCachePath() + "/progress.bin", f)) {
     uint8_t data[4];
     if (f.read(data, 4) == 4) {
@@ -456,7 +445,7 @@ bool TxtReaderActivity::loadPageIndexCache() {
   // - N * uint32_t: page offsets
 
   std::string cachePath = txt->getCachePath() + "/index.bin";
-  EspFsFile f;
+  FsFile f;
   if (!Storage.openFileForRead("TRS", cachePath, f)) {
     LOG_DBG("TRS", "No page index cache found");
     return false;
@@ -539,7 +528,7 @@ bool TxtReaderActivity::loadPageIndexCache() {
 
 void TxtReaderActivity::savePageIndexCache() const {
   std::string cachePath = txt->getCachePath() + "/index.bin";
-  EspFsFile f;
+  FsFile f;
   if (!Storage.openFileForWrite("TRS", cachePath, f)) {
     LOG_ERR("TRS", "Failed to save page index cache");
     return;
@@ -562,4 +551,18 @@ void TxtReaderActivity::savePageIndexCache() const {
   }
 
   LOG_DBG("TRS", "Saved page index cache: %d pages", totalPages);
+}
+
+ScreenshotInfo TxtReaderActivity::getScreenshotInfo() const {
+  ScreenshotInfo info;
+  info.readerType = ScreenshotInfo::ReaderType::Txt;
+  if (txt) {
+    const std::string t = txt->getTitle();
+    snprintf(info.title, sizeof(info.title), "%s", t.c_str());
+  }
+  info.currentPage = currentPage + 1;
+  info.totalPages = totalPages;
+  info.progressPercent = totalPages > 0 ? static_cast<int>((currentPage + 1) * 100.0f / totalPages + 0.5f) : 0;
+  if (info.progressPercent > 100) info.progressPercent = 100;
+  return info;
 }

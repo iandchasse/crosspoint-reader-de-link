@@ -11,13 +11,14 @@
 #include "fontIds.h"
 
 namespace {
-constexpr int MENU_ITEMS = 6;
+constexpr int MENU_ITEMS = 7;
 const StrId menuNames[MENU_ITEMS] = {StrId::STR_CHAPTER_PAGE_COUNT,
                                      StrId::STR_BOOK_PROGRESS_PERCENTAGE,
                                      StrId::STR_PROGRESS_BAR,
                                      StrId::STR_PROGRESS_BAR_THICKNESS,
                                      StrId::STR_TITLE,
-                                     StrId::STR_BATTERY};
+                                     StrId::STR_BATTERY,
+                                     StrId::STR_XTC_STATUS_BAR};
 constexpr int PROGRESS_BAR_ITEMS = 3;
 const StrId progressBarNames[PROGRESS_BAR_ITEMS] = {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE};
 
@@ -32,8 +33,8 @@ constexpr int BATTERY_ITEMS = 5;
 const StrId batteryNames[BATTERY_ITEMS] = {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS, StrId::STR_CLOCK,
                                            StrId::STR_HYBRID};
 
-const char* translatedShow = tr(STR_SHOW);
-const char* translatedHide = tr(STR_HIDE);
+constexpr int XTC_STATUS_BAR_ITEMS = 3;
+const StrId xtcStatusBarNames[XTC_STATUS_BAR_ITEMS] = {StrId::STR_HIDE, StrId::STR_BOTTOM, StrId::STR_TOP};
 
 const int widthMargin = 10;
 const int verticalPreviewPadding = 50;
@@ -60,6 +61,10 @@ void StatusBarSettingsActivity::onEnter() {
 
   if (SETTINGS.hideBatteryPercentage >= BATTERY_ITEMS) {
     SETTINGS.hideBatteryPercentage = CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
+  }
+
+  if (SETTINGS.xtcStatusBarMode >= XTC_STATUS_BAR_ITEMS) {
+    SETTINGS.xtcStatusBarMode = CrossPointSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_HIDE;
   }
 
   requestUpdate();
@@ -124,6 +129,9 @@ void StatusBarSettingsActivity::handleSelection() {
     // Ensure statusBarBattery reflects whether we want to show ANYTHING in that slot
     SETTINGS.statusBarBattery =
         (SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS) ? 0 : 1;
+  } else if (selectedIndex == 6) {
+    // XTC Status Bar
+    SETTINGS.xtcStatusBarMode = (SETTINGS.xtcStatusBarMode + 1) % XTC_STATUS_BAR_ITEMS;
   }
   SETTINGS.saveToFile();
 }
@@ -157,6 +165,8 @@ void StatusBarSettingsActivity::render(RenderLock&&) {
           return I18N.get(titleNames[SETTINGS.statusBarTitle]);
         } else if (index == 5) {
           return I18N.get(batteryNames[SETTINGS.hideBatteryPercentage]);
+        } else if (index == 6) {
+          return I18N.get(xtcStatusBarNames[SETTINGS.xtcStatusBarMode]);
         } else {
           return tr(STR_HIDE);
         }
