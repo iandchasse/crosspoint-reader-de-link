@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 /**
  * FsCompat.h
@@ -63,9 +63,19 @@ class EspFsFile : public fs::File {
   size_t fileSize() { return fs::File::size(); }
 
   // -------------------------------------------------------------------------
+  // fileSize64() — 64-bit variant for upstream compatibility (XtcParser)
+  // -------------------------------------------------------------------------
+  uint64_t fileSize64() { return static_cast<uint64_t>(fs::File::size()); }
+
+  // -------------------------------------------------------------------------
   // seekSet() — SdFat name for absolute seek (same as seek())
   // -------------------------------------------------------------------------
   bool seekSet(uint32_t pos) { return fs::File::seek(pos); }
+
+  // -------------------------------------------------------------------------
+  // seek64() — 64-bit seek for upstream compatibility (XtcParser)
+  // -------------------------------------------------------------------------
+  bool seek64(uint64_t pos) { return fs::File::seek(static_cast<uint32_t>(pos)); }
 
   // -------------------------------------------------------------------------
   // read() with no args — SdFat returns int (byte value, or -1 on EOF).

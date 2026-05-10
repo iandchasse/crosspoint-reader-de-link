@@ -57,7 +57,6 @@ void drawBatteryIcon(const GfxRenderer& renderer, int x, int y, int battWidth, i
   }
 }
 
-}  // namespace
 
 void BaseTheme::drawBatteryOutline(const GfxRenderer& renderer, int x, int y, int battWidth, int rectHeight) {
   // Top line

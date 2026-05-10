@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <FS.h>  // need to be included before SdFat.h for compatibility with FS.h's File class
 #include <SDCardManager.h>
@@ -50,56 +50,17 @@ class HalStorage {
 
 #define Storage HalStorage::getInstance()
 
-class HalFile : public Print {
-  friend class HalStorage;
-  class Impl;
-  std::unique_ptr<Impl> impl;
-  explicit HalFile(std::unique_ptr<Impl> impl);
-
- public:
-  HalFile();
-  ~HalFile();
-  HalFile(HalFile&&);
-  HalFile& operator=(HalFile&&);
-  HalFile(const HalFile&) = delete;
-  HalFile& operator=(const HalFile&) = delete;
-
-  void flush();
-  size_t getName(char* name, size_t len);
-  size_t size();
-  size_t fileSize();
-  uint64_t fileSize64();
-  bool seek(size_t pos);
-  bool seek64(uint64_t pos);
-  bool seekCur(int64_t offset);
-  bool seekSet(size_t offset);
-  int available() const;
-  size_t position() const;
-  int read(void* buf, size_t count);
-  int read();  // read a single byte
-  size_t write(const void* buf, size_t count);
-  size_t write(uint8_t b) override;
-  bool rename(const char* newPath);
-  bool isDirectory() const;
-  void rewindDirectory();
-  bool close();
-  HalFile openNextFile();
-  bool isOpen() const;
-  operator bool() const;
-};
-
-// Only do renaming FsFile to HalFile if this header is included by downstream code
-// The renaming is to allow using the thread-safe HalFile instead of the raw FsFile, without needing to change the
-// downstream code
-#ifndef HAL_STORAGE_IMPL
-using FsFile = HalFile;
-#endif
+// --- Type compatibility aliases ---
+// On the S3 platform, EspFsFile (from FsCompat.h) is the canonical file type.
+// It wraps ESP32's fs::File with SdFat-compatible API methods.
+// ESP32's SD_MMC driver is already thread-safe, so no HalFile mutex wrapper is needed.
+//
+// Upstream code uses both "FsFile" (SdFat's raw type) and "HalFile" (thread-safe wrapper).
+// We alias both to EspFsFile so all upstream code compiles transparently.
+using FsFile = EspFsFile;
+using HalFile = EspFsFile;
 
 // Downstream code must use Storage instead of SdMan
 #ifdef SdMan
 #undef SdMan
 #endif
-
-// Aliases to support upstream abstraction layer commits
-using FsFile = EspFsFile;
-using HalFile = EspFsFile;

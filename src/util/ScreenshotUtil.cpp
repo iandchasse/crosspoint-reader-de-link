@@ -78,7 +78,7 @@ void ScreenshotUtil::takeScreenshot(GfxRenderer& renderer) {
   char filename[256];
   buildFilename(info, filename, sizeof(filename));
 
-  bool saved = saveFramebufferAsBmp(filename, fb, renderer.getDisplayWidth(), renderer.getDisplayHeight());
+  bool saved = saveFramebufferAsBmp(filename, fb, renderer.getScreenWidth(), renderer.getScreenHeight());
   if (saved) {
     LOG_DBG("SCR", "Screenshot saved to %s", filename);
   } else {
@@ -88,7 +88,7 @@ void ScreenshotUtil::takeScreenshot(GfxRenderer& renderer) {
 
   // Display a border around the screen to indicate a screenshot was taken
   if (renderer.storeBwBuffer()) {
-    renderer.drawRect(6, 6, renderer.getDisplayHeight() - 12, renderer.getDisplayWidth() - 12, 2, true);
+    renderer.drawRect(6, 6, renderer.getScreenWidth() - 12, renderer.getScreenHeight() - 12, 2, true);
     renderer.displayBuffer();
     delay(1000);
     renderer.restoreBwBuffer();

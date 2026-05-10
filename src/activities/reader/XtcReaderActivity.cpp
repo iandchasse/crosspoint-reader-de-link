@@ -1,4 +1,4 @@
-﻿/**
+/**
  * XtcReaderActivity.cpp
  *
  * XTC ebook reader activity implementation
@@ -59,7 +59,7 @@ void XtcReaderActivity::onExit() {
 void XtcReaderActivity::loop() {
 #ifdef FRONTLIGHT_PRESENT
   // Long press CONFIRM (1s+) opens frontlight control
-  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= goHomeMs) {
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
     startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              // After returning from frontlight control, request screen update
@@ -68,7 +68,7 @@ void XtcReaderActivity::loop() {
   }
 #endif
   // Enter chapter selection activity
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() < goHomeMs) {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
     if (xtc && xtc->hasChapters() && !xtc->getChapters().empty()) {
       startActivityForResult(
           std::make_unique<XtcReaderChapterSelectionActivity>(renderer, mappedInput, xtc, currentPage),
