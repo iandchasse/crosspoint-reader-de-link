@@ -25,6 +25,9 @@
 #include "ProgressMapper.h"
 #include "QrDisplayActivity.h"
 #include "ReaderUtils.h"
+#ifdef FRONTLIGHT_PRESENT
+#include "activities/settings/FrontlightControlActivity.h"
+#endif
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -145,8 +148,19 @@ void EpubReaderActivity::loop() {
     }
   }
 
+#ifdef FRONTLIGHT_PRESENT
+  // Long press CONFIRM (1s+) opens frontlight control
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+    startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
+                           [this](const ActivityResult& result) {
+                             // After returning from frontlight control, request screen update
+                           });
+    return;
+  }
+#endif
+
   // Enter reader menu activity.
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
     const int currentPage = section ? section->currentPage + 1 : 0;
     const int totalPages = section ? section->pageCount : 0;
     float bookProgress = 0.0f;

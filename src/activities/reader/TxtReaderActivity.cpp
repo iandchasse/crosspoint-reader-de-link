@@ -11,6 +11,9 @@
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
 #include "ReaderUtils.h"
+#ifdef FRONTLIGHT_PRESENT
+#include "activities/settings/FrontlightControlActivity.h"
+#endif
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -58,6 +61,17 @@ void TxtReaderActivity::onExit() {
 }
 
 void TxtReaderActivity::loop() {
+#ifdef FRONTLIGHT_PRESENT
+  // Long press CONFIRM (1s+) opens frontlight control
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+    startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
+                           [this](const ActivityResult& result) {
+                             // After returning from frontlight control, request screen update
+                           });
+    return;
+  }
+#endif
+
   // Long press BACK (1s+) goes to file selection
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
     activityManager.goToFileBrowser(txt ? txt->getPath() : "");
