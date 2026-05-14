@@ -218,8 +218,6 @@ void enterDeepSleep() {
   powerManager.startDeepSleep(gpio);
 }
 
-void ensureSdFontLoaded() { sdFontSystem.ensureLoaded(renderer); }
-
 void setupDisplayAndFonts() {
   display.begin();
   renderer.begin();
