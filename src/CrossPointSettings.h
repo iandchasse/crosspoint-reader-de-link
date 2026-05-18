@@ -120,6 +120,7 @@ class CrossPointSettings {
     SLEEP_10_MIN = 2,
     SLEEP_15_MIN = 3,
     SLEEP_30_MIN = 4,
+    SLEEP_3_MIN = 5,
     SLEEP_TIMEOUT_COUNT
   };
 
@@ -257,6 +258,8 @@ class CrossPointSettings {
   char sdFontFamilyName[32] = "";
   // Show hidden files/directories (starting with '.') in the file browser (0 = hidden, 1 = show)
   uint8_t showHiddenFiles = 0;
+  // Move epub to /Read/ folder on SD card when finished (0 = disabled, 1 = enabled)
+  uint8_t moveFinishedToReadFolder = 0;
   // Image rendering mode in EPUB reader
   uint8_t imageRendering = IMAGES_DISPLAY;
   // Show clock in the reader status bar

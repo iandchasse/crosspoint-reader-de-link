@@ -14,6 +14,7 @@ static inline void safeWdtReset() {
 }
 
 #include "MappedInputManager.h"
+#include "SilentRestart.h"
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -58,14 +59,11 @@ void CalibreConnectActivity::onEnter() {
 void CalibreConnectActivity::onExit() {
   Activity::onExit();
 
-  stopWebServer();
-  MDNS.end();
-
-  delay(50);
-  WiFi.disconnect(false);
-  delay(30);
-  WiFi.mode(WIFI_OFF);
-  delay(30);
+  if (WiFi.getMode() != WIFI_MODE_NULL) {
+    WiFi.disconnect(false);
+    delay(30);
+    silentRestart();
+  }
 }
 
 void CalibreConnectActivity::onWifiSelectionComplete(const bool connected) {

@@ -29,6 +29,52 @@ bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
 
 unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
 
+unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPowerButtonHeldTime(); }
+
+void HalGPIO::startDeepSleep() {
+  // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
+  while (inputMgr.isPressed(BTN_POWER)) {
+    delay(50);
+    inputMgr.update();
+  }
+  // Arm the wakeup trigger *after* the button is released
+  esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+  // Enter Deep Sleep
+  esp_deep_sleep_start();
+}
+
+void HalGPIO::verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPressAllowed) {
+  if (shortPressAllowed) {
+    // Fast path - no duration check needed
+    return;
+  }
+  // TODO: Intermittent edge case remains: a single tap followed by another single tap
+  // can still power on the device. Tighten wake debounce/state handling here.
+
+  // Calibrate: subtract boot time already elapsed, assuming button held since boot
+  const uint16_t calibration = millis();
+  const uint16_t calibratedDuration = (calibration < requiredDurationMs) ? (requiredDurationMs - calibration) : 1;
+
+  const auto start = millis();
+  inputMgr.update();
+  // inputMgr.isPressed() may take up to ~500ms to return correct state
+  while (!inputMgr.isPressed(BTN_POWER) && millis() - start < 1000) {
+    delay(10);
+    inputMgr.update();
+  }
+  if (inputMgr.isPressed(BTN_POWER)) {
+    do {
+      delay(10);
+      inputMgr.update();
+    } while (inputMgr.isPressed(BTN_POWER) && inputMgr.getPowerButtonHeldTime() < calibratedDuration);
+    if (inputMgr.getPowerButtonHeldTime() < calibratedDuration) {
+      startDeepSleep();
+    }
+  } else {
+    startDeepSleep();
+  }
+}
+
 bool HalGPIO::isUsbConnected() const {
   // Native ESP-IDF API: detects SOF packets from a connected USB host
   return usb_serial_jtag_is_connected();
