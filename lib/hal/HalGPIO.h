@@ -42,6 +42,8 @@ class HalGPIO {
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
+  void verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPressAllowed);
+  void startDeepSleep();
 
   // Check if USB is connected (uses native ESP-IDF USB Serial/JTAG API)
   bool isUsbConnected() const;

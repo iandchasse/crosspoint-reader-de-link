@@ -516,72 +516,71 @@ void loop() {
   }
 #endif
 
-  if (gpio.isPressed(HalGPIO::BTN_POWER) && gpio.getHeldTime() > SETTINGS.getPowerButtonDuration()) {
-    if (gpio.isPressed(HalGPIO::BTN_POWER) && gpio.getPowerButtonHeldTime() > SETTINGS.getPowerButtonDuration()) {
-      // If the screenshot combination is potentially being pressed, don't sleep
-      if (gpio.isPressed(HalGPIO::BTN_DOWN)) {
-        return;
-      }
-      // additional protection: force reset if in a soft-locked condition
-      const unsigned long startWait = millis();
-      delay(50);
-      if (gpio.isPressed(HalGPIO::BTN_POWER)) {
-        GUI.drawPopup(renderer, "Keep Holding to Reset");
-        while (gpio.isPressed(HalGPIO::BTN_POWER)) {
-          if (millis() - startWait >= 10000) {
-            LOG_ERR("PWR", "Power button held for 10s during sleep prep. Forcing reset.");
-            esp_restart();
-          }
-          delay(50);
-          gpio.update();
-        }
-      }
-      // if it doesn't reset, go ahead with deep sleep
-      enterDeepSleep();
-      // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
+  if (gpio.isPressed(HalGPIO::BTN_POWER) && gpio.getPowerButtonHeldTime() > SETTINGS.getPowerButtonDuration()) {
+    // If the screenshot combination is potentially being pressed, don't sleep
+    if (gpio.isPressed(HalGPIO::BTN_DOWN)) {
       return;
     }
-
-    // Refresh screen when power button is short-pressed with FORCE_REFRESH setting.
-    if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::FORCE_REFRESH &&
-        mappedInputManager.wasReleased(MappedInputManager::Button::Power)) {
-      LOG_DBG("MAIN", "Manual screen refresh triggered");
-      RenderLock lock;
-      renderer.displayBuffer(HalDisplay::HALF_REFRESH);
-    }
-
-    // Refresh the battery icon when USB is plugged or unplugged.
-    // Placed after sleep guards so we never queue a render that won't be processed.
-    if (gpio.wasUsbStateChanged() && !activityManager.isReaderActivity()) {
-      activityManager.requestUpdate();
-    }
-
-    const unsigned long activityStartTime = millis();
-    activityManager.loop();
-    const unsigned long activityDuration = millis() - activityStartTime;
-
-    const unsigned long loopDuration = millis() - loopStartTime;
-    if (loopDuration > maxLoopDuration) {
-      maxLoopDuration = loopDuration;
-      if (maxLoopDuration > 50) {
-        LOG_DBG("LOOP", "New max loop duration: %lu ms (activity: %lu ms)", maxLoopDuration, activityDuration);
-      }
-    }
-
-    // Add delay at the end of the loop to prevent tight spinning
-    // When an activity requests skip loop delay (e.g., webserver running), use yield() for faster response
-    // Otherwise, use longer delay to save power
-    if (activityManager.skipLoopDelay()) {
-      powerManager.setPowerSaving(false);  // Make sure we're at full performance when skipLoopDelay is requested
-      yield();                             // Give FreeRTOS a chance to run tasks, but return immediately
-    } else {
-      if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS) {
-        // If we've been inactive for a while, increase the delay to save power
-        powerManager.setPowerSaving(true);  // Lower CPU frequency after extended inactivity
+    // additional protection: force reset if in a soft-locked condition
+    const unsigned long startWait = millis();
+    delay(50);
+    if (gpio.isPressed(HalGPIO::BTN_POWER)) {
+      GUI.drawPopup(renderer, "Keep Holding to Reset");
+      while (gpio.isPressed(HalGPIO::BTN_POWER)) {
+        if (millis() - startWait >= 10000) {
+          LOG_ERR("PWR", "Power button held for 10s during sleep prep. Forcing reset.");
+          esp_restart();
+        }
         delay(50);
-      } else {
-        // Short delay to prevent tight loop while still being responsive
-        delay(10);
+        gpio.update();
       }
+    }
+    // if it doesn't reset, go ahead with deep sleep
+    enterDeepSleep();
+    // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
+    return;
+  }
+
+  // Refresh screen when power button is short-pressed with FORCE_REFRESH setting.
+  if (SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::FORCE_REFRESH &&
+      mappedInputManager.wasReleased(MappedInputManager::Button::Power)) {
+    LOG_DBG("MAIN", "Manual screen refresh triggered");
+    RenderLock lock;
+    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+  }
+
+  // Refresh the battery icon when USB is plugged or unplugged.
+  // Placed after sleep guards so we never queue a render that won't be processed.
+  if (gpio.wasUsbStateChanged() && !activityManager.isReaderActivity()) {
+    activityManager.requestUpdate();
+  }
+
+  const unsigned long activityStartTime = millis();
+  activityManager.loop();
+  const unsigned long activityDuration = millis() - activityStartTime;
+
+  const unsigned long loopDuration = millis() - loopStartTime;
+  if (loopDuration > maxLoopDuration) {
+    maxLoopDuration = loopDuration;
+    if (maxLoopDuration > 50) {
+      LOG_DBG("LOOP", "New max loop duration: %lu ms (activity: %lu ms)", maxLoopDuration, activityDuration);
     }
   }
+
+  // Add delay at the end of the loop to prevent tight spinning
+  // When an activity requests skip loop delay (e.g., webserver running), use yield() for faster response
+  // Otherwise, use longer delay to save power
+  if (activityManager.skipLoopDelay()) {
+    powerManager.setPowerSaving(false);  // Make sure we're at full performance when skipLoopDelay is requested
+    yield();                             // Give FreeRTOS a chance to run tasks, but return immediately
+  } else {
+    if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS) {
+      // If we've been inactive for a while, increase the delay to save power
+      powerManager.setPowerSaving(true);  // Lower CPU frequency after extended inactivity
+      delay(50);
+    } else {
+      // Short delay to prevent tight loop while still being responsive
+      delay(10);
+    }
+  }
+}
