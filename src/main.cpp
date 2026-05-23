@@ -309,7 +309,8 @@ void enterDeepSleep(bool fromTimeout = false) {
   LOG_DBG("MAIN", "Power button press calibration value: %lu ms", t2 - t1);
   LOG_DBG("MAIN", "Entering deep sleep");
 
-  powerManager.startDeepSleep(gpio);
+  powerManager.startDeepSleep(gpio, isQuickResumeSleep && APP_STATE.lastSleepFromReader,
+                              APP_STATE.pagesUntilFullRefresh);
 }
 
 void setupDisplayAndFonts(bool seamless = false) {
@@ -356,7 +357,7 @@ static void powerButtonMonitorTask(void* pvParameters) {
     if (pressed) {
       if (heldStart == 0) {
         heldStart = millis();
-      } else if (millis() - heldStart >= 8000) { // 8 seconds hold to reset
+      } else if (millis() - heldStart >= 8000) {  // 8 seconds hold to reset
         LOG_ERR("SYS", "Power button held for 8s (soft-lock recovery). Restarting...");
         delay(10);
         esp_restart();
@@ -452,6 +453,20 @@ void setup() {
   }
 #endif
   switch (gpio.getWakeupReason()) {
+    case HalGPIO::WakeupReason::UlpButton: {
+      const uint8_t ulpBtn = gpio.getUlpWakeupButton();
+      LOG_DBG("MAIN", "Wakeup reason: ULP Button (%u)", ulpBtn);
+      if (ulpBtn == 1) {
+        APP_STATE.pendingWakeAction = BootWakeButton::PageFwd;
+      } else if (ulpBtn == 2) {
+        APP_STATE.pendingWakeAction = BootWakeButton::PageBack;
+      } else if (ulpBtn == 3) {
+        APP_STATE.pendingWakeAction = BootWakeButton::Menu;
+      } else if (ulpBtn == 4) {
+        APP_STATE.pendingWakeAction = BootWakeButton::Home;
+      }
+      break;
+    }
     case HalGPIO::WakeupReason::PowerButton:
       // For normal wakeups, verify power button press duration
       LOG_DBG("MAIN", "Verifying power button press duration");
@@ -542,9 +557,13 @@ void setup() {
     // openEpubPath + lastSleepFromReader from a prior session.
     activityManager.goHome();
   } else if (APP_STATE.openEpubPath.empty() || !APP_STATE.lastSleepFromReader ||
-             mappedInputManager.isPressed(MappedInputManager::Button::Back) || APP_STATE.readerActivityLoadCount > 0) {
+             mappedInputManager.isPressed(MappedInputManager::Button::Back) || APP_STATE.readerActivityLoadCount > 0 ||
+             APP_STATE.pendingWakeAction == BootWakeButton::Home) {
+    if (APP_STATE.pendingWakeAction == BootWakeButton::Home) {
+      APP_STATE.pendingWakeAction = BootWakeButton::None;
+    }
     // Boot to home screen if no book is open, last sleep was not from reader, back button is held, or reader activity
-    // crashed (indicated by readerActivityLoadCount > 0)
+    // crashed (indicated by readerActivityLoadCount > 0), or ULP woke to Home
     activityManager.goHome();
   } else {
     // Clear app state to avoid getting into a boot loop if the epub doesn't load

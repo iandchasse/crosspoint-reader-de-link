@@ -61,9 +61,28 @@ void TxtReaderActivity::onExit() {
 }
 
 void TxtReaderActivity::loop() {
+  if (initialized && APP_STATE.pendingWakeAction != BootWakeButton::None) {
+    BootWakeButton action = APP_STATE.pendingWakeAction;
+    APP_STATE.pendingWakeAction = BootWakeButton::None;
+    if (action == BootWakeButton::PageFwd) {
+      if (currentPage < totalPages - 1) {
+        currentPage++;
+        requestUpdate();
+      } else {
+        onGoHome();
+      }
+    } else if (action == BootWakeButton::PageBack) {
+      if (currentPage > 0) {
+        currentPage--;
+        requestUpdate();
+      }
+    }
+  }
+
 #ifdef FRONTLIGHT_PRESENT
   // Long press CONFIRM (1s+) opens frontlight control
-  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
+      mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
     startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              // After returning from frontlight control, request screen update
@@ -411,7 +430,7 @@ void TxtReaderActivity::renderPage() {
   renderLines();
   renderStatusBar();
 
-  ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
+  ReaderUtils::displayWithRefreshCycle(renderer, APP_STATE.pagesUntilFullRefresh, ReaderUtils::wasRecentSleep());
 
   if (SETTINGS.textAntiAliasing) {
     ReaderUtils::renderAntiAliased(renderer, [&renderLines]() { renderLines(); });

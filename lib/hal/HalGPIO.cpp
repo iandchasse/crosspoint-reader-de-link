@@ -78,10 +78,17 @@ bool HalGPIO::isCharging() const {
   return digitalRead(BAT_CHECK) == LOW;
 }
 
+#include <ulp_common_defs.h>
+
 HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {
   const bool usbConnected = isUsbConnected();
   const auto wakeupCause = esp_sleep_get_wakeup_cause();
   const auto resetReason = esp_reset_reason();
+
+  // Woke from deep sleep via ULP coprocessor button monitoring
+  if (wakeupCause == ESP_SLEEP_WAKEUP_ULP) {
+    return WakeupReason::UlpButton;
+  }
 
   // Woke from deep sleep via GPIO (power button press)
   if (wakeupCause == ESP_SLEEP_WAKEUP_GPIO && resetReason == ESP_RST_DEEPSLEEP) {
@@ -104,3 +111,10 @@ HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {
 
   return WakeupReason::Other;
 }
+
+uint8_t HalGPIO::getUlpWakeupButton() const {
+  // RTC_SLOW_MEM[0] holds the button ID (0 = none, 1 = FWD, 2 = BACK, 3 = MENU, 4 = HOME)
+  uint8_t btn = static_cast<uint8_t>(RTC_SLOW_MEM[0]);
+  RTC_SLOW_MEM[0] = 0; // Clear it so subsequent boots/sleeps start clean
+  return btn;
+}

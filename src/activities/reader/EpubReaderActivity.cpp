@@ -157,13 +157,22 @@ void EpubReaderActivity::onEnter() {
     }
   }
 
+  if (ReaderUtils::wasRecentSleep()) {
+    APP_STATE.pagesUntilFullRefresh = RtcState::pagesUntilFullRefreshRtc;  // restore cadence
+  } else {
+    APP_STATE.pagesUntilFullRefresh = 1;  // force half refresh on first render — long sleep means ghosting likely
+  }
+
   // Save current epub as last opened epub and add to recent books
   APP_STATE.openEpubPath = epub->getPath();
   APP_STATE.saveToFile();
   RECENT_BOOKS.addBook(epub->getPath(), epub->getTitle(), epub->getAuthor(), epub->getThumbBmpPath());
 
-  // Trigger first update
-  requestUpdate();
+  // Only trigger first update if we don't have a pending wake action
+  // that will request its own update
+  if (APP_STATE.pendingWakeAction == BootWakeButton::None) {
+    requestUpdate();
+  }
 }
 
 void EpubReaderActivity::onExit() {
@@ -191,6 +200,54 @@ void EpubReaderActivity::loop() {
     // Should never happen
     finish();
     return;
+  }
+
+  if (APP_STATE.pendingWakeAction != BootWakeButton::None) {
+    BootWakeButton action = APP_STATE.pendingWakeAction;
+    APP_STATE.pendingWakeAction = BootWakeButton::None;
+
+    if (action == BootWakeButton::PageFwd) {
+      nextPageNumber++;
+      requestUpdate();
+      return;
+    } else if (action == BootWakeButton::PageBack) {
+      if (nextPageNumber > 0) {
+        nextPageNumber--;
+      } else if (currentSpineIndex > 0) {
+        currentSpineIndex--;
+        nextPageNumber = std::numeric_limits<uint16_t>::max();
+      }
+      requestUpdate();
+      return;
+    } else if (action == BootWakeButton::Menu) {
+      if (cachedChapterTotalPageCount > 0) {
+        const int currentPage = nextPageNumber + 1;
+        const int totalPages = cachedChapterTotalPageCount;
+        float bookProgress = 0.0f;
+        if (epub && epub->getBookSize() > 0 && totalPages > 0) {
+          const float chapterProgress = static_cast<float>(nextPageNumber) / static_cast<float>(totalPages);
+          bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
+        }
+        const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
+        startActivityForResult(
+            std::make_unique<EpubReaderMenuActivity>(renderer, mappedInput, epub->getTitle(), currentPage, totalPages,
+                                                     bookProgressPercent, SETTINGS.orientation, false),
+            [this](const ActivityResult& result) {
+              const auto& menu = std::get<MenuResult>(result.data);
+              applyOrientation(menu.orientation);
+              toggleAutoPageTurn(menu.pageTurnOption);
+              if (!result.isCancelled) {
+                onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
+              }
+            });
+        return;
+      } else {
+        // cachedChapterTotalPageCount unavailable, fall back to rendering first
+        APP_STATE.pendingWakeAction = action;
+        requestUpdate();
+        return;
+      }
+    }
   }
 
   // End-of-Book screen reached (currentSpineIndex == spine count) means the book is
@@ -250,7 +307,8 @@ void EpubReaderActivity::loop() {
 
 #ifdef FRONTLIGHT_PRESENT
   // Long press CONFIRM (1s+) opens frontlight control
-  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
+      mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
     startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              // After returning from frontlight control, request screen update
@@ -260,7 +318,8 @@ void EpubReaderActivity::loop() {
 #endif
 
   // Enter reader menu activity.
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) &&
+      mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
     const int currentPage = section ? section->currentPage + 1 : 0;
     const int totalPages = section ? section->pageCount : 0;
     float bookProgress = 0.0f;
@@ -919,7 +978,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     }
     // Double FAST_REFRESH handles ghosting for image pages; don't count toward full refresh cadence
   } else {
-    ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
+    ReaderUtils::displayWithRefreshCycle(renderer, APP_STATE.pagesUntilFullRefresh, ReaderUtils::wasRecentSleep());
   }
   const auto tDisplay = millis();
 

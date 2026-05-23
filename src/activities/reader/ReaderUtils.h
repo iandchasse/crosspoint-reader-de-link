@@ -4,8 +4,11 @@
 #include <GfxRenderer.h>
 #include <HalTiltSensor.h>
 #include <Logging.h>
+#include <RtcState.h>
+#include <sys/time.h>  // or wherever the RTC time function lives
 
 #include "MappedInputManager.h"
+#include "esp_sleep.h"
 
 namespace ReaderUtils {
 
@@ -59,13 +62,21 @@ inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
   return {prev, next, tiltPrev || tiltNext};
 }
 
-inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh) {
-  if (pagesUntilFullRefresh <= 1) {
+inline bool wasRecentSleep(uint32_t thresholdSeconds = 180) {
+  if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_ULP) return false;
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  return ((uint32_t)tv.tv_sec - RtcState::sleepEntryTime) < thresholdSeconds;
+}
+
+inline void displayWithRefreshCycle(const GfxRenderer& renderer, uint8_t& pagesUntilFullRefresh,
+                                    bool forceFast = false) {
+  if (!forceFast && pagesUntilFullRefresh <= 1) {
     renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
   } else {
     renderer.displayBuffer();
-    pagesUntilFullRefresh--;
+    if (!forceFast) pagesUntilFullRefresh--;
   }
 }
 

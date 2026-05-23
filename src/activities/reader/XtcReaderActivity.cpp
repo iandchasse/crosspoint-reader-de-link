@@ -57,9 +57,39 @@ void XtcReaderActivity::onExit() {
 }
 
 void XtcReaderActivity::loop() {
+  if (xtc && APP_STATE.pendingWakeAction != BootWakeButton::None) {
+    BootWakeButton action = APP_STATE.pendingWakeAction;
+    APP_STATE.pendingWakeAction = BootWakeButton::None;
+    if (action == BootWakeButton::PageFwd) {
+      if (currentPage < xtc->getPageCount() - 1) {
+        currentPage++;
+        requestUpdate();
+      } else {
+        currentPage = xtc->getPageCount();  // Allow showing "End of book"
+        requestUpdate();
+      }
+    } else if (action == BootWakeButton::PageBack) {
+      if (currentPage > 0) {
+        currentPage--;
+        requestUpdate();
+      }
+    } else if (action == BootWakeButton::Menu) {
+      if (xtc->hasChapters() && !xtc->getChapters().empty()) {
+        startActivityForResult(
+            std::make_unique<XtcReaderChapterSelectionActivity>(renderer, mappedInput, xtc, currentPage),
+            [this](const ActivityResult& result) {
+              if (!result.isCancelled) {
+                currentPage = std::get<PageResult>(result.data).page;
+              }
+            });
+      }
+    }
+  }
+
 #ifdef FRONTLIGHT_PRESENT
   // Long press CONFIRM (1s+) opens frontlight control
-  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
+      mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
     startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
                            [this](const ActivityResult& result) {
                              // After returning from frontlight control, request screen update
@@ -68,7 +98,8 @@ void XtcReaderActivity::loop() {
   }
 #endif
   // Enter chapter selection activity
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) &&
+      mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
     if (xtc && xtc->hasChapters() && !xtc->getChapters().empty()) {
       startActivityForResult(
           std::make_unique<XtcReaderChapterSelectionActivity>(renderer, mappedInput, xtc, currentPage),
@@ -306,7 +337,7 @@ void XtcReaderActivity::renderPage() {
       }
     }
 
-    ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
+    ReaderUtils::displayWithRefreshCycle(renderer, APP_STATE.pagesUntilFullRefresh, ReaderUtils::wasRecentSleep());
 
     // Pass 2: LSB buffer - mark DARK gray only (XTH value 1)
     // In LUT: 0 bit = apply gray effect, 1 bit = untouched
@@ -382,7 +413,7 @@ void XtcReaderActivity::renderPage() {
     renderStatusBarOverlay(StatusBarOverlayPosition::Bottom);
   }
 
-  ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
+  ReaderUtils::displayWithRefreshCycle(renderer, APP_STATE.pagesUntilFullRefresh, ReaderUtils::wasRecentSleep());
 
   LOG_DBG("XTR", "Rendered page %lu/%lu (%u-bit)", currentPage + 1, xtc->getPageCount(), bitDepth);
 }
