@@ -514,9 +514,11 @@ void setup() {
       APP_STATE.saveToFile();
       if (loadSleepFrameBuffer()) {
         // Frame restored: swap the sleep moon for the loading icon.
+        // Sync the display controller's RAM with the loaded frame before partial update.
+        display.cleanupGrayscaleBuffers(display.getFrameBuffer());
         const auto pageHeight = renderer.getScreenHeight();
         renderer.drawImage(LoadingIcon, 0, pageHeight - LOADINGICON_HEIGHT, LOADINGICON_WIDTH, LOADINGICON_HEIGHT);
-        renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+        renderer.displayBuffer(HalDisplay::FAST_REFRESH);
       } else {
         activityManager.goToBoot();  // frame file missing, fall back to the splash
       }
