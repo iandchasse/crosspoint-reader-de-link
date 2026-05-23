@@ -17,8 +17,13 @@ class HalDisplay {
     FAST_REFRESH   // Fast refresh using custom LUT
   };
 
-  // Initialize the display hardware and driver
-  void begin();
+  // Pass seamless=true on any path where the panel already shows the
+  // content it should after begin() returns (silent reboot's popup,
+  // sleep-wake with a restored buffer). Skips the wakeup-gated
+  // requestResync() and defuses the SDK's X3 _x3InitialFullSyncsRemaining
+  // counter; otherwise the first two paints get promoted to FULL
+  // (~770ms each on X3).
+  void begin(bool seamless = false);
 
   // Display dimensions
   static constexpr uint16_t DISPLAY_WIDTH = EInkDisplay::DISPLAY_WIDTH;
@@ -48,6 +53,12 @@ class HalDisplay {
   void cleanupGrayscaleBuffers(const uint8_t* bwBuffer);
 
   void displayGrayBuffer(bool turnOffScreen = false);
+
+  // Runtime geometry passthrough
+  inline uint16_t getDisplayWidth() const { return DISPLAY_WIDTH; }
+  inline uint16_t getDisplayHeight() const { return DISPLAY_HEIGHT; }
+  inline uint16_t getDisplayWidthBytes() const { return DISPLAY_WIDTH_BYTES; }
+  inline uint32_t getBufferSize() const { return BUFFER_SIZE; }
 
  private:
   EInkDisplay einkDisplay;

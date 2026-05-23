@@ -1,12 +1,13 @@
 ﻿#include "WebDAVHandler.h"
 
-#include <Epub.h>
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
 #include <esp_task_wdt.h>
 
+#include "util/BookCacheUtils.h"
 #include "util/StringUtils.h"
+
 
 // Safe WDT reset - registers the task first if not already registered.
 static inline void safeWdtReset() {
@@ -430,7 +431,7 @@ void WebDAVHandler::handlePut(WebServer& s) {
     return;
   }
 
-  clearEpubCacheIfNeeded(path);
+  clearBookCache(path.c_str());
   s.send(_putExisted ? 204 : 201);
   LOG_DBG("DAV", "PUT complete: %s", path.c_str());
 }
@@ -486,7 +487,7 @@ void WebDAVHandler::handleDelete(WebServer& s) {
     }
   } else {
     file.close();
-    clearEpubCacheIfNeeded(path);
+    clearBookCache(path.c_str());
     if (Storage.remove(path.c_str())) {
       s.send(204);
     } else {
@@ -595,7 +596,7 @@ void WebDAVHandler::handleMove(WebServer& s) {
     return;
   }
 
-  clearEpubCacheIfNeeded(srcPath);
+  clearBookCache(srcPath.c_str());
   bool success = file.rename(dstPath.c_str());
   file.close();
 
@@ -858,13 +859,6 @@ bool WebDAVHandler::getOverwrite(WebServer& s) const {
   String ow = s.header("Overwrite");
   if (ow == "F" || ow == "f") return false;
   return true;  // Default is T
-}
-
-void WebDAVHandler::clearEpubCacheIfNeeded(const String& path) const {
-  if (FsHelpers::hasEpubExtension(path)) {
-    Epub(path.c_str(), "/.crosspoint").clearCache();
-    LOG_DBG("DAV", "Cleared epub cache for: %s", path.c_str());
-  }
 }
 
 String WebDAVHandler::getMimeType(const String& path) const {

@@ -1,6 +1,7 @@
 #include "WifiSelectionActivity.h"
 
 #include <GfxRenderer.h>
+#include <HalClock.h>
 #include <I18n.h>
 #include <Logging.h>
 #include <WiFi.h>
@@ -8,14 +9,15 @@
 
 #include <map>
 
+#include "CrossPointSettings.h"
 #include "MappedInputManager.h"
 #include "WifiCredentialStore.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "esp_wifi.h"
 #include "fontIds.h"
-#include <HalClock.h>
 #include "util/TimeUtil.h"
+
 
 void WifiSelectionActivity::onEnter() {
   Activity::onEnter();

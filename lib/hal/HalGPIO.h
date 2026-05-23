@@ -30,6 +30,10 @@ class HalGPIO {
  public:
   HalGPIO() = default;
 
+  // Inline device type helpers (this platform is always X4/S3)
+  inline bool deviceIsX3() const { return false; }
+  inline bool deviceIsX4() const { return true; }
+
   // Start button GPIO and setup SPI for screen and SD card
   void begin();
 

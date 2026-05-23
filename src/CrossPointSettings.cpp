@@ -1,4 +1,4 @@
-﻿#include "CrossPointSettings.h"
+#include "CrossPointSettings.h"
 
 #include <HalStorage.h>
 #include <JsonSettingsIO.h>
@@ -247,7 +247,10 @@ bool CrossPointSettings::loadFromBinaryFile() {
     serialization::readPod(inputFile, frontlightBrightness);
     if (++settingsRead >= fileSettingsCount) break;
     serialization::readPod(inputFile, frontlightWarmth);
+    if (++settingsRead >= fileSettingsCount) break;
 #endif
+    serialization::readPod(inputFile, frontButtonFollowOrientation);
+    if (++settingsRead >= fileSettingsCount) break;
   } while (false);
 
   if (frontButtonMappingRead) {
