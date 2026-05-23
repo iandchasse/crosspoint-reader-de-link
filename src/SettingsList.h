@@ -102,7 +102,7 @@ inline SettingInfo buildFontFamilySetting(const SdCardFontRegistry* registry) {
 // version. Callers without SD fonts pay only a vector copy.
 inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* registry = nullptr) {
   static const std::vector<SettingInfo> baseList = [] {
-    std::vector<SettingInfo> v = {
+    static const SettingInfo array[] = {
         // --- Display ---
 #ifdef FRONTLIGHT_PRESENT
         SettingInfo::Action(StrId::STR_FRONTLIGHT, SettingAction::FrontlightControl),
@@ -276,6 +276,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Toggle(StrId::STR_CLOCK_SYNCED, &CrossPointSettings::clockHasBeenSynced, "clockHasBeenSynced",
                             StrId::STR_CUSTOMISE_STATUS_BAR),
     };
+    std::vector<SettingInfo> v(array, array + sizeof(array) / sizeof(array[0]));
     // Only show tilt page turn setting when the QMI8658 IMU is present (X3)
     if (halTiltSensor.isAvailable()) {
       // Insert after the short power button setting (end of Controls section)
