@@ -349,6 +349,25 @@ void setupDisplayAndFonts(bool seamless = false) {
   LOG_DBG("MAIN", "Fonts setup");
 }
 
+static void powerButtonMonitorTask(void* pvParameters) {
+  unsigned long heldStart = 0;
+  while (true) {
+    const bool pressed = (digitalRead(InputManager::POWER_BUTTON_PIN) == (gpio.deviceIsX3() ? LOW : HIGH));
+    if (pressed) {
+      if (heldStart == 0) {
+        heldStart = millis();
+      } else if (millis() - heldStart >= 8000) { // 8 seconds hold to reset
+        LOG_ERR("SYS", "Power button held for 8s (soft-lock recovery). Restarting...");
+        delay(10);
+        esp_restart();
+      }
+    } else {
+      heldStart = 0;
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
 void setup() {
   t1 = millis();
 
@@ -374,6 +393,11 @@ void setup() {
   silentRebootTarget = 0;
 
   gpio.begin();
+#if CONFIG_FREERTOS_UNICORE
+  xTaskCreate(powerButtonMonitorTask, "pwr_monitor", 2048, nullptr, 1, nullptr);
+#else
+  xTaskCreatePinnedToCore(powerButtonMonitorTask, "pwr_monitor", 2048, nullptr, 1, nullptr, 0);
+#endif
   powerManager.begin();
   halTiltSensor.begin();
   halClock.begin();
@@ -652,21 +676,7 @@ void loop() {
     if (gpio.isPressed(HalGPIO::BTN_DOWN)) {
       return;
     }
-    // additional protection: force reset if in a soft-locked condition
-    const unsigned long startWait = millis();
-    delay(50);
-    if (gpio.isPressed(HalGPIO::BTN_POWER)) {
-      GUI.drawPopup(renderer, "Keep Holding to Reset");
-      while (gpio.isPressed(HalGPIO::BTN_POWER)) {
-        if (millis() - startWait >= 10000) {
-          LOG_ERR("PWR", "Power button held for 10s during sleep prep. Forcing reset.");
-          esp_restart();
-        }
-        delay(50);
-        gpio.update();
-      }
-    }
-    // if it doesn't reset, go ahead with deep sleep
+    // go ahead with deep sleep
     enterDeepSleep();
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start
     return;
