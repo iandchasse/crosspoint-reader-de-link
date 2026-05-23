@@ -5,6 +5,8 @@ description: how to switch between s3-port work and upstream PR work
 # Branch + Submodule Workflow
 
 This repo has two parallel tracks that each need a different `open-x4-sdk` commit.
+The branch `s3-port` is the default branch of this fork, and the `upstream-og` branch tracks the upstream master branch (`crosspoint-reader/crosspoint-reader` at `master`).
+
 The `.git/hooks/post-checkout` hook handles switching automatically.
 
 ---
