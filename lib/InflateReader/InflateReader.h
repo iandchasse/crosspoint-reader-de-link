@@ -25,7 +25,7 @@ enum class InflateStatus {
 //
 //     struct MyCtx {
 //       InflateReader reader;   // must be first
-//       EspFsFile* file;
+//       HalFile* file;
 //       // ...
 //     };
 //     static int myCb(struct uzlib_uncomp* u) {

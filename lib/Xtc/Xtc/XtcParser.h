@@ -84,7 +84,7 @@ class XtcParser {
   XtcError getLastError() const { return m_lastError; }
 
  private:
-  EspFsFile m_file;
+HalFile m_file;
   std::string m_filepath;
   bool m_isOpen;
   XtcHeader m_header;

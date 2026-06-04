@@ -13,7 +13,7 @@ class WebDAVHandler : public RequestHandler {
 
  private:
   // PUT streaming state (raw() is called in chunks)
-  EspFsFile _putFile;
+HalFile _putFile;
   String _putPath;
   bool _putOk = false;
   bool _putExisted = false;

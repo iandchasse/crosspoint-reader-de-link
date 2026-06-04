@@ -50,10 +50,10 @@ class BookMetadataCache {
   bool loaded;
   bool buildMode;
 
-  EspFsFile bookFile;
+HalFile bookFile;
   // Temp file handles during build
-  EspFsFile spineFile;
-  EspFsFile tocFile;
+  HalFile spineFile;
+  HalFile tocFile;
 
   // Index for fast href→spineIndex lookup (used only for large EPUBs)
   struct SpineHrefIndexEntry {
@@ -76,10 +76,10 @@ class BookMetadataCache {
     return hash;
   }
 
-  uint32_t writeSpineEntry(EspFsFile& file, const SpineEntry& entry) const;
-  uint32_t writeTocEntry(EspFsFile& file, const TocEntry& entry) const;
-  SpineEntry readSpineEntry(EspFsFile& file) const;
-  TocEntry readTocEntry(EspFsFile& file) const;
+uint32_t writeSpineEntry(HalFile& file, const SpineEntry& entry) const;
+  uint32_t writeTocEntry(HalFile& file, const TocEntry& entry) const;
+  SpineEntry readSpineEntry(HalFile& file) const;
+  TocEntry readTocEntry(HalFile& file) const;
 
  public:
   BookMetadata coreMetadata;

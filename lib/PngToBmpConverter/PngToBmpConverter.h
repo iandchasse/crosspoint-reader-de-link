@@ -1,14 +1,14 @@
-﻿#pragma once
+#pragma once
+#include <HalStorage.h>
 
-class EspFsFile;
 class Print;
 
 class PngToBmpConverter {
-  static bool pngFileToBmpStreamInternal(EspFsFile& pngFile, Print& bmpOut, int targetWidth, int targetHeight, bool oneBit,
-                                         bool crop = true);
+static bool pngFileToBmpStreamInternal(HalFile& pngFile, Print& bmpOut, int targetWidth, int targetHeight,
+                                         bool oneBit, bool crop = true);
 
  public:
-  static bool pngFileToBmpStream(EspFsFile& pngFile, Print& bmpOut, bool crop = true);
-  static bool pngFileToBmpStreamWithSize(EspFsFile& pngFile, Print& bmpOut, int targetMaxWidth, int targetMaxHeight);
-  static bool pngFileTo1BitBmpStreamWithSize(EspFsFile& pngFile, Print& bmpOut, int targetMaxWidth, int targetMaxHeight);
+  static bool pngFileToBmpStream(HalFile& pngFile, Print& bmpOut, bool crop = true);
+  static bool pngFileToBmpStreamWithSize(HalFile& pngFile, Print& bmpOut, int targetMaxWidth, int targetMaxHeight);
+  static bool pngFileTo1BitBmpStreamWithSize(HalFile& pngFile, Print& bmpOut, int targetMaxWidth, int targetMaxHeight);
 };

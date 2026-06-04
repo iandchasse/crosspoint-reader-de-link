@@ -54,6 +54,12 @@ class HalDisplay {
 
   void displayGrayBuffer(bool turnOffScreen = false);
 
+  // Tiled grayscale: stream one band of a plane (lsbPlane selects LSB/MSB RAM)
+  // straight to the controller; supportsStripGrayscale() gates the path. See
+  // EInkDisplay::writeGrayscalePlaneStrip.
+  void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows);
+  bool supportsStripGrayscale() const;
+
   // Runtime geometry passthrough
   inline uint16_t getDisplayWidth() const { return DISPLAY_WIDTH; }
   inline uint16_t getDisplayHeight() const { return DISPLAY_HEIGHT; }
@@ -63,3 +69,6 @@ class HalDisplay {
  private:
   EInkDisplay einkDisplay;
 };
+
+extern HalDisplay display;
+

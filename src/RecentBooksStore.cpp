@@ -148,7 +148,7 @@ bool RecentBooksStore::loadFromFile() {
 }
 
 bool RecentBooksStore::loadFromBinaryFile() {
-  EspFsFile inputFile;
+HalFile inputFile;
   if (!Storage.openFileForRead("RBS", RECENT_BOOKS_FILE_BIN, inputFile)) {
     return false;
   }

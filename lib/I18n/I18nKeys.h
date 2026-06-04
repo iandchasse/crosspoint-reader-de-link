@@ -50,6 +50,10 @@ extern const char STRINGS_LT_DATA[];
 extern const uint16_t OFFSETS_LT[];
 extern const char STRINGS_SI_DATA[];
 extern const uint16_t OFFSETS_SI[];
+extern const char STRINGS_CAV_DATA[];
+extern const uint16_t OFFSETS_CAV[];
+extern const char STRINGS_HE_DATA[];
+extern const uint16_t OFFSETS_HE[];
 }  // namespace i18n_strings
 
 // Language enum
@@ -76,6 +80,8 @@ enum class Language : uint8_t {
   HU = 19,
   LT = 20,
   SI = 21,
+  CAV = 22,
+  HE = 23,
   _COUNT
 };
 
@@ -167,6 +173,9 @@ enum class StrId : uint16_t {
   STR_LONG_PRESS_BEHAVIOR_OFF,
   STR_LONG_PRESS_BEHAVIOR_SKIP,
   STR_LONG_PRESS_BEHAVIOR_ORIENTATION,
+  STR_LONG_PRESS_CONFIRM_BEHAVIOR,
+  STR_LONG_PRESS_CONFIRM_FRONTLIGHT,
+  STR_LONG_PRESS_CONFIRM_BOOKMARK,
   STR_SET_SLEEP_COVER,
   STR_FONT_FAMILY,
   STR_FONT_SIZE,
@@ -232,9 +241,9 @@ enum class StrId : uint16_t {
   STR_LANDSCAPE_CCW,
   STR_PREV_NEXT,
   STR_NEXT_PREV,
+  STR_DISABLED,
   STR_NOTO_SERIF,
   STR_NOTO_SANS,
-  STR_OPEN_DYSLEXIC,
   STR_SMALL,
   STR_MEDIUM,
   STR_LARGE,
@@ -246,12 +255,6 @@ enum class StrId : uint16_t {
   STR_ALIGN_LEFT,
   STR_CENTER,
   STR_ALIGN_RIGHT,
-  STR_MIN_1,
-  STR_MIN_3,
-  STR_MIN_5,
-  STR_MIN_10,
-  STR_MIN_15,
-  STR_MIN_30,
   STR_PAGES_1,
   STR_PAGES_5,
   STR_PAGES_10,
@@ -273,6 +276,8 @@ enum class StrId : uint16_t {
   STR_DOWNLOAD_FAILED,
   STR_ERROR_MSG,
   STR_UNNAMED,
+  STR_HOLD_CONFIRM_TO_DELETE,
+  STR_BOOKMARK_INSTRUCTIONS,
   STR_NO_SERVER_URL,
   STR_FETCH_FEED_FAILED,
   STR_PARSE_FEED_FAILED,
@@ -350,6 +355,8 @@ enum class StrId : uint16_t {
   STR_THEME_LYRA_EXTENDED,
   STR_SUNLIGHT_FADING_FIX,
   STR_REMAP_FRONT_BUTTONS,
+  STR_BOOKMARKS,
+  STR_BOOKMARK_ADDED,
   STR_OPDS_BROWSER,
   STR_SEARCH,
   STR_COVER_CUSTOM,
@@ -379,6 +386,7 @@ enum class StrId : uint16_t {
   STR_SYNC_PROGRESS,
   STR_DELETE_CACHE,
   STR_DELETE,
+  STR_CONFIRM_DELETE_BOOKMARK,
   STR_DISPLAY_QR,
   STR_CHAPTER_PREFIX,
   STR_PAGES_SEPARATOR,
@@ -411,7 +419,6 @@ enum class StrId : uint16_t {
   STR_EMBEDDED_STYLE,
   STR_FOCUS_READING,
   STR_OPDS_SERVER_URL,
-  STR_SCREENSHOT_BUTTON,
   STR_HYBRID,
   STR_USE_CLOCK,
   STR_CLOCK_SETTINGS,
@@ -449,6 +456,10 @@ enum class StrId : uint16_t {
   STR_FOOTNOTES,
   STR_NO_FOOTNOTES,
   STR_LINK,
+  STR_SCREENSHOT_BUTTON,
+  STR_SLEEP_TIMER_VALUE_FORMAT,
+  STR_SLEEP_NEVER,
+  STR_SLEEP_TIMER_STEP_HINT,
   STR_ADD_SERVER,
   STR_SERVER_NAME,
   STR_NO_SERVERS,
@@ -556,6 +567,10 @@ inline LangStrings getLanguageStrings(Language lang) {
       return {i18n_strings::STRINGS_LT_DATA, i18n_strings::OFFSETS_LT};
     case Language::SI:
       return {i18n_strings::STRINGS_SI_DATA, i18n_strings::OFFSETS_SI};
+    case Language::CAV:
+      return {i18n_strings::STRINGS_CAV_DATA, i18n_strings::OFFSETS_CAV};
+    case Language::HE:
+      return {i18n_strings::STRINGS_HE_DATA, i18n_strings::OFFSETS_HE};
     default:
       return {i18n_strings::STRINGS_EN_DATA, i18n_strings::OFFSETS_EN};
   }
@@ -568,26 +583,28 @@ constexpr uint8_t getLanguageCount() { return static_cast<uint8_t>(Language::_CO
 //    0: EN   English
 //    1: BE   Беларуская
 //    2: CA   Català
-//    3: CS   Čeština
-//    4: DA   Dansk
-//    5: DE   Deutsch
-//    6: ES   Español
-//    7: FI   Suomi
-//    8: FR   Français
-//    9: HU   Magyar
-//   10: IT   Italiano
-//   11: KK   Қазақша
-//   12: LT   Lietuvių
-//   13: NL   Nederlands
-//   14: PL   Polski
-//   15: PT   Português (Brasil)
-//   16: RO   Română
-//   17: RU   Русский
-//   18: SI   Slovenščina
-//   19: SV   Svenska
-//   20: TR   Türkçe
-//   21: UK   Українська
-constexpr uint8_t SORTED_LANGUAGE_INDICES[] = {0, 11, 9, 4, 15, 3, 1, 14, 2, 19, 12, 18, 20, 16, 13, 5, 8, 6, 21, 7, 17, 10};
+//    3: CAV  Valencià
+//    4: CS   Čeština
+//    5: DA   Dansk
+//    6: DE   Deutsch
+//    7: ES   Español
+//    8: FI   Suomi
+//    9: FR   Français
+//   10: HE   עברית
+//   11: HU   Magyar
+//   12: IT   Italiano
+//   13: KK   Қазақша
+//   14: LT   Lietuvių
+//   15: NL   Nederlands
+//   16: PL   Polski
+//   17: PT   Português (Brasil)
+//   18: RO   Română
+//   19: RU   Русский
+//   20: SI   Slovenščina
+//   21: SV   Svenska
+//   22: TR   Türkçe
+//   23: UK   Українська
+constexpr uint8_t SORTED_LANGUAGE_INDICES[] = {0, 11, 9, 22, 4, 15, 3, 1, 14, 2, 23, 19, 12, 18, 20, 16, 13, 5, 8, 6, 21, 7, 17, 10};
 
 static_assert(sizeof(SORTED_LANGUAGE_INDICES) / sizeof(SORTED_LANGUAGE_INDICES[0]) == getLanguageCount(),
               "SORTED_LANGUAGE_INDICES size mismatch");
