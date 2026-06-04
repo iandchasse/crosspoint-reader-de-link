@@ -21,7 +21,7 @@ bool Txt::load() {
     return false;
   }
 
-  EspFsFile file;
+HalFile file;
   if (!Storage.openFileForRead("TXT", filepath, file)) {
     LOG_ERR("TXT", "Failed to open file: %s", filepath.c_str());
     return false;
@@ -115,7 +115,7 @@ bool Txt::generateCoverBmp() const {
   if (FsHelpers::hasBmpExtension(coverImagePath)) {
     // Copy BMP file to cache
     LOG_DBG("TXT", "Copying BMP cover image to cache");
-    EspFsFile src, dst;
+HalFile src, dst;
     if (!Storage.openFileForRead("TXT", coverImagePath, src)) {
       return false;
     }
@@ -132,7 +132,7 @@ bool Txt::generateCoverBmp() const {
   } else if (FsHelpers::hasJpgExtension(coverImagePath)) {
     // Convert JPG/JPEG to BMP (same approach as Epub)
     LOG_DBG("TXT", "Generating BMP from JPG cover image");
-    EspFsFile coverJpg, coverBmp;
+HalFile coverJpg, coverBmp;
     if (!Storage.openFileForRead("TXT", coverImagePath, coverJpg)) {
       return false;
     }
@@ -175,7 +175,7 @@ bool Txt::readContent(uint8_t* buffer, size_t offset, size_t length) const {
     return false;
   }
 
-  EspFsFile file;
+HalFile file;
   if (!Storage.openFileForRead("TXT", filepath, file)) {
     return false;
   }
