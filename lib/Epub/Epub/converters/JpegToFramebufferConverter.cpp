@@ -1,4 +1,4 @@
-﻿#include "JpegToFramebufferConverter.h"
+#include "JpegToFramebufferConverter.h"
 
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
@@ -19,7 +19,7 @@ namespace {
 
 // Context struct passed through JPEGDEC callbacks to avoid global mutable state.
 // The draw callback receives this via pDraw->pUser (set by setUserPointer()).
-// The file I/O callbacks receive the HalFile* via pFile->fHandle (set by jpegOpen()).
+// The file I/O callbacks receive the FsFile* via pFile->fHandle (set by jpegOpen()).
 struct JpegContext {
   GfxRenderer* renderer{nullptr};
   const RenderConfig* config{nullptr};
@@ -61,7 +61,7 @@ void* jpegOpen(const char* filename, int32_t* size) {
 }
 
 void jpegClose(void* handle) {
-HalFile* f = reinterpret_cast<HalFile*>(handle);
+  HalFile* f = reinterpret_cast<HalFile*>(handle);
   if (f) {
     f->close();
     delete f;
@@ -73,7 +73,7 @@ HalFile* f = reinterpret_cast<HalFile*>(handle);
 // MUST maintain iPos to match the actual file position, otherwise progressive
 // JPEGs with large headers fail during parsing.
 int32_t jpegRead(JPEGFILE* pFile, uint8_t* pBuf, int32_t len) {
-HalFile* f = reinterpret_cast<HalFile*>(pFile->fHandle);
+  HalFile* f = reinterpret_cast<HalFile*>(pFile->fHandle);
   if (!f) return 0;
   int32_t bytesRead = f->read(pBuf, len);
   if (bytesRead < 0) return 0;
@@ -82,7 +82,7 @@ HalFile* f = reinterpret_cast<HalFile*>(pFile->fHandle);
 }
 
 int32_t jpegSeek(JPEGFILE* pFile, int32_t pos) {
-HalFile* f = reinterpret_cast<HalFile*>(pFile->fHandle);
+  HalFile* f = reinterpret_cast<HalFile*>(pFile->fHandle);
   if (!f) return -1;
   if (!f->seek(pos)) return -1;
   pFile->iPos = pos;
@@ -119,6 +119,12 @@ constexpr int32_t FP_ONE = 1 << FP_SHIFT;
 constexpr int32_t FP_MASK = FP_ONE - 1;
 
 int jpegDrawCallback(JPEGDRAW* pDraw) {
+  static unsigned long lastYield = 0;
+  if (millis() - lastYield > 100) {
+    delay(1);
+    lastYield = millis();
+  }
+
   JpegContext* ctx = reinterpret_cast<JpegContext*>(pDraw->pUser);
   if (!ctx || !ctx->config || !ctx->renderer) return 0;
 
@@ -132,7 +138,7 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
   if (stride <= 0 || blockH <= 0 || validW <= 0) return 1;
 
   const bool useDithering = ctx->config->useDithering;
-  bool caching = ctx->caching;
+  const bool caching = ctx->caching;
   const int32_t fineScaleFPX = ctx->fineScaleFPX;
   const int32_t invScaleFPX = ctx->invScaleFPX;
   const int32_t fineScaleFPY = ctx->fineScaleFPY;
@@ -169,21 +175,9 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
   DirectPixelWriter pw;
   pw.init(renderer);
 
-  // The cache streams to disk one MCU-row band at a time. Flushing rows below
-  // this block (raster order guarantees they are final) repositions the band;
-  // cacheOriginY then maps screen rows to the band-local buffer rows. If a flush
-  // write fails, stop caching for the rest of this decode (and let finalize drop
-  // the partial file) rather than writing past the band buffer.
   DirectCacheWriter cw;
-  int cacheOriginY = 0;
   if (caching) {
-    if (!ctx->cache.advanceTo(dstYStart)) {
-      caching = false;
-      ctx->caching = false;
-    } else {
-      cw.init(ctx->cache.buffer, ctx->cache.bytesPerRow, ctx->cache.bandRows, ctx->cache.originX);
-      cacheOriginY = ctx->config->y + ctx->cache.bandStart;
-    }
+    cw.init(ctx->cache.buffer, ctx->cache.bytesPerRow, ctx->cache.originX);
   }
 
   // === 1:1 fast path: no scaling math ===
@@ -191,7 +185,7 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
     for (int dstY = dstYStart; dstY < dstYEnd; dstY++) {
       const int outY = cfgY + dstY;
       pw.beginRow(outY);
-      if (caching) cw.beginRow(outY, cacheOriginY);
+      if (caching) cw.beginRow(outY, ctx->config->y);
       const uint8_t* row = &pixels[(dstY - blockY) * stride];
       for (int dstX = dstXStart; dstX < dstXEnd; dstX++) {
         const int outX = cfgX + dstX;
@@ -225,7 +219,7 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
     for (int dstY = dstYStart; dstY < dstYEnd; dstY++) {
       const int outY = cfgY + dstY;
       pw.beginRow(outY);
-      if (caching) cw.beginRow(outY, cacheOriginY);
+      if (caching) cw.beginRow(outY, ctx->config->y);
       const int32_t srcFyFP = dstY * invScaleFPY;
       const int32_t fy = srcFyFP & FP_MASK;
       const int32_t fyInv = FP_ONE - fy;
@@ -322,7 +316,7 @@ int jpegDrawCallback(JPEGDRAW* pDraw) {
   for (int dstY = dstYStart; dstY < dstYEnd; dstY++) {
     const int outY = cfgY + dstY;
     pw.beginRow(outY);
-    if (caching) cw.beginRow(outY, cacheOriginY);
+    if (caching) cw.beginRow(outY, ctx->config->y);
     const int32_t srcFyFP = dstY * invScaleFPY;
     int ly = (srcFyFP >> FP_SHIFT) - blockY;
     if (ly < 0) ly = 0;
@@ -481,14 +475,11 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
   jpeg->setPixelType(EIGHT_BIT_GRAYSCALE);
   jpeg->setUserPointer(&ctx);
 
-  // Start streaming the pixel cache to disk. The band only needs to hold the
-  // tallest single decode block: a JPEGDEC MCU cell is at most 16 scaled-source
-  // rows tall, which our fine scale maps to this many output rows.
+  // Allocate cache buffer using final output dimensions
   ctx.caching = !config.cachePath.empty();
   if (ctx.caching) {
-    const int maxBlockDstRows = (int)(((int64_t)16 * ctx.fineScaleFPY) >> FP_SHIFT) + 2;
-    if (!ctx.cache.begin(config.cachePath, destWidth, destHeight, config.x, config.y, maxBlockDstRows)) {
-      LOG_ERR("JPG", "Failed to start cache stream, continuing without caching");
+    if (!ctx.cache.allocate(destWidth, destHeight, config.x, config.y)) {
+      LOG_ERR("JPG", "Failed to allocate cache buffer, continuing without caching");
       ctx.caching = false;
     }
   }
@@ -499,16 +490,14 @@ bool JpegToFramebufferConverter::decodeToFramebuffer(const std::string& imagePat
 
   if (rc != 1) {
     LOG_ERR("JPG", "Decode failed (rc=%d, lastError=%d)", rc, jpeg->getLastError());
-    if (ctx.caching) ctx.cache.abort();
     return false;
   }
 
   LOG_DBG("JPG", "JPEG decoding complete - render time: %lu ms", decodeTime);
 
-  // Finalize the streamed cache file. Note: a flush failure mid-decode clears
-  // ctx.caching (the partial file is dropped), so re-read the flag here.
+  // Write cache file if caching was enabled
   if (ctx.caching) {
-    ctx.cache.finalize();
+    ctx.cache.writeToFile(config.cachePath);
   }
 
   return true;
