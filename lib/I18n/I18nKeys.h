@@ -510,6 +510,7 @@ enum class StrId : uint16_t {
   STR_FIRMWARE_UPDATE_DO_NOT_POWER_OFF,
   STR_RECOVERY_MODE,
   STR_RECOVERY_MODE_HINT,
+  STR_USB_MASS_STORAGE,
   // Sentinel - must be last
   _COUNT
 };

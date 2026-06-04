@@ -18,11 +18,13 @@
 #include <SPI.h>
 #include <WiFi.h>
 #include <builtinFonts/all.h>
-
 #include <cstring>
+#include "UsbMscMode.h"
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "SilentRestart.h"
+
 #ifdef FRONTLIGHT_PRESENT
 #include "FrontlightGlobal.h"
 #endif
@@ -129,6 +131,8 @@ RTC_NOINIT_ATTR uint32_t silentRebootTarget;
 constexpr uint32_t SILENT_REBOOT_MAGIC = 0xC1EAB007;
 constexpr uint32_t SILENT_REBOOT_TARGET_HOME = 0;
 constexpr uint32_t SILENT_REBOOT_TARGET_READER = 1;
+
+RTC_NOINIT_ATTR uint32_t usbMscBootFlag;
 
 // How the device is coming back to life, resolved once at boot. Both resume
 // flows suppress the splash and leave the panel holding its pre-boot frame; a
@@ -343,6 +347,12 @@ static void powerButtonMonitorTask(void* pvParameters) {
 
 void setup() {
   t1 = millis();
+
+  if (usbMscBootFlag == USB_MSC_BOOT_MAGIC) {
+    runUsbMscMode();
+  } else {
+    forceUsbSerialJtag();
+  }
 
 #ifdef ENABLE_SERIAL_LOG
   // Earliest possible Serial setup. The 250 ms stall before begin() lets the

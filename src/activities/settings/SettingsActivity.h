@@ -27,6 +27,7 @@ enum class SettingAction {
   DetectTimezone,
   SyncTime,
   DownloadFonts,
+  USBMSCMode,
 };
 
 struct SettingInfo {
