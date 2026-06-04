@@ -155,6 +155,13 @@ class CrossPointSettings {
     LONG_PRESS_BUTTON_BEHAVIOR_COUNT
   };
 
+  // Confirm button long press behavior
+  enum LONG_PRESS_CONFIRM_BEHAVIOR {
+    LONG_PRESS_CONFIRM_FRONTLIGHT = 0,
+    LONG_PRESS_CONFIRM_BOOKMARK = 1,
+    LONG_PRESS_CONFIRM_BEHAVIOR_COUNT
+  };
+
   // UI Theme
   enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2, ROUNDEDRAFF = 3 };
 
@@ -262,6 +269,8 @@ class CrossPointSettings {
   uint8_t hideBatteryPercentage = HIDE_NEVER;
   // Long-press page turn button behavior
   uint8_t longPressButtonBehavior = OFF;
+  // Long-press confirm button behavior (frontlight settings or bookmark)
+  uint8_t longPressConfirmBehavior = LONG_PRESS_CONFIRM_FRONTLIGHT;
   // Disable page-turn on left side button combo (BTN_UP_2/BTN_DOWN_2)
   uint8_t disableSidePageTurn = 0;
   // UI Theme

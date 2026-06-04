@@ -260,13 +260,27 @@ void EpubReaderActivity::loop() {
   }
 
 #ifdef FRONTLIGHT_PRESENT
-  // Long press CONFIRM (1s+) opens frontlight control
-  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
-    startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
-                           [this](const ActivityResult& result) {
-                             // After returning from frontlight control, request screen update
-                           });
-    return;
+  if (SETTINGS.longPressConfirmBehavior == CrossPointSettings::LONG_PRESS_CONFIRM_FRONTLIGHT) {
+    // Long press CONFIRM (1s+) opens frontlight control
+    if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+      startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
+                             [this](const ActivityResult& result) {
+                               // After returning from frontlight control, request screen update
+                             });
+      return;
+    }
+  } else {
+    // Behavior is BOOKMARK: long press CONFIRM (400ms+) triggers bookmarking immediately while holding
+    if (mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
+        mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS) {
+      if (!showBookmarkMessage) {
+        addBookmark();
+        showBookmarkMessage = true;
+        ignoreNextConfirmRelease = true;  // Prevent accidental menu open after adding bookmark
+        bookmarkMessageTime = millis();
+        requestUpdate();
+      }
+    }
   }
 #else
   // Without frontlight, long press CONFIRM (400ms+) triggers bookmarking immediately while holding
@@ -282,19 +296,43 @@ void EpubReaderActivity::loop() {
   }
 #endif
 
-  // Enter reader menu activity or trigger bookmark on release (if FRONTLIGHT_PRESENT)
+  // Enter reader menu activity or trigger bookmark on release (if FRONTLIGHT_PRESENT and behavior is FRONTLIGHT)
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (ignoreNextConfirmRelease) {
       ignoreNextConfirmRelease = false;
     } else {
 #ifdef FRONTLIGHT_PRESENT
-      // If frontlight is present, bookmarking triggers on release if held between 400ms and 1s
-      if (mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
-        addBookmark();
-        showBookmarkMessage = true;
-        bookmarkMessageTime = millis();
-        requestUpdate();
-      } else if (mappedInput.getHeldTime() < ReaderUtils::BOOKMARK_HOLD_MS) {
+      if (SETTINGS.longPressConfirmBehavior == CrossPointSettings::LONG_PRESS_CONFIRM_FRONTLIGHT) {
+        // If behavior is frontlight, bookmarking triggers on release if held between 400ms and 1s
+        if (mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
+          addBookmark();
+          showBookmarkMessage = true;
+          bookmarkMessageTime = millis();
+          requestUpdate();
+        } else if (mappedInput.getHeldTime() < ReaderUtils::BOOKMARK_HOLD_MS) {
+          const int currentPage = section ? section->currentPage + 1 : 0;
+          const int totalPages = section ? section->pageCount : 0;
+          float bookProgress = 0.0f;
+          if (epub->getBookSize() > 0 && section && section->pageCount > 0) {
+            const float chapterProgress = static_cast<float>(section->currentPage) / static_cast<float>(section->pageCount);
+            bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
+          }
+          const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
+          startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
+                                     renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
+                                     SETTINGS.orientation, !currentPageFootnotes.empty()),
+                                 [this](const ActivityResult& result) {
+                                   // Always apply orientation change even if the menu was cancelled
+                                   const auto& menu = std::get<MenuResult>(result.data);
+                                   applyOrientation(menu.orientation);
+                                   toggleAutoPageTurn(menu.pageTurnOption);
+                                   if (!result.isCancelled) {
+                                     onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
+                                   }
+                                 });
+        }
+      } else {
+        // Behavior is BOOKMARK: any non-ignored release triggers menu activity (since bookmark triggers on press)
         const int currentPage = section ? section->currentPage + 1 : 0;
         const int totalPages = section ? section->pageCount : 0;
         float bookProgress = 0.0f;

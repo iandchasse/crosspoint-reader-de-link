@@ -190,6 +190,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
                            StrId::STR_LONG_PRESS_BEHAVIOR_ORIENTATION},
                           "longPressButtonBehavior", StrId::STR_CAT_CONTROLS),
+#ifdef FRONTLIGHT_PRESENT
+        SettingInfo::Enum(StrId::STR_LONG_PRESS_CONFIRM_BEHAVIOR, &CrossPointSettings::longPressConfirmBehavior,
+                          {StrId::STR_LONG_PRESS_CONFIRM_FRONTLIGHT, StrId::STR_LONG_PRESS_CONFIRM_BOOKMARK},
+                          "longPressConfirmBehavior", StrId::STR_CAT_CONTROLS),
+#endif
         SettingInfo::Toggle(StrId::STR_DISABLE_SIDE_PAGE_TURN, &CrossPointSettings::disableSidePageTurn,
                             "disableSidePageTurn", StrId::STR_CAT_CONTROLS),
         SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,

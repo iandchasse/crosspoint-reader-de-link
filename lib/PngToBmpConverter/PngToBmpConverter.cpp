@@ -1,5 +1,6 @@
-﻿#include "PngToBmpConverter.h"
+#include "PngToBmpConverter.h"
 
+#include <HalDisplay.h>
 #include <HalStorage.h>
 #include <InflateReader.h>
 #include <Logging.h>

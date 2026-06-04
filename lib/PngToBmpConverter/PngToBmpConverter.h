@@ -1,6 +1,6 @@
-﻿#pragma once
+#pragma once
+#include <HalStorage.h>
 
-class EspFsFile;
 class Print;
 
 class PngToBmpConverter {

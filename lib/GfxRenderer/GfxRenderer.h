@@ -44,14 +44,15 @@ class GfxRenderer {
                 "BW buffer chunking does not line up with display buffer size");
 
   HalDisplay& display;
-  static constexpr uint16_t panelWidth = HalDisplay::DISPLAY_WIDTH;
-  static constexpr uint16_t panelHeight = HalDisplay::DISPLAY_HEIGHT;
-  static constexpr uint16_t panelWidthBytes = HalDisplay::DISPLAY_WIDTH_BYTES;
   RenderMode renderMode;
   Orientation orientation;
   bool fadingFix;
   uint8_t* frameBuffer = nullptr;
-  uint8_t* bwBufferChunks[BW_BUFFER_NUM_CHUNKS] = {nullptr};
+  uint16_t panelWidth = HalDisplay::DISPLAY_WIDTH;
+  uint16_t panelHeight = HalDisplay::DISPLAY_HEIGHT;
+  uint16_t panelWidthBytes = HalDisplay::DISPLAY_WIDTH_BYTES;
+  uint32_t frameBufferSize = HalDisplay::BUFFER_SIZE;
+  std::vector<uint8_t*> bwBufferChunks;
   std::map<int, EpdFontFamily> fontMap;
   // Mutable because ensureSdCardFontReady() is const (called from layout code
   // that holds a const GfxRenderer&) but triggers SD card reads and heap
