@@ -19,7 +19,7 @@ namespace {
 
 // Context struct passed through JPEGDEC callbacks to avoid global mutable state.
 // The draw callback receives this via pDraw->pUser (set by setUserPointer()).
-// The file I/O callbacks receive the FsFile* via pFile->fHandle (set by jpegOpen()).
+// The file I/O callbacks receive the HalFile* via pFile->fHandle (set by jpegOpen()).
 struct JpegContext {
   GfxRenderer* renderer{nullptr};
   const RenderConfig* config{nullptr};

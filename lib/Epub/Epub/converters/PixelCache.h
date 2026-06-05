@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <HalStorage.h>
 #include <Logging.h>
