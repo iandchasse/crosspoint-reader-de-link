@@ -1101,7 +1101,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
     // text there ghosts gray (#2190). Force the next ordinary page onto the
     // HALF ghost-cleanup path, which drives every pixel to its target
     // regardless of residue.
-    pagesUntilFullRefresh = 1;
+    APP_STATE.pagesUntilFullRefresh = 1;
   } else {
     ReaderUtils::displayWithRefreshCycle(renderer, APP_STATE.pagesUntilFullRefresh, ReaderUtils::wasRecentSleep());
   }
