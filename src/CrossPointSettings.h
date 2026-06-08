@@ -135,7 +135,19 @@ class CrossPointSettings {
   };
 
   // Short power button press actions
-  enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, TOGGLE_FRONTLIGHT = 3, FORCE_REFRESH = 4, SHORT_PWRBTN_COUNT };
+  // NOTE: these values are persisted in settings, so existing entries must keep
+  // their numbers. Upstream (#1658) uses FORCE_REFRESH=3, FOOTNOTES=4, but this
+  // port already ships TOGGLE_FRONTLIGHT=3 / FORCE_REFRESH=4, so FOOTNOTES is
+  // appended as 5 rather than renumbering and silently changing users' setting.
+  enum SHORT_PWRBTN {
+    IGNORE = 0,
+    SLEEP = 1,
+    PAGE_TURN = 2,
+    TOGGLE_FRONTLIGHT = 3,
+    FORCE_REFRESH = 4,
+    FOOTNOTES = 5,
+    SHORT_PWRBTN_COUNT
+  };
 
   // Hide battery percentage
   enum HIDE_BATTERY_PERCENTAGE {
@@ -277,6 +289,8 @@ class CrossPointSettings {
   uint8_t uiTheme = LYRA;
   // Sunlight fading compensation
   uint8_t fadingFix = 0;
+  // Power button return from footnotes (1 = enabled, 0 = disabled)
+  uint8_t pwrBtnFootnoteBack = 1;
   // Use book's embedded CSS styles for EPUB rendering (1 = enabled, 0 = disabled)
   uint8_t embeddedStyle = 1;
   // Focus Reading - emphasizes the first part of words with bold

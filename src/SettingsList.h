@@ -197,13 +197,20 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
 #endif
         SettingInfo::Toggle(StrId::STR_DISABLE_SIDE_PAGE_TURN, &CrossPointSettings::disableSidePageTurn,
                             "disableSidePageTurn", StrId::STR_CAT_CONTROLS),
+        // Option order must match the SHORT_PWRBTN enum, where FOOTNOTES is 5
+        // (appended after this port's TOGGLE_FRONTLIGHT=3 / FORCE_REFRESH=4).
         SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
 #ifdef FRONTLIGHT_PRESENT
-                          {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_TOGGLE_FRONTLIGHT, StrId::STR_FORCE_REFRESH},
+                          {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_TOGGLE_FRONTLIGHT,
+                           StrId::STR_FORCE_REFRESH, StrId::STR_FOOTNOTES},
 #else
-                          {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH},
+                          {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH,
+                           StrId::STR_FOOTNOTES},
 #endif
                           "shortPwrBtn", StrId::STR_CAT_CONTROLS),
+        SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &CrossPointSettings::pwrBtnFootnoteBack,
+                            "pwrBtnFootnoteBack", StrId::STR_CAT_CONTROLS),
+
 
         // --- System ---
         SettingInfo::Value(
