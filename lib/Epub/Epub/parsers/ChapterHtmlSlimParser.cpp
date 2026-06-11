@@ -758,7 +758,7 @@ HalFile cachedImageFile;
       entry.depth = self->depth;
       entry.hasUnderline = true;
       entry.underline = true;
-      ChapterHtmlSlimParser::applyDirectionToEntry(entry, cssStyle);
+      applyDirectionToEntry(entry, cssStyle);
       self->inlineStyleStack.push_back(entry);
       self->updateEffectiveInlineStyle();
 
@@ -843,7 +843,7 @@ HalFile cachedImageFile;
       entry.hasItalic = true;
       entry.italic = cssStyle.fontStyle == CssFontStyle::Italic;
     }
-    ChapterHtmlSlimParser::applyDirectionToEntry(entry, cssStyle);
+    applyDirectionToEntry(entry, cssStyle);
     self->inlineStyleStack.push_back(entry);
     self->updateEffectiveInlineStyle();
   } else if (matches(name, BOLD_TAGS, std::size(BOLD_TAGS))) {
@@ -866,7 +866,7 @@ HalFile cachedImageFile;
       entry.hasUnderline = true;
       entry.underline = cssStyle.textDecoration == CssTextDecoration::Underline;
     }
-    ChapterHtmlSlimParser::applyDirectionToEntry(entry, cssStyle);
+    applyDirectionToEntry(entry, cssStyle);
     self->inlineStyleStack.push_back(entry);
     self->updateEffectiveInlineStyle();
   } else if (matches(name, ITALIC_TAGS, std::size(ITALIC_TAGS))) {
@@ -889,7 +889,7 @@ HalFile cachedImageFile;
       entry.hasUnderline = true;
       entry.underline = cssStyle.textDecoration == CssTextDecoration::Underline;
     }
-    ChapterHtmlSlimParser::applyDirectionToEntry(entry, cssStyle);
+    applyDirectionToEntry(entry, cssStyle);
     self->inlineStyleStack.push_back(entry);
     self->updateEffectiveInlineStyle();
   } else if (strcmp(name, "sup") == 0 || strcmp(name, "sub") == 0) {
@@ -931,7 +931,7 @@ HalFile cachedImageFile;
         entry.hasUnderline = true;
         entry.underline = cssStyle.textDecoration == CssTextDecoration::Underline;
       }
-      ChapterHtmlSlimParser::applyDirectionToEntry(entry, cssStyle);
+      applyDirectionToEntry(entry, cssStyle);
       if (cssStyle.hasVerticalAlign()) {
         if (cssStyle.verticalAlign == CssVerticalAlign::Super) {
           entry.hasSup = true;
