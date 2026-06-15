@@ -1,5 +1,7 @@
 #include "MappedInputManager.h"
 
+#include <GfxRenderer.h>
+
 #include "CrossPointSettings.h"
 
 namespace {
@@ -16,6 +18,15 @@ constexpr SideLayoutMap kSideLayouts[] = {
     {HalGPIO::BTN_DOWN, HalGPIO::BTN_UP},
 };
 }  // namespace
+
+bool MappedInputManager::isNavDirectionSwapped() const {
+  // Key the swap on the orientation the screen is *actually* rendered at, not the persisted reader
+  // setting. The reader (and its modal menus) render rotated, so navigation/labels flip there; the
+  // home and settings UI render in portrait, so they never flip even when a rotated reader is configured.
+  const auto orientation = renderer.getOrientation();
+  return SETTINGS.frontButtonFollowOrientation &&
+         (orientation == GfxRenderer::PortraitInverted || orientation == GfxRenderer::LandscapeCounterClockwise);
+}
 
 bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint8_t) const) const {
   const auto sideLayout = static_cast<CrossPointSettings::SIDE_BUTTON_LAYOUT>(SETTINGS.sideButtonLayout);
@@ -70,6 +81,15 @@ bool MappedInputManager::mapButton(const Button button, bool (HalGPIO::*fn)(uint
       const uint8_t combo2Hw = (side.pageForward == HalGPIO::BTN_UP) ? HalGPIO::BTN_UP_2 : HalGPIO::BTN_DOWN_2;
       return combo1 || (gpio.*fn)(combo2Hw);
     }
+    case Button::NavNext:
+      // Logical "next item" navigation: side Down + front Right, with the control axis flipped in
+      // INVERTED / LANDSCAPE_CCW (frontButtonFollowOrientation) so it matches the rotated hint labels.
+      return isNavDirectionSwapped() ? (mapButton(Button::Up, fn) || mapButton(Button::Left, fn))
+                                     : (mapButton(Button::Down, fn) || mapButton(Button::Right, fn));
+    case Button::NavPrevious:
+      // Logical "previous item" navigation: side Up + front Left, axis-flipped in the same orientations.
+      return isNavDirectionSwapped() ? (mapButton(Button::Down, fn) || mapButton(Button::Right, fn))
+                                     : (mapButton(Button::Up, fn) || mapButton(Button::Left, fn));
   }
 
   return false;
@@ -90,9 +110,7 @@ unsigned long MappedInputManager::getHeldTime() const { return gpio.getHeldTime(
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,
                                                          const char* next) const {
   // Swap previous/next labels to match the page turn direction swap in INVERTED and LANDSCAPE_CCW.
-  const bool swapLabels =
-      SETTINGS.frontButtonFollowOrientation && (SETTINGS.orientation == CrossPointSettings::INVERTED ||
-                                                SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CCW);
+  const bool swapLabels = isNavDirectionSwapped();
   const char* leftLabel = swapLabels ? next : previous;
   const char* rightLabel = swapLabels ? previous : next;
 

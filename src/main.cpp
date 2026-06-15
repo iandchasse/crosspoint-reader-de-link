@@ -45,8 +45,10 @@
 
 HalDisplay display;
 HalGPIO gpio;
-MappedInputManager mappedInputManager(gpio);
+// The renderer must outlive/precede the input manager: MappedInputManager holds a reference to it
+// so logical button mapping can follow the *live* render orientation.
 GfxRenderer renderer(display);
+MappedInputManager mappedInputManager(gpio, renderer);
 #ifdef FRONTLIGHT_PRESENT
 FrontlightManager frontlightManager;
 #endif
