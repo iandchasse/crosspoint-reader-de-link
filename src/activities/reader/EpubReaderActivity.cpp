@@ -267,103 +267,13 @@ void EpubReaderActivity::loop() {
     requestUpdate();
   }
 
-#ifdef FRONTLIGHT_PRESENT
-  if (SETTINGS.longPressConfirmBehavior == CrossPointSettings::LONG_PRESS_CONFIRM_FRONTLIGHT) {
-    // Long press CONFIRM (1s+) opens frontlight control
-    if (mappedInput.isPressed(MappedInputManager::Button::Confirm) && mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
-      startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
-                             [this](const ActivityResult& result) {
-                               // After returning from frontlight control, request screen update
-                             });
-      return;
-    }
-  } else {
-    // Behavior is BOOKMARK: long press CONFIRM (400ms+) triggers bookmarking immediately while holding
-    if (mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
-        mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS) {
-      if (!showBookmarkMessage) {
-        addBookmark();
-        showBookmarkMessage = true;
-        ignoreNextConfirmRelease = true;  // Prevent accidental menu open after adding bookmark
-        bookmarkMessageTime = millis();
-        requestUpdate();
-      }
-    }
-  }
-#else
-  // Without frontlight, long press CONFIRM (400ms+) triggers bookmarking immediately while holding
-  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
-      mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS) {
-    if (!showBookmarkMessage) {
-      addBookmark();
-      showBookmarkMessage = true;
-      ignoreNextConfirmRelease = true;  // Prevent accidental menu open after adding bookmark
-      bookmarkMessageTime = millis();
-      requestUpdate();
-    }
-  }
-#endif
-
-  // Enter reader menu activity or trigger bookmark on release (if FRONTLIGHT_PRESENT and behavior is FRONTLIGHT)
+  // Enter reader menu activity on short-press Confirm. A long-press that fired a bound
+  // function (bookmark, KOReader sync, or — on this port — the frontlight control) sets
+  // ignoreNextConfirmRelease so the release following the hold does not also open the menu.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (ignoreNextConfirmRelease) {
       ignoreNextConfirmRelease = false;
     } else {
-#ifdef FRONTLIGHT_PRESENT
-      if (SETTINGS.longPressConfirmBehavior == CrossPointSettings::LONG_PRESS_CONFIRM_FRONTLIGHT) {
-        // TEMP: the 400ms–1s "add bookmark" shortcut on long-press Select is
-        // disabled for now. Any release below the frontlight hold threshold
-        // (GO_HOME_MS, 1s) opens the reader menu; a 1s+ hold still opens the
-        // frontlight control (handled on press above). Bookmarks remain available
-        // from the reader menu. Restore the branch below to re-enable the shortcut.
-        // NOTE: the longPressConfirmBehavior setting already toggles frontlight vs
-        // bookmark on long-press — revisit once the upstream resync lands.
-        if (mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
-          const int currentPage = section ? section->currentPage + 1 : 0;
-          const int totalPages = section ? section->pageCount : 0;
-          float bookProgress = 0.0f;
-          if (epub->getBookSize() > 0 && section && section->pageCount > 0) {
-            const float chapterProgress = static_cast<float>(section->currentPage) / static_cast<float>(section->pageCount);
-            bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
-          }
-          const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
-          startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
-                                     renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
-                                     SETTINGS.orientation, !currentPageFootnotes.empty()),
-                                 [this](const ActivityResult& result) {
-                                   // Always apply orientation change even if the menu was cancelled
-                                   const auto& menu = std::get<MenuResult>(result.data);
-                                   applyOrientation(menu.orientation);
-                                   toggleAutoPageTurn(menu.pageTurnOption);
-                                   if (!result.isCancelled) {
-                                     onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
-                                   }
-                                 });
-        }
-      } else {
-        // Behavior is BOOKMARK: any non-ignored release triggers menu activity (since bookmark triggers on press)
-        const int currentPage = section ? section->currentPage + 1 : 0;
-        const int totalPages = section ? section->pageCount : 0;
-        float bookProgress = 0.0f;
-        if (epub->getBookSize() > 0 && section && section->pageCount > 0) {
-          const float chapterProgress = static_cast<float>(section->currentPage) / static_cast<float>(section->pageCount);
-          bookProgress = epub->calculateProgress(currentSpineIndex, chapterProgress) * 100.0f;
-        }
-        const int bookProgressPercent = clampPercent(static_cast<int>(bookProgress + 0.5f));
-        startActivityForResult(std::make_unique<EpubReaderMenuActivity>(
-                                   renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent,
-                                   SETTINGS.orientation, !currentPageFootnotes.empty()),
-                               [this](const ActivityResult& result) {
-                                 // Always apply orientation change even if the menu was cancelled
-                                 const auto& menu = std::get<MenuResult>(result.data);
-                                 applyOrientation(menu.orientation);
-                                 toggleAutoPageTurn(menu.pageTurnOption);
-                                 if (!result.isCancelled) {
-                                   onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
-                                 }
-                               });
-      }
-#else
       const int currentPage = section ? section->currentPage + 1 : 0;
       const int totalPages = section ? section->pageCount : 0;
       float bookProgress = 0.0f;
@@ -384,7 +294,52 @@ void EpubReaderActivity::loop() {
                                  onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
                                }
                              });
+    }
+  }
+
+  // Long-press Confirm runs the user-selected function (SETTINGS.longPressMenuFunction).
+  // On frontlight hardware this port can instead bind a 1s+ hold to the frontlight
+  // control via SETTINGS.longPressConfirmBehavior.
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm)) {
+#ifdef FRONTLIGHT_PRESENT
+    if (SETTINGS.longPressConfirmBehavior == CrossPointSettings::LONG_PRESS_CONFIRM_FRONTLIGHT) {
+      // Hold ~1s opens the frontlight control.
+      if (mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+        startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
+                               [this](const ActivityResult& result) {
+                                 // After returning from frontlight control, request screen update
+                               });
+        ignoreNextConfirmRelease = true;  // suppress the menu open on the following release
+        return;
+      }
+    } else
 #endif
+    {
+      switch (SETTINGS.longPressMenuFunction) {
+        case CrossPointSettings::LP_MENU_BOOKMARK:
+          // Hold ~0.4s drops a bookmark at the current page.
+          if (mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && !showBookmarkMessage) {
+            addBookmark();
+            showBookmarkMessage = true;
+            ignoreNextConfirmRelease = true;  // Prevent accidental menu open after adding bookmark
+            bookmarkMessageTime = millis();
+            requestUpdate();
+          }
+          break;
+        case CrossPointSettings::LP_MENU_KOSYNC:
+          // Hold ~1s launches KOReader sync. If sync can't run (no credentials stored), fall
+          // through so the normal Confirm-release still opens the reader menu.
+          if (mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+            if (launchKOReaderSync()) {
+              ignoreNextConfirmRelease = true;  // sync launched or error shown; suppress menu open
+              return;
+            }
+          }
+          break;
+        case CrossPointSettings::LP_MENU_DISABLED:
+        default:
+          break;
+      }
     }
   }
 
@@ -678,50 +633,7 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::SYNC: {
-      if (KOREADER_STORE.hasCredentials()) {
-        const int currentPage = section ? section->currentPage : nextPageNumber;
-        const int totalPages = section ? section->pageCount : cachedChapterTotalPageCount;
-        std::optional<uint16_t> paragraphIndex;
-        if (section && currentPage >= 0 && currentPage < section->pageCount) {
-          const uint16_t paragraphPage =
-              currentPage > 0 ? static_cast<uint16_t>(currentPage - 1) : static_cast<uint16_t>(currentPage);
-          if (const auto pIdx = section->getParagraphIndexForPage(paragraphPage)) {
-            paragraphIndex = *pIdx;
-          }
-        }
-
-        // Pre-compute local KO position and chapter name while Epub is still in RAM.
-        CrossPointPosition localPos = getCurrentPosition();
-        SavedProgressPosition localKoPos = ProgressMapper::toSavedProgress(epub, localPos);
-        const int tocIdx = epub->getTocIndexForSpineIndex(currentSpineIndex);
-        std::string localChapterName = (tocIdx >= 0) ? epub->getTocItem(tocIdx).title : "";
-        const std::string savedEpubPath = epub->getPath();
-
-        // Persist current position so the reader resumes at the right page on return.
-        // goToReader() depends on this file, so abort the sync if the write fails.
-        if (!saveProgress(currentSpineIndex, currentPage, totalPages)) {
-          LOG_ERR("KOSync", "Aborting sync because current progress could not be saved");
-          pendingSyncSaveError = true;
-          requestUpdate();
-          return;
-        }
-
-        // Release Epub and Section to free ~65KB RAM for the TLS handshake.
-        LOG_DBG("KOSync", "Releasing epub for sync (heap before: %u)", (unsigned)ESP.getFreeHeap());
-        {
-          RenderLock lock(*this);
-          if (section) {
-            nextPageNumber = section->currentPage;
-          }
-          section.reset();
-          epub.reset();
-        }
-        LOG_DBG("KOSync", "Epub released (heap after: %u)", (unsigned)ESP.getFreeHeap());
-
-        activityManager.replaceActivity(std::make_unique<KOReaderSyncActivity>(
-            renderer, mappedInput, savedEpubPath, currentSpineIndex, currentPage, totalPages, std::move(localKoPos),
-            std::move(localChapterName), paragraphIndex));
-      }
+      launchKOReaderSync();
       break;
     }
     case EpubReaderMenuActivity::MenuAction::BOOKMARKS: {
@@ -731,6 +643,54 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
   }
+}
+
+bool EpubReaderActivity::launchKOReaderSync() {
+  if (!KOREADER_STORE.hasCredentials()) return false;  // no-op: nothing to launch
+
+  const int currentPage = section ? section->currentPage : nextPageNumber;
+  const int totalPages = section ? section->pageCount : cachedChapterTotalPageCount;
+  std::optional<uint16_t> paragraphIndex;
+  if (section && currentPage >= 0 && currentPage < section->pageCount) {
+    const uint16_t paragraphPage =
+        currentPage > 0 ? static_cast<uint16_t>(currentPage - 1) : static_cast<uint16_t>(currentPage);
+    if (const auto pIdx = section->getParagraphIndexForPage(paragraphPage)) {
+      paragraphIndex = *pIdx;
+    }
+  }
+
+  // Pre-compute local KO position and chapter name while Epub is still in RAM.
+  CrossPointPosition localPos = getCurrentPosition();
+  SavedProgressPosition localKoPos = ProgressMapper::toSavedProgress(epub, localPos);
+  const int tocIdx = epub->getTocIndexForSpineIndex(currentSpineIndex);
+  std::string localChapterName = (tocIdx >= 0) ? epub->getTocItem(tocIdx).title : "";
+  const std::string savedEpubPath = epub->getPath();
+
+  // Persist current position so the reader resumes at the right page on return.
+  // goToReader() depends on this file, so abort the sync if the write fails.
+  if (!saveProgress(currentSpineIndex, currentPage, totalPages)) {
+    LOG_ERR("KOSync", "Aborting sync because current progress could not be saved");
+    pendingSyncSaveError = true;
+    requestUpdate();
+    return true;  // acted: surfaced a save error to the user
+  }
+
+  // Release Epub and Section to free ~65KB RAM for the TLS handshake.
+  LOG_DBG("KOSync", "Releasing epub for sync (heap before: %u)", (unsigned)ESP.getFreeHeap());
+  {
+    RenderLock lock(*this);
+    if (section) {
+      nextPageNumber = section->currentPage;
+    }
+    section.reset();
+    epub.reset();
+  }
+  LOG_DBG("KOSync", "Epub released (heap after: %u)", (unsigned)ESP.getFreeHeap());
+
+  activityManager.replaceActivity(std::make_unique<KOReaderSyncActivity>(
+      renderer, mappedInput, savedEpubPath, currentSpineIndex, currentPage, totalPages, std::move(localKoPos),
+      std::move(localChapterName), paragraphIndex));
+  return true;  // acted: launched the sync activity
 }
 
 void EpubReaderActivity::applyOrientation(const uint8_t orientation) {
