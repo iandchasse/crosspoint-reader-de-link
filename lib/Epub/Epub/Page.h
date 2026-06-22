@@ -88,7 +88,8 @@ class Page {
   }
 
   void render(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) const;
-bool serialize(HalFile& file) const;
+  void renderImages(GfxRenderer& renderer, int fontId, int xOffset, int yOffset) const;
+  bool serialize(HalFile& file) const;
   static std::unique_ptr<Page> deserialize(HalFile& file);
 
   // Check if page contains any images (used to force full refresh)
