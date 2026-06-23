@@ -295,8 +295,8 @@ class CrossPointSettings {
   // Disable page-turn on left side button combo (BTN_UP_2/BTN_DOWN_2)
   uint8_t disableSidePageTurn = 0;
   // Long-press Confirm function in EPUB reader (cycles through LONG_PRESS_MENU_FUNCTION values).
-  // Defaults to Bookmark to preserve the upstream long-press-Confirm-adds-bookmark behavior.
-  uint8_t longPressMenuFunction = LP_MENU_BOOKMARK;
+  // Defaults to Disabled so shortcut-based bookmark toggling remains opt-in.
+  uint8_t longPressMenuFunction = LP_MENU_DISABLED;
   // UI Theme
   uint8_t uiTheme = LYRA;
   // Sunlight fading compensation

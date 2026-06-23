@@ -10,16 +10,17 @@
 EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                                const std::string& title, const int currentPage, const int totalPages,
                                                const int bookProgressPercent, const uint8_t currentOrientation,
-                                               const bool hasFootnotes)
+                                               const bool hasFootnotes, const bool hasBookmarks)
     : Activity("EpubReaderMenu", renderer, mappedInput),
-      menuItems(buildMenuItems(hasFootnotes)),
+      menuItems(buildMenuItems(hasFootnotes, hasBookmarks)),
       title(title),
       pendingOrientation(currentOrientation),
       currentPage(currentPage),
       totalPages(totalPages),
       bookProgressPercent(bookProgressPercent) {}
 
-std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuItems(bool hasFootnotes) {
+std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuItems(bool hasFootnotes,
+                                                                                     bool hasBookmarks) {
   std::vector<MenuItem> items;
   items.reserve(12);
   items.push_back({MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER});
@@ -29,7 +30,10 @@ std::vector<EpubReaderMenuActivity::MenuItem> EpubReaderMenuActivity::buildMenuI
 #ifdef FRONTLIGHT_PRESENT
   items.push_back({MenuAction::FRONTLIGHT, StrId::STR_FRONTLIGHT});
 #endif
-  items.push_back({MenuAction::BOOKMARKS, StrId::STR_BOOKMARKS});
+  if (hasBookmarks) {
+    items.push_back({MenuAction::BOOKMARKS, StrId::STR_BOOKMARKS});
+  }
+  items.push_back({MenuAction::TOGGLE_BOOKMARK, StrId::STR_TOGGLE_BOOKMARK});
   items.push_back({MenuAction::ROTATE_SCREEN, StrId::STR_ORIENTATION});
   items.push_back({MenuAction::AUTO_PAGE_TURN, StrId::STR_AUTO_TURN_PAGES_PER_MIN});
   items.push_back({MenuAction::GO_TO_PERCENT, StrId::STR_GO_TO_PERCENT});

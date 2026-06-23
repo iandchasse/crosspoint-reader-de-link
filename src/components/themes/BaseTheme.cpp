@@ -17,6 +17,7 @@
 #include "I18n.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
+#include "components/icons/bookmark.h"
 #include "fontIds.h"
 
 // Internal constants
@@ -24,6 +25,28 @@ namespace {
 constexpr int homeMenuMargin = 20;
 constexpr int homeMarginTop = 30;
 constexpr int subtitleY = 738;
+constexpr int bookmarkStatusIconWidth = 16;
+constexpr int bookmarkStatusIconHeight = 14;
+constexpr int bookmarkStatusIconGap = 4;
+constexpr int bookmarkStatusIconTopCrop = 2;
+
+bool statusBarTextLaneVisible() {
+  return SETTINGS.statusBarChapterPageCount || SETTINGS.statusBarBookProgressPercentage ||
+         SETTINGS.statusBarTitle != CrossPointSettings::STATUS_BAR_TITLE::HIDE_TITLE || SETTINGS.statusBarBattery ||
+         (SETTINGS.statusBarClock && (halClock.isAvailable() || HalClock::isSynced()));
+}
+
+void drawBookmarkStatusIcon(const GfxRenderer& renderer, const int x, const int y) {
+  constexpr int bytesPerRow = bookmarkStatusIconWidth / 8;
+  for (int row = 0; row < bookmarkStatusIconHeight; ++row) {
+    for (int col = 0; col < bookmarkStatusIconWidth; ++col) {
+      const uint8_t byte = BookmarkStatusIcon[(row + bookmarkStatusIconTopCrop) * bytesPerRow + col / 8];
+      const uint8_t mask = 1U << (7 - (col % 8));
+      renderer.drawPixel(x + col, y + row, (byte & mask) != 0);
+    }
+  }
+}
+
 }  // namespace
 
 // Helper: draw battery icon at given position
@@ -753,11 +776,12 @@ void BaseTheme::fillPopupProgress(const GfxRenderer& renderer, const Rect& layou
 
 void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, const int currentPage,
                               const int pageCount, std::string title, const int paddingBottom, const int textYOffset,
-                              const bool fillMargin) const {
+                              const bool fillMargin, const bool isPageBookmarked) const {
   auto metrics = UITheme::getInstance().getMetrics();
   int orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft;
   renderer.getOrientedViewableTRBL(&orientedMarginTop, &orientedMarginRight, &orientedMarginBottom,
                                    &orientedMarginLeft);
+  const bool showStatusBarTextLane = statusBarTextLaneVisible();
 
   // Draw Progress Text
   const auto screenHeight = renderer.getScreenHeight();
@@ -803,45 +827,47 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     renderer.fillRect(barMarginLeft, progressBarY, barWidth, barHeight, true);
   }
 
-  // Draw Battery. The clock is no longer multiplexed into this setting: it is
-  // driven independently by SETTINGS.statusBarClock (upstream's X3 mechanism).
-  const bool showBatteryPercentage =
-      SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
-
-  // Clock is shown whenever the status-bar clock toggle is on and a time source
-  // exists — the DS3231 when present (X3), otherwise the NTP-synced system time.
-  const bool showClock = SETTINGS.statusBarClock && (halClock.isAvailable() || HalClock::isSynced());
-
-  if (SETTINGS.statusBarBattery) {
-    GUI.drawBatteryLeft(renderer,
-                        Rect{metrics.statusBarHorizontalMargin + orientedMarginLeft + 1, textY, metrics.batteryWidth,
-                             metrics.batteryHeight},
-                        showBatteryPercentage);
+  // Draw Bookmark
+  const int leftClusterX = metrics.statusBarHorizontalMargin + orientedMarginLeft + 1;
+  const bool showBookmarkIcon = showStatusBarTextLane && isPageBookmarked;
+  const int bookmarkReserveWidth = showBookmarkIcon ? (bookmarkStatusIconWidth + bookmarkStatusIconGap) : 0;
+  if (showBookmarkIcon) {
+    const int bookmarkY = textY + 5;
+    drawBookmarkStatusIcon(renderer, leftClusterX, bookmarkY);
   }
 
-  // Draw Clock from the DS3231 when one is present (X3).
+  // Draw Battery
+  const bool showBatteryPercentage =
+      SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
+  int leftClusterWidth = bookmarkReserveWidth;
+  if (SETTINGS.statusBarBattery) {
+    GUI.drawBatteryLeft(renderer,
+                        Rect{leftClusterX + bookmarkReserveWidth, textY, metrics.batteryWidth, metrics.batteryHeight},
+                        showBatteryPercentage);
+    leftClusterWidth += showBatteryPercentage ? 50 : 20;
+  }
+
+  // Draw Clock. One position for both time sources (upstream's X3 placement, to
+  // the left of the progress text): the DS3231 when present, otherwise the
+  // NTP-synced system time. Keeping the native clock out of the left cluster
+  // avoids it colliding with the bookmark icon / battery / title margin.
+  const bool showClock = SETTINGS.statusBarClock && (halClock.isAvailable() || HalClock::isSynced());
   int clockTextWidth = 0;
-  if (showClock && halClock.isAvailable()) {
-    char timeBuf[9];
-    if (halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1)) {
+  if (showClock) {
+    char timeBuf[16];
+    bool haveTime = false;
+    if (halClock.isAvailable()) {
+      haveTime = halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1);
+    } else {
+      HalClock::formatTime(timeBuf, sizeof(timeBuf), !SETTINGS.clockFormat12h);
+      haveTime = timeBuf[0] != '-';
+    }
+    if (haveTime) {
       clockTextWidth = renderer.getTextWidth(SMALL_FONT_ID, timeBuf);
       // Position to the left of the progress text (with a small gap)
       const int clockX = renderer.getScreenWidth() - metrics.statusBarHorizontalMargin - orientedMarginRight -
                          progressTextWidth - (progressTextWidth > 0 ? 10 : 0) - clockTextWidth;
       renderer.drawText(SMALL_FONT_ID, clockX, textY, timeBuf);
-    }
-  }
-
-  // Draw clock in reader status bar (after battery, on the right of it or alone) for native clock
-  if (!halClock.isAvailable() && showClock) {
-    char clockStr[16];
-    HalClock::formatTime(clockStr, sizeof(clockStr), !SETTINGS.clockFormat12h);
-    if (clockStr[0] != '-') {
-      const int clockX = SETTINGS.statusBarBattery
-                             ? metrics.statusBarHorizontalMargin + orientedMarginLeft + 1 + metrics.batteryWidth +
-                                   batteryPercentSpacing + 30
-                             : metrics.statusBarHorizontalMargin + orientedMarginLeft + 1;
-      renderer.drawText(SMALL_FONT_ID, clockX, textY, clockStr);
     }
   }
 
@@ -853,8 +879,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     const int rendererableScreenWidth =
         renderer.getScreenWidth() - (metrics.statusBarHorizontalMargin * 2) - orientedMarginLeft - orientedMarginRight;
 
-    const int batterySize = SETTINGS.statusBarBattery ? ((showBatteryPercentage || showClock) ? 50 : 20) : 0;
-    const int titleMarginLeft = batterySize + 30;
+    const int titleMarginLeft = leftClusterWidth + 30;
     const int clockReserve = clockTextWidth > 0 ? (clockTextWidth + 10) : 0;
     const int titleMarginRight = progressTextWidth + clockReserve + 30;
 
