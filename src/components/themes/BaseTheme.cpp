@@ -786,7 +786,11 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   // Draw Progress Text
   const auto screenHeight = renderer.getScreenHeight();
   auto textY = screenHeight - UITheme::getInstance().getStatusBarHeight() - orientedMarginBottom - paddingBottom - 4;
-  int progressTextWidth = 0;
+
+  const int leftClusterX = metrics.statusBarHorizontalMargin + orientedMarginLeft + 1;
+  const int rightClusterX = renderer.getScreenWidth() - metrics.statusBarHorizontalMargin - orientedMarginRight;
+  int leftClusterWidth = 0;
+  int rightClusterWidth = 0;
 
   if (SETTINGS.statusBarBookProgressPercentage || SETTINGS.statusBarChapterPageCount) {
     // Right aligned text for progress counter
@@ -800,11 +804,10 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
       snprintf(progressStr, sizeof(progressStr), "%d/%d", currentPage, pageCount);
     }
 
-    progressTextWidth = renderer.getTextWidth(SMALL_FONT_ID, progressStr);
-    renderer.drawText(
-        SMALL_FONT_ID,
-        renderer.getScreenWidth() - metrics.statusBarHorizontalMargin - orientedMarginRight - progressTextWidth, textY,
-        progressStr);
+    int progressTextWidth = renderer.getTextWidth(SMALL_FONT_ID, progressStr);
+    renderer.drawText(SMALL_FONT_ID, rightClusterX - progressTextWidth, textY, progressStr);
+
+    rightClusterWidth += progressTextWidth;
   }
 
   // Draw Progress Bar
@@ -830,23 +833,34 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   // Left status-bar cluster, laid out left to right: battery, then clock, then the
   // bookmark indicator LAST (#2444). Drawing the bookmark last is the whole point
   // of that fix — toggling a bookmark must not shift the battery or clock, which
-  // it did when the bookmark reserved space ahead of them.
-  const int leftClusterX = metrics.statusBarHorizontalMargin + orientedMarginLeft + 1;
-  int leftClusterWidth = 0;
+  // it did when the bookmark reserved space ahead of them. The cluster origins are
+  // declared with the progress text above.
 
   // Draw Battery
   const bool showBatteryPercentage =
       SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
+
   if (SETTINGS.statusBarBattery) {
     GUI.drawBatteryLeft(renderer,
                         Rect{leftClusterX + leftClusterWidth, textY, metrics.batteryWidth, metrics.batteryHeight},
                         showBatteryPercentage);
-    leftClusterWidth += showBatteryPercentage ? 50 : 20;
+    int batteryWidth = metrics.batteryWidth;
+
+    if (showBatteryPercentage) {
+      const uint16_t percentage = powerManager.getBatteryPercentage();
+      // width of icon + spacing + text for layout purposes
+      batteryWidth +=
+          batteryPercentSpacing + renderer.getTextWidth(SMALL_FONT_ID, (std::to_string(percentage) + "%").c_str());
+    }
+
+    leftClusterWidth += batteryWidth;
   }
 
-  // Draw Clock, in the left cluster after the battery: the DS3231 when present,
-  // otherwise the NTP-synced system time.
-  const bool showClock = SETTINGS.statusBarClock && (halClock.isAvailable() || HalClock::isSynced());
+  // Draw Clock: the DS3231 when present, otherwise the NTP-synced system time.
+  // Placement is user-selectable (#2359) — the left cluster after the battery, or
+  // the right cluster ahead of the progress text.
+  const bool showClock = SETTINGS.statusBarClock != CrossPointSettings::STATUS_BAR_CLOCK_HIDE &&
+                         (halClock.isAvailable() || HalClock::isSynced());
   if (showClock) {
     char timeBuf[16];
     bool haveTime = false;
@@ -858,9 +872,15 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     }
     if (haveTime) {
       const int clockTextWidth = renderer.getTextWidth(SMALL_FONT_ID, timeBuf);
-      const int clockGap = leftClusterWidth > 0 ? 10 : 0;
-      renderer.drawText(SMALL_FONT_ID, leftClusterX + leftClusterWidth + clockGap, textY, timeBuf);
-      leftClusterWidth += clockTextWidth + clockGap;
+      if (SETTINGS.statusBarClock == CrossPointSettings::STATUS_BAR_CLOCK_LEFT) {
+        const int clockGap = leftClusterWidth > 0 ? 10 : 0;
+        renderer.drawText(SMALL_FONT_ID, leftClusterX + leftClusterWidth + clockGap, textY, timeBuf);
+        leftClusterWidth += clockTextWidth + clockGap;
+      } else {
+        const int clockGap = rightClusterWidth > 0 ? 10 : 0;
+        renderer.drawText(SMALL_FONT_ID, rightClusterX - rightClusterWidth - clockGap - clockTextWidth, textY, timeBuf);
+        rightClusterWidth += clockTextWidth + clockGap;
+      }
     }
   }
 
@@ -882,9 +902,9 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
         renderer.getScreenWidth() - (metrics.statusBarHorizontalMargin * 2) - orientedMarginLeft - orientedMarginRight;
 
     const int titleMarginLeft = leftClusterWidth + 30;
-    // The clock now sits in the left cluster (#2444), so its width is already
-    // counted in titleMarginLeft — the right margin only reserves the progress text.
-    const int titleMarginRight = progressTextWidth + 30;
+    // rightClusterWidth covers the progress text plus the clock when it is placed
+    // on the right; a left-placed clock is already counted in titleMarginLeft.
+    const int titleMarginRight = rightClusterWidth + 30;
 
     // Attempt to center title on the screen, but if title is too wide then later we will center it within the
     // available space.
