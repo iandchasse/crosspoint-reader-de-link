@@ -74,6 +74,17 @@ void HalDisplay::copyGrayscaleBuffers(const uint8_t* lsbBuffer, const uint8_t* m
   einkDisplay.copyGrayscaleBuffers(lsbBuffer, msbBuffer);
 }
 
+// The OEM differential base waveform and the preconditioning settle pass are X3/UC81xx features that
+// only exist in the upstream SDK. The de-link SDK drives an S3 panel, so both take the non-X3
+// behaviour upstream documents: base = a normal display with the fallback mode, precondition = no-op.
+void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) {
+  displayBuffer(fallback, turnOffScreen);
+}
+
+void HalDisplay::preconditionGrayscale() {}
+
+void HalDisplay::preconditionGrayscale(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {}
+
 void HalDisplay::copyGrayscaleLsbBuffers(const uint8_t* lsbBuffer) { einkDisplay.copyGrayscaleLsbBuffers(lsbBuffer); }
 
 void HalDisplay::copyGrayscaleMsbBuffers(const uint8_t* msbBuffer) { einkDisplay.copyGrayscaleMsbBuffers(msbBuffer); }
