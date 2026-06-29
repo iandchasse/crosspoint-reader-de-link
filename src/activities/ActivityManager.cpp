@@ -22,11 +22,12 @@
 static portMUX_TYPE activityManagerSpinlock = portMUX_INITIALIZER_UNLOCKED;
 
 void ActivityManager::begin() {
-  xTaskCreate(&renderTaskTrampoline, "ActivityManagerRender",
-              8192,              // Stack size
-              this,              // Parameters
-              1,                 // Priority
-              &renderTaskHandle  // Task handle
+  xTaskCreatePinnedToCore(&renderTaskTrampoline, "ActivityManagerRender",
+                          8192,               // Stack size
+                          this,               // Parameters
+                          1,                  // Priority
+                          &renderTaskHandle,  // Task handle
+                          0                   // Pin to core 0 (PRO_CPU)
   );
   assert(renderTaskHandle != nullptr && "Failed to create render task");
 }
@@ -139,8 +140,7 @@ void ActivityManager::loop() {
     }
   }
 
-  if (requestedUpdate) {
-    requestedUpdate = false;
+  if (requestedUpdate.exchange(false)) {
     // Using direct notification to signal the render task to update
     // Increment counter so multiple rapid calls won't be lost
     if (renderTaskHandle) {
