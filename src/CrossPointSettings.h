@@ -291,10 +291,11 @@ class CrossPointSettings {
 
   // Reader screen margin settings
   uint8_t screenMargin = 5;
-  // OPDS browser settings
-  char opdsServerUrl[128] = "";
-  char opdsUsername[64] = "";
-  char opdsPassword[64] = "";
+  // NOTE: the OPDS server URL/username/password used to live here; #2464 moved
+  // them into OpdsServerStore (multi-server), so they are gone from SETTINGS.
+  // The two fields below are separate global download preferences (#2571) and
+  // deliberately stay.
+  //
   // OPDS download destination folder ("" = SD root). Global; edited from the
   // OPDS server list. Persisted via a category-less SettingInfo::String in
   // SettingsList.h, so it stays out of the on-device Settings screen.
