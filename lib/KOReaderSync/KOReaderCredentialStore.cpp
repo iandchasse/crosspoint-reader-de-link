@@ -90,6 +90,9 @@ HalFile file;
   } else {
     username.clear();
   }
+  // Binary format predates sendMetadata; migrated stores keep the default (off)
+  // until the JSON re-save. (The auto-merge wrongly injected a doc[] read here,
+  // but loadFromBinaryFile has no JsonDocument.)
 
   if (file.available()) {
     serialization::readString(file, password);
@@ -172,4 +175,9 @@ std::string KOReaderCredentialStore::getBaseUrl() const {
 void KOReaderCredentialStore::setMatchMethod(DocumentMatchMethod method) {
   matchMethod = method;
   LOG_DBG("KRS", "Set match method: %s", method == DocumentMatchMethod::FILENAME ? "Filename" : "Binary");
+}
+
+void KOReaderCredentialStore::setSendMetadata(bool enabled) {
+  sendMetadata = enabled;
+  LOG_DBG("KRS", "Set send metadata: %s", enabled ? "true" : "false");
 }
