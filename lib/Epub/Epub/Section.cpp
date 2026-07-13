@@ -17,7 +17,10 @@ namespace {
 // v29: text decoration bits now include line-through in serialized wordStyles.
 // v30: TextBlock word data stored as one flat arena (offset table + NUL-terminated
 //      text blob) instead of length-prefixed strings and per-field arrays.
-constexpr uint8_t SECTION_FILE_VERSION = 30;
+// v31: Arabic shaping changed both drawing and measurement (getTextAdvanceX now
+//      measures the shaped visual text); cached word positions from v30 no longer
+//      match what drawText renders.
+constexpr uint8_t SECTION_FILE_VERSION = 31;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
