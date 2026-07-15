@@ -16,6 +16,7 @@ bool save(const KOReaderCredentialStore& store, const char* path) {
   doc["serverUrl"] = store.getServerUrl();
   doc["matchMethod"] = static_cast<uint8_t>(store.getMatchMethod());
   doc["sendMetadata"] = store.getSendMetadata();
+  doc["syncBehavior"] = static_cast<uint8_t>(store.getSyncBehavior());
 
   String json;
   serializeJson(doc, json);
@@ -47,6 +48,19 @@ bool load(KOReaderCredentialStore& store, const char* json, bool* needsResave) {
   store.setMatchMethod(static_cast<DocumentMatchMethod>(method));
 
   store.setSendMetadata(doc["sendMetadata"] | false);
+
+  // syncBehavior defaults to ASK_EVERY_TIME when absent (older files) or invalid,
+  // and flags a resave so the field is written back.
+  const JsonVariantConst behaviorValue = doc["syncBehavior"];
+  const uint8_t behavior = behaviorValue | static_cast<uint8_t>(KOReaderSyncBehavior::ASK_EVERY_TIME);
+  if (behavior <= static_cast<uint8_t>(KOReaderSyncBehavior::SMART)) {
+    store.setSyncBehavior(static_cast<KOReaderSyncBehavior>(behavior));
+    if (behaviorValue.isNull() && needsResave) *needsResave = true;
+  } else {
+    LOG_DBG("KRS", "Invalid syncBehavior %u in JSON, resetting to ASK_EVERY_TIME", behavior);
+    store.setSyncBehavior(KOReaderSyncBehavior::ASK_EVERY_TIME);
+    if (needsResave) *needsResave = true;
+  }
 
   return true;
 }
