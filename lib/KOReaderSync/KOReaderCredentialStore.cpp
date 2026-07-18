@@ -20,8 +20,17 @@ constexpr char KOREADER_FILE_BIN[] = "/.crosspoint/koreader.bin";
 constexpr char KOREADER_FILE_JSON[] = "/.crosspoint/koreader.json";
 constexpr char KOREADER_FILE_BAK[] = "/.crosspoint/koreader.bin.bak";
 
-// Default sync server URL
-constexpr char DEFAULT_SERVER_URL[] = "https://sync.koreader.rocks:443";
+// Default sync server URL. crosspoint-sync speaks the full KOSync protocol, so
+// pointing at any other kosync server (e.g. https://sync.koreader.rocks:443)
+// still works via the custom server URL setting.
+constexpr char DEFAULT_SERVER_URL[] = "https://sync.crosspointreader.com";
+
+// Default before config version 2. Configs saved without a version stamp and an
+// empty serverUrl were implicitly syncing here — they get pinned on upgrade.
+constexpr char LEGACY_DEFAULT_SERVER_URL[] = "https://sync.koreader.rocks:443";
+
+// Bumped when a change to defaults would alter behavior for existing configs.
+constexpr uint8_t CONFIG_VERSION = 2;
 
 // Legacy obfuscation key - "KOReader" in ASCII (only used for binary migration)
 constexpr uint8_t LEGACY_OBFUSCATION_KEY[] = {0x4B, 0x4F, 0x52, 0x65, 0x61, 0x64, 0x65, 0x72};
@@ -73,7 +82,7 @@ bool KOReaderCredentialStore::loadFromFile() {
 }
 
 bool KOReaderCredentialStore::loadFromBinaryFile() {
-HalFile file;
+  HalFile file;
   if (!Storage.openFileForRead("KRS", KOREADER_FILE_BIN, file)) {
     return false;
   }
