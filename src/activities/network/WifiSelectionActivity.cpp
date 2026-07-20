@@ -228,6 +228,11 @@ void WifiSelectionActivity::attemptConnection() {
   WiFi.disconnect(true, true);  // Abort any in-progress SDK auto-connect and clear NVS-saved SSID
   delay(100);
 
+  // Scan all channels so networks with multiple APs use the strongest matching
+  // BSSID instead of the first match found by the framework's default fast scan.
+  WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+  WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+
   // Set hostname so routers show "CrossPoint-Reader-AABBCCDDEEFF" instead of "esp32-XXXXXXXXXXXX"
   String mac = WiFi.macAddress();
   mac.replace(":", "");
@@ -255,6 +260,16 @@ void WifiSelectionActivity::checkConnectionStatus() {
     snprintf(ipStr, sizeof(ipStr), "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
     connectedIP = ipStr;
     autoConnecting = false;
+
+#if defined(ENABLE_SERIAL_LOG) && LOG_LEVEL >= 2
+    uint8_t connectedBssid[6] = {};
+    WiFi.BSSID(connectedBssid);
+    LOG_DBG("WIFI", "Connected BSSID: %02x:%02x:%02x:%02x:%02x:%02x, channel: %d, RSSI: %d dBm",
+            static_cast<unsigned>(connectedBssid[0]), static_cast<unsigned>(connectedBssid[1]),
+            static_cast<unsigned>(connectedBssid[2]), static_cast<unsigned>(connectedBssid[3]),
+            static_cast<unsigned>(connectedBssid[4]), static_cast<unsigned>(connectedBssid[5]), WiFi.channel(),
+            WiFi.RSSI());
+#endif
 
     // Trigger NTP time sync via HalClock now that we have network
     if (HalClock::syncNtp()) {
