@@ -5,6 +5,8 @@
 #include <JPEGDEC.h>
 #include <Logging.h>
 #include <Memory.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include <cstdio>
 #include <cstring>
@@ -171,11 +173,22 @@ constexpr uint32_t FP_ONE = 1UL << 16;
 // Static file pointer for JPEGDEC open callback.
 // Safe in single-threaded embedded context; never accessed concurrently.
 static HalFile* s_jpegFile = nullptr;
+static uint8_t s_jpegIoSinceYield = 0;
+
+static void yieldToIdle() { vTaskDelay(1); }
+
+static void yieldDuringJpegIo() {
+  if (++s_jpegIoSinceYield < 4) return;
+  s_jpegIoSinceYield = 0;
+  yieldToIdle();
+}
 
 void* bmpJpegOpen(const char* /*filename*/, int32_t* size) {
   if (!s_jpegFile || !*s_jpegFile) return nullptr;
+  s_jpegIoSinceYield = 0;
   s_jpegFile->seek(0);
   *size = static_cast<int32_t>(s_jpegFile->size());
+  yieldDuringJpegIo();
   return s_jpegFile;
 }
 
@@ -189,6 +202,7 @@ int32_t bmpJpegRead(JPEGFILE* pFile, uint8_t* pBuf, int32_t len) {
   int32_t n = f->read(pBuf, len);
   if (n < 0) n = 0;
   pFile->iPos += n;
+  yieldDuringJpegIo();
   return n;
 }
 
@@ -196,6 +210,7 @@ int32_t bmpJpegSeek(JPEGFILE* pFile, int32_t pos) {
   auto* f = reinterpret_cast<HalFile*>(pFile->fHandle);
   if (!f || !f->seek(pos)) return -1;
   pFile->iPos = pos;
+  yieldDuringJpegIo();
   return pos;
 }
 
@@ -238,8 +253,22 @@ struct BmpConvertCtx {
   std::unique_ptr<FloydSteinbergDitherer> fsDitherer;
   std::unique_ptr<Atkinson1BitDitherer> atkinson1BitDitherer;
 
+  uint8_t rowsSinceYield;
+  uint8_t blocksSinceYield;
   bool error;
 };
+
+static void yieldDuringDecode(BmpConvertCtx* ctx) {
+  if (++ctx->rowsSinceYield < 8) return;
+  ctx->rowsSinceYield = 0;
+  yieldToIdle();
+}
+
+static void yieldDuringDecodeBlock(BmpConvertCtx* ctx) {
+  if (++ctx->blocksSinceYield < 16) return;
+  ctx->blocksSinceYield = 0;
+  yieldToIdle();
+}
 
 // Write a fully-assembled output row (grayscale bytes, length outWidth) to BMP
 static void writeOutputRow(BmpConvertCtx* ctx, const uint8_t* srcRow, int outY) {
@@ -276,6 +305,7 @@ static void writeOutputRow(BmpConvertCtx* ctx, const uint8_t* srcRow, int outY) 
   }
 
   ctx->bmpOut->write(ctx->bmpRow.get(), ctx->bytesPerRow);
+  yieldDuringDecode(ctx);
 }
 
 // Matches the progressive-JPEG smoothing used by JpegToFramebufferConverter, but stays
@@ -398,6 +428,7 @@ static void flushScaledRow(BmpConvertCtx* ctx) {
 
   ctx->bmpOut->write(ctx->bmpRow.get(), ctx->bytesPerRow);
   ctx->currentOutY++;
+  yieldDuringDecode(ctx);
 }
 
 // JPEGDEC draw callback — receives one MCU-width × MCU-height block at a time,
@@ -407,6 +438,7 @@ static void flushScaledRow(BmpConvertCtx* ctx) {
 int bmpDrawCallback(JPEGDRAW* pDraw) {
   auto* ctx = reinterpret_cast<BmpConvertCtx*>(pDraw->pUser);
   if (!ctx || ctx->error) return 0;
+  yieldDuringDecodeBlock(ctx);
 
   const uint8_t* pixels = reinterpret_cast<uint8_t*>(pDraw->pPixels);
   const int stride = pDraw->iWidth;
@@ -601,6 +633,8 @@ bool JpegToBmpConverter::jpegFileToBmpStreamInternal(HalFile& jpegFile, Print& b
   ctx.smoothScaleY_fp = interpolationStep(ctx.srcHeight, outHeight);
   ctx.smoothNextOutY = 0;
   ctx.smoothPrevY = -1;
+  ctx.rowsSinceYield = 0;
+  ctx.blocksSinceYield = 0;
   ctx.error = false;
 
   // MCU row buffer: MAX_MCU_HEIGHT rows × decoded srcWidth columns of grayscale

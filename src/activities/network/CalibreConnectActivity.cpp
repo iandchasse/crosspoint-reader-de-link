@@ -4,20 +4,13 @@
 #include <GfxRenderer.h>
 #include <I18n.h>
 #include <WiFi.h>
-#include <esp_task_wdt.h>
-
-static inline void safeWdtReset() {
-  if (esp_task_wdt_reset() != ESP_OK) {
-    esp_task_wdt_add(NULL);
-    esp_task_wdt_reset();
-  }
-}
 
 #include "MappedInputManager.h"
 #include "SilentRestart.h"
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TaskWatchdog.h"
 
 namespace {
 constexpr const char* HOSTNAME = "crosspoint";
@@ -116,12 +109,12 @@ void CalibreConnectActivity::loop() {
       LOG_DBG("CAL", "WARNING: %lu ms gap since last handleClient", timeSinceLastHandleClient);
     }
 
-    safeWdtReset();
+    resetTaskWatchdogIfSubscribed();
     constexpr int MAX_ITERATIONS = 80;
     for (int i = 0; i < MAX_ITERATIONS && webServer->isRunning(); i++) {
       webServer->handleClient();
       if ((i & 0x07) == 0x07) {
-        safeWdtReset();
+        resetTaskWatchdogIfSubscribed();
       }
       if ((i & 0x0F) == 0x0F) {
         yield();

@@ -3,19 +3,9 @@
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
-#include <esp_task_wdt.h>
 
 #include "util/BookCacheUtils.h"
-#include "util/StringUtils.h"
-
-
-// Safe WDT reset - registers the task first if not already registered.
-static inline void safeWdtReset() {
-  if (esp_task_wdt_reset() != ESP_OK) {
-    esp_task_wdt_add(NULL);
-    esp_task_wdt_reset();
-  }
-}
+#include "util/TaskWatchdog.h"
 
 namespace {
 constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
@@ -94,7 +84,7 @@ HalFile existing = Storage.open(_putPath.c_str());
 
   } else if (raw.status == RAW_WRITE) {
     if (_putFile && _putOk) {
-      safeWdtReset();
+      resetTaskWatchdogIfSubscribed();
       size_t written = _putFile.write(raw.buf, raw.currentSize);
       if (written != raw.currentSize) {
         _putOk = false;
@@ -292,7 +282,7 @@ HalFile file = root.openNextFile();
 
       file.close();
       yield();
-      safeWdtReset();
+      resetTaskWatchdogIfSubscribed();
       file = root.openNextFile();
     }
   }
@@ -681,7 +671,7 @@ HalFile dstFile;
   uint8_t buf[4096];
   bool copyOk = true;
   while (srcFile.available()) {
-    safeWdtReset();
+    resetTaskWatchdogIfSubscribed();
     int bytesRead = srcFile.read(buf, sizeof(buf));
     if (bytesRead <= 0) break;
     size_t written = dstFile.write(buf, bytesRead);

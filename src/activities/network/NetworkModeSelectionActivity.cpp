@@ -29,14 +29,7 @@ void NetworkModeSelectionActivity::onEnter() {
 void NetworkModeSelectionActivity::onExit() { Activity::onExit(); }
 
 void NetworkModeSelectionActivity::loop() {
-  // Handle back button - cancel
-  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-    onCancel();
-    return;
-  }
-
-  // Handle confirm button - select current option
-  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+  auto selectCurrent = [this] {
     if (selectedIndex == USB_MSC_INDEX) {
       // USB Mass Storage runs from a dedicated boot path, so arm the flag and
       // reboot rather than returning a NetworkMode to the web-server flow.
@@ -51,7 +44,32 @@ void NetworkModeSelectionActivity::loop() {
       mode = NetworkMode::CREATE_HOTSPOT;
     }
     onModeSelected(mode);
+  };
+
+  // Handle back button - cancel
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+    onCancel();
     return;
+  }
+
+  // Handle confirm button - select current option
+  if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+    selectCurrent();
+    return;
+  }
+
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
+  const int contentHeight =
+      renderer.getScreenHeight() - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
+  switch (handleListTouch(selectedIndex, MENU_ITEM_COUNT, contentTop, contentHeight, true)) {
+    case ListTouchResult::Activated:
+      selectCurrent();
+      return;
+    case ListTouchResult::Consumed:
+      return;
+    case ListTouchResult::None:
+      break;
   }
 
   // Handle navigation
