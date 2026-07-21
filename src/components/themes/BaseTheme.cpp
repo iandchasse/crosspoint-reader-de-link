@@ -31,12 +31,6 @@ constexpr int bookmarkStatusIconHeight = 14;
 constexpr int bookmarkStatusIconGap = 4;
 constexpr int bookmarkStatusIconTopCrop = 2;
 
-bool statusBarTextLaneVisible() {
-  return SETTINGS.statusBarChapterPageCount || SETTINGS.statusBarBookProgressPercentage ||
-         SETTINGS.statusBarTitle != CrossPointSettings::STATUS_BAR_TITLE::HIDE_TITLE || SETTINGS.statusBarBattery ||
-         (SETTINGS.statusBarClock && (halClock.isAvailable() || HalClock::isSynced()));
-}
-
 void drawBookmarkStatusIcon(const GfxRenderer& renderer, const int x, const int y) {
   constexpr int bytesPerRow = bookmarkStatusIconWidth / 8;
   for (int row = 0; row < bookmarkStatusIconHeight; ++row) {
@@ -819,7 +813,12 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   int orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft;
   renderer.getOrientedViewableTRBL(&orientedMarginTop, &orientedMarginRight, &orientedMarginBottom,
                                    &orientedMarginLeft);
-  const bool showStatusBarTextLane = statusBarTextLaneVisible();
+  const auto sb = SETTINGS.statusBarSpec();
+  // "Clock available" here means either source: the X3's DS3231, or this port's
+  // native NTP-synced system clock (the only one on de-link). Passing just
+  // halClock.isAvailable() would collapse the text lane on de-link whenever the
+  // clock is the only element enabled.
+  const bool showStatusBarTextLane = sb.textLaneVisible(halClock.isAvailable() || HalClock::isSynced());
 
   // Draw Progress Text
   const auto screenHeight = renderer.getScreenHeight();
@@ -830,17 +829,17 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   int leftClusterWidth = 0;
   int rightClusterWidth = 0;
 
-  if (SETTINGS.statusBarBookProgressPercentage || SETTINGS.statusBarChapterPageCount) {
+  if (sb.showBookProgressPercent || sb.showChapterPageCount) {
     // Right aligned text for progress counter
     char progressStr[32];
 
     // Prefix the page count with "~" while a still-building spine only yields an estimated total.
     const char* estimatePrefix = pageCountEstimated ? "~" : "";
 
-    if (SETTINGS.statusBarBookProgressPercentage && SETTINGS.statusBarChapterPageCount) {
+    if (sb.showBookProgressPercent && sb.showChapterPageCount) {
       snprintf(progressStr, sizeof(progressStr), "%s%d/%d  %.0f%%", estimatePrefix, currentPage, pageCount,
                bookProgress);
-    } else if (SETTINGS.statusBarBookProgressPercentage) {
+    } else if (sb.showBookProgressPercent) {
       snprintf(progressStr, sizeof(progressStr), "%.0f%%", bookProgress);
     } else {
       snprintf(progressStr, sizeof(progressStr), "%s%d/%d", estimatePrefix, currentPage, pageCount);
@@ -853,22 +852,21 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   }
 
   // Draw Progress Bar
-  if (SETTINGS.statusBarProgressBar != CrossPointSettings::STATUS_BAR_PROGRESS_BAR::HIDE_PROGRESS) {
+  if (sb.showsProgressBar()) {
     const int barMarginLeft = fillMargin ? 0 : orientedMarginLeft;
     const int barMarginRight = fillMargin ? 0 : orientedMarginRight;
     const int progressBarMaxWidth = renderer.getScreenWidth() - barMarginLeft - barMarginRight;
-    const int progressBarY = renderer.getScreenHeight() - orientedMarginBottom -
-                             ((SETTINGS.statusBarProgressBarThickness + 1) * 2) - paddingBottom + (fillMargin ? 1 : 0);
+    const int progressBarY = renderer.getScreenHeight() - orientedMarginBottom - sb.progressBarHeightPx -
+                             paddingBottom + (fillMargin ? 1 : 0);
     size_t progress;
-    if (SETTINGS.statusBarProgressBar == CrossPointSettings::STATUS_BAR_PROGRESS_BAR::BOOK_PROGRESS) {
+    if (sb.progressBarMode == CrossPointSettings::STATUS_BAR_PROGRESS_BAR::BOOK_PROGRESS) {
       progress = static_cast<size_t>(bookProgress);
     } else {
       // Chapter progress
       progress = (pageCount > 0) ? (static_cast<float>(currentPage) / pageCount) * 100 : 0;
     }
     const int barWidth = progressBarMaxWidth * progress / 100;
-    const int barHeight =
-        ((SETTINGS.statusBarProgressBarThickness + 1) * 2) + (fillMargin ? orientedMarginBottom - 1 : 0);
+    const int barHeight = sb.progressBarHeightPx + (fillMargin ? orientedMarginBottom - 1 : 0);
     renderer.fillRect(barMarginLeft, progressBarY, barWidth, barHeight, true);
   }
 
@@ -879,10 +877,9 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   // declared with the progress text above.
 
   // Draw Battery
-  const bool showBatteryPercentage =
-      SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
+  const bool showBatteryPercentage = sb.showBatteryPercent;
 
-  if (SETTINGS.statusBarBattery) {
+  if (sb.showBattery) {
     GUI.drawBatteryLeft(renderer,
                         Rect{leftClusterX + leftClusterWidth, textY, metrics.batteryWidth, metrics.batteryHeight},
                         showBatteryPercentage);
@@ -898,31 +895,33 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     leftClusterWidth += batteryWidth;
   }
 
-  // Draw Clock: the DS3231 when present, otherwise the NTP-synced system time.
-  // Placement is user-selectable (#2359) — the left cluster after the battery, or
-  // the right cluster ahead of the progress text.
-  const bool showClock = SETTINGS.statusBarClock != CrossPointSettings::STATUS_BAR_CLOCK_HIDE &&
-                         (halClock.isAvailable() || HalClock::isSynced());
-  if (showClock) {
-    char timeBuf[16];
+  // Draw Clock, reading placement from the resolved spec (#2647). Upstream only
+  // draws the X3's DS3231 here; this port also has the native NTP-synced system
+  // clock, which is the ONLY source on de-link (no DS3231), so the source is
+  // chosen at draw time. Placement is user-selectable (#2359) — the left cluster
+  // after the battery, or the right cluster ahead of the progress text.
+  if (sb.showsClock() && (halClock.isAvailable() || HalClock::isSynced())) {
+    char timeBuf[16];  // 16, not 9: the native clock may prefix "~" when approximate
     bool haveTime = false;
     if (halClock.isAvailable()) {
-      haveTime = halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat12h != 0);
+      haveTime = halClock.formatTime(timeBuf, sizeof(timeBuf), sb.clockUtcOffsetQ, sb.clock12h);
     } else {
-      HalClock::formatTime(timeBuf, sizeof(timeBuf), !SETTINGS.clockFormat12h);
+      HalClock::formatTime(timeBuf, sizeof(timeBuf), !sb.clock12h);
       haveTime = timeBuf[0] != '-';
     }
     if (haveTime) {
       const int clockTextWidth = renderer.getTextWidth(SMALL_FONT_ID, timeBuf);
-      if (SETTINGS.statusBarClock == CrossPointSettings::STATUS_BAR_CLOCK_LEFT) {
+      int clockX = 0;
+      if (sb.clockMode == CrossPointSettings::STATUS_BAR_CLOCK_LEFT) {
         const int clockGap = leftClusterWidth > 0 ? 10 : 0;
-        renderer.drawText(SMALL_FONT_ID, leftClusterX + leftClusterWidth + clockGap, textY, timeBuf);
+        clockX = leftClusterX + leftClusterWidth + clockGap;
         leftClusterWidth += clockTextWidth + clockGap;
       } else {
         const int clockGap = rightClusterWidth > 0 ? 10 : 0;
-        renderer.drawText(SMALL_FONT_ID, rightClusterX - rightClusterWidth - clockGap - clockTextWidth, textY, timeBuf);
+        clockX = rightClusterX - rightClusterWidth - clockGap - clockTextWidth;
         rightClusterWidth += clockTextWidth + clockGap;
       }
+      renderer.drawText(SMALL_FONT_ID, clockX, textY, timeBuf);
     }
   }
 
