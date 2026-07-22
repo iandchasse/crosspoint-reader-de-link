@@ -267,7 +267,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
 #endif
 
   // Reader screen margin settings
-  uint8_t screenMargin = 5;
+  static constexpr uint8_t SCREEN_MARGIN_MIN = 5;
+  static constexpr uint8_t SCREEN_MARGIN_MAX = 40;
+  static constexpr uint8_t SCREEN_MARGIN_STEP = 5;
+  uint8_t screenMargin = SCREEN_MARGIN_MIN;
   // NOTE: the OPDS server URL/username/password used to live here; #2464 moved
   // them into OpdsServerStore (multi-server), so they are gone from SETTINGS.
   // The two fields below are separate global download preferences (#2571) and
