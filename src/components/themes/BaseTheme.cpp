@@ -827,32 +827,26 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     renderer.fillRect(barMarginLeft, progressBarY, barWidth, barHeight, true);
   }
 
-  // Draw Bookmark
+  // Left status-bar cluster, laid out left to right: battery, then clock, then the
+  // bookmark indicator LAST (#2444). Drawing the bookmark last is the whole point
+  // of that fix — toggling a bookmark must not shift the battery or clock, which
+  // it did when the bookmark reserved space ahead of them.
   const int leftClusterX = metrics.statusBarHorizontalMargin + orientedMarginLeft + 1;
-  const bool showBookmarkIcon = showStatusBarTextLane && isPageBookmarked;
-  const int bookmarkReserveWidth = showBookmarkIcon ? (bookmarkStatusIconWidth + bookmarkStatusIconGap) : 0;
-  if (showBookmarkIcon) {
-    const int bookmarkY = textY + 5;
-    drawBookmarkStatusIcon(renderer, leftClusterX, bookmarkY);
-  }
+  int leftClusterWidth = 0;
 
   // Draw Battery
   const bool showBatteryPercentage =
       SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
-  int leftClusterWidth = bookmarkReserveWidth;
   if (SETTINGS.statusBarBattery) {
     GUI.drawBatteryLeft(renderer,
-                        Rect{leftClusterX + bookmarkReserveWidth, textY, metrics.batteryWidth, metrics.batteryHeight},
+                        Rect{leftClusterX + leftClusterWidth, textY, metrics.batteryWidth, metrics.batteryHeight},
                         showBatteryPercentage);
     leftClusterWidth += showBatteryPercentage ? 50 : 20;
   }
 
-  // Draw Clock. One position for both time sources (upstream's X3 placement, to
-  // the left of the progress text): the DS3231 when present, otherwise the
-  // NTP-synced system time. Keeping the native clock out of the left cluster
-  // avoids it colliding with the bookmark icon / battery / title margin.
+  // Draw Clock, in the left cluster after the battery: the DS3231 when present,
+  // otherwise the NTP-synced system time.
   const bool showClock = SETTINGS.statusBarClock && (halClock.isAvailable() || HalClock::isSynced());
-  int clockTextWidth = 0;
   if (showClock) {
     char timeBuf[16];
     bool haveTime = false;
@@ -863,12 +857,20 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
       haveTime = timeBuf[0] != '-';
     }
     if (haveTime) {
-      clockTextWidth = renderer.getTextWidth(SMALL_FONT_ID, timeBuf);
-      // Position to the left of the progress text (with a small gap)
-      const int clockX = renderer.getScreenWidth() - metrics.statusBarHorizontalMargin - orientedMarginRight -
-                         progressTextWidth - (progressTextWidth > 0 ? 10 : 0) - clockTextWidth;
-      renderer.drawText(SMALL_FONT_ID, clockX, textY, timeBuf);
+      const int clockTextWidth = renderer.getTextWidth(SMALL_FONT_ID, timeBuf);
+      const int clockGap = leftClusterWidth > 0 ? 10 : 0;
+      renderer.drawText(SMALL_FONT_ID, leftClusterX + leftClusterWidth + clockGap, textY, timeBuf);
+      leftClusterWidth += clockTextWidth + clockGap;
     }
+  }
+
+  // Draw Bookmark last so its presence never moves anything else.
+  if (showStatusBarTextLane && isPageBookmarked) {
+    const int bookmarkGap = leftClusterWidth > 0 ? bookmarkStatusIconGap : 0;
+    const int bookmarkX = leftClusterX + leftClusterWidth + bookmarkGap;
+    const int bookmarkY = textY + 5;
+    drawBookmarkStatusIcon(renderer, bookmarkX, bookmarkY);
+    leftClusterWidth += bookmarkStatusIconWidth + bookmarkGap;
   }
 
   // Draw Title
@@ -880,8 +882,9 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
         renderer.getScreenWidth() - (metrics.statusBarHorizontalMargin * 2) - orientedMarginLeft - orientedMarginRight;
 
     const int titleMarginLeft = leftClusterWidth + 30;
-    const int clockReserve = clockTextWidth > 0 ? (clockTextWidth + 10) : 0;
-    const int titleMarginRight = progressTextWidth + clockReserve + 30;
+    // The clock now sits in the left cluster (#2444), so its width is already
+    // counted in titleMarginLeft — the right margin only reserves the progress text.
+    const int titleMarginRight = progressTextWidth + 30;
 
     // Attempt to center title on the screen, but if title is too wide then later we will center it within the
     // available space.
