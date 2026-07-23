@@ -28,6 +28,13 @@ struct DirectPixelWriter {
   // Orientation is collapsed into a linear transform:
   //   phyX = phyXBase + x * phyXStepX + y * phyXStepY
   //   phyY = phyYBase + x * phyYStepX + y * phyYStepY
+  //
+  // WARNING: this duplicates GfxRenderer::rotateCoordinates() — it is the same
+  // mapping, precomputed so the image hot path avoids a call per pixel. The two
+  // MUST agree. They silently disagreed once (this copy kept a flipped Portrait
+  // after the renderer's was corrected) and the only symptom was images rendering
+  // upside down while text was fine, because text goes through drawPixel and
+  // images come through here. If you change one, change the other.
   int phyXBase, phyYBase;
   int phyXStepX, phyYStepX;  // per logical-X step
   int phyXStepY, phyYStepY;  // per logical-Y step
@@ -47,13 +54,13 @@ struct DirectPixelWriter {
 
     switch (renderer.getOrientation()) {
       case GfxRenderer::Portrait:
-        // Logical portrait (480x800) → panel (800x480) - Inverted for specific physical mount
-        // phyX = (phyW-1) - y, phyY = x
-        phyXBase = phyW - 1;
-        phyYBase = 0;
+        // Logical portrait (480x800) → panel (800x480), rotated 90° clockwise.
+        // phyX = y, phyY = (phyH-1) - x
+        phyXBase = 0;
+        phyYBase = phyH - 1;
         phyXStepX = 0;
-        phyYStepX = 1;
-        phyXStepY = -1;
+        phyYStepX = -1;
+        phyXStepY = 1;
         phyYStepY = 0;
         break;
       case GfxRenderer::LandscapeClockwise:
@@ -66,13 +73,13 @@ struct DirectPixelWriter {
         phyYStepY = -1;
         break;
       case GfxRenderer::PortraitInverted:
-        // Logical portrait (480x800) → panel (800x480) - Standard orientation
-        // phyX = y, phyY = (phyH-1) - x
-        phyXBase = 0;
-        phyYBase = phyH - 1;
+        // Logical portrait (480x800) → panel (800x480), rotated 90° counter-clockwise.
+        // phyX = (phyW-1) - y, phyY = x
+        phyXBase = phyW - 1;
+        phyYBase = 0;
         phyXStepX = 0;
-        phyYStepX = -1;
-        phyXStepY = 1;
+        phyYStepX = 1;
+        phyXStepY = -1;
         phyYStepY = 0;
         break;
       case GfxRenderer::LandscapeCounterClockwise:
