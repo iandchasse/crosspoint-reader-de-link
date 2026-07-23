@@ -9,7 +9,7 @@
 #include <HalStorage.h>
 #include <USB.h>
 #include <USBMSC.h>
-#include <UsbMsc.h>
+#include <FreeInkUsbMsc.h>
 #include <tusb.h>
 
 #include "CrossPointSettings.h"
