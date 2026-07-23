@@ -1302,7 +1302,10 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     renderContents(std::move(p), orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft);
     LOG_DBG("ERS", "Rendered page in %dms", millis() - start);
   }
-  silentIndexNextChapterIfNeeded(viewportWidth, viewportHeight);
+  // (The port's #979 silentIndexNextChapterIfNeeded prefetch was dropped with the
+  // lazy incremental indexing merge (#2452): that feature already builds each
+  // chapter incrementally with a fast first page and no UI block, which subsumes
+  // #979's blocking penultimate-page prefetch.)
   // Only persist when the position actually changed. render() also runs on menu,
   // bookmark and screenshot re-renders, and writeAtomic is several FAT ops for 6 bytes.
   // Every real page turn changes currentPage, so progress durability is unaffected.
