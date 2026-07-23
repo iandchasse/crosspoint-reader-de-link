@@ -5,6 +5,21 @@
 
 #include <vector>
 
+// --- Type compatibility aliases ---
+// FsFile is SdFat's own type again. The SDK mounts an FsVolume on a native
+// esp-idf SDMMC block device (SdFat has no SDIO driver of its own), so this
+// board gets real SdFat file objects even though its card is on 4-bit SDMMC
+// rather than SPI — which is what upstream already assumes.
+//
+// This retires the EspFsFile shim, which wrapped ESP32's fs::File and re-added
+// the SdFat methods Arduino's File lacks (seekCur, int read(), void* read/write,
+// getName, seekSet, fileSize, ...). FsFile has all of them natively.
+//
+// EspFsFile stays as an alias so the port's existing references keep compiling;
+// new code should use FsFile.
+using EspFsFile = FsFile;
+using HalFile = FsFile;
+
 class HalStorage {
  public:
   HalStorage();
@@ -50,20 +65,6 @@ class HalStorage {
 
 #define Storage HalStorage::getInstance()
 
-// --- Type compatibility aliases ---
-// FsFile is SdFat's own type again. The SDK mounts an FsVolume on a native
-// esp-idf SDMMC block device (SdFat has no SDIO driver of its own), so this
-// board gets real SdFat file objects even though its card is on 4-bit SDMMC
-// rather than SPI — which is what upstream already assumes.
-//
-// This retires the EspFsFile shim, which wrapped ESP32's fs::File and re-added
-// the SdFat methods Arduino's File lacks (seekCur, int read(), void* read/write,
-// getName, seekSet, fileSize, ...). FsFile has all of them natively.
-//
-// EspFsFile stays as an alias so the port's existing references keep compiling;
-// new code should use FsFile.
-using EspFsFile = FsFile;
-using HalFile = FsFile;
 
 // Downstream code must use Storage instead of SdMan
 #ifdef SdMan

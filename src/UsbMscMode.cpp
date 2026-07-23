@@ -7,7 +7,10 @@
 #include <HalDisplay.h>
 #include <HalGPIO.h>
 #include <HalStorage.h>
+#include <USB.h>
+#include <USBMSC.h>
 #include <UsbMsc.h>
+#include <tusb.h>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -25,7 +28,35 @@ extern EpdFontFamily ui12FontFamily;
 
 namespace {
 
+// SD sector access lives in the SDK; the USBMSC LUN that forwards to it lives
+// here, because the Arduino USB stack is the application's to own -- the SDK
+// stays independent of which USB mode a consumer's build selects.
 freeink::UsbMsc usbMsc;
+USBMSC msc;
+
+bool startUsbMsc() {
+  if (!usbMsc.begin()) return false;
+
+  msc.vendorID("ESP32S3");
+  msc.productID("EPDReader");
+  msc.productRevision("1.0");
+  msc.onRead([](uint32_t lba, uint32_t, void* buffer, uint32_t bufsize) -> int32_t {
+    return usbMsc.readSectors(lba, buffer, bufsize);
+  });
+  msc.onWrite([](uint32_t lba, uint32_t, uint8_t* buffer, uint32_t bufsize) -> int32_t {
+    return usbMsc.writeSectors(lba, buffer, bufsize);
+  });
+  msc.onStartStop([](uint8_t, bool, bool) -> bool {
+    // The host ejecting the drive is its last chance to have data committed.
+    usbMsc.flush();
+    return true;
+  });
+  msc.mediaPresent(true);
+  msc.begin(usbMsc.sectorCount(), usbMsc.sectorSize());
+
+  USB.begin();
+  return true;
+}
 
 // Hold duration to leave the mode. Long enough that it can't be hit by accident
 // while the device is sitting plugged into a host.
@@ -44,7 +75,13 @@ void drawStatus(const char* line, const int height, const bool showExitHint) {
 // Leaving MSC mode is a reboot: the host has owned the FAT while we were
 // attached, so nothing in this firmware's caches can be trusted afterwards.
 void restartToNormalMode() {
-  usbMsc.end();  // flushes, detaches, and hands the PHY back to serial/JTAG
+  // Soft-disconnect first so the host unmounts cleanly rather than reporting a
+  // surprise removal; the SDK then flushes and returns the PHY to serial/JTAG.
+  if (tud_inited()) {
+    tud_disconnect();
+    delay(100);
+  }
+  usbMsc.end();
   ESP.restart();
 }
 
@@ -79,11 +116,7 @@ void runUsbMscMode() {
     restartToNormalMode();
   }
 
-  freeink::UsbMsc::Config cfg;
-  cfg.vendorId = "ESP32S3";
-  cfg.productId = "EPDReader";
-  cfg.revision = "1.0";
-  if (!usbMsc.begin(cfg)) {
+  if (!startUsbMsc()) {
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, height / 2, "USB Storage Failed!", true, EpdFontFamily::BOLD);
     renderer.displayBuffer(HalDisplay::FULL_REFRESH);
