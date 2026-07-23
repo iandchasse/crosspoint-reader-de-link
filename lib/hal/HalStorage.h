@@ -51,14 +51,19 @@ class HalStorage {
 #define Storage HalStorage::getInstance()
 
 // --- Type compatibility aliases ---
-// On the S3 platform, EspFsFile (from FsCompat.h) is the canonical file type.
-// It wraps ESP32's fs::File with SdFat-compatible API methods.
-// ESP32's SD_MMC driver is already thread-safe, so no HalFile mutex wrapper is needed.
+// FsFile is SdFat's own type again. The SDK mounts an FsVolume on a native
+// esp-idf SDMMC block device (SdFat has no SDIO driver of its own), so this
+// board gets real SdFat file objects even though its card is on 4-bit SDMMC
+// rather than SPI — which is what upstream already assumes.
 //
-// Upstream code uses both "FsFile" (SdFat's raw type) and "HalFile" (thread-safe wrapper).
-// We alias both to EspFsFile so all upstream code compiles transparently.
-using FsFile = EspFsFile;
-using HalFile = EspFsFile;
+// This retires the EspFsFile shim, which wrapped ESP32's fs::File and re-added
+// the SdFat methods Arduino's File lacks (seekCur, int read(), void* read/write,
+// getName, seekSet, fileSize, ...). FsFile has all of them natively.
+//
+// EspFsFile stays as an alias so the port's existing references keep compiling;
+// new code should use FsFile.
+using EspFsFile = FsFile;
+using HalFile = FsFile;
 
 // Downstream code must use Storage instead of SdMan
 #ifdef SdMan

@@ -1,3 +1,4 @@
-[submodule "open-x4-sdk"]
-	path = open-x4-sdk
-	url = https://github.com/iandchasse/community-sdk-de-link.git
+[submodule "freeink-sdk"]
+	path = freeink-sdk
+	url = https://github.com/iandchasse/freeink-sdk.git
+	branch = de-link

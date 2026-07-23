@@ -65,17 +65,26 @@ class HalGPIO {
 
   WakeupReason getWakeupReason() const;
 
-  // Button indices
-  static constexpr uint8_t BTN_BACK = 0;
-  static constexpr uint8_t BTN_CONFIRM = 1;
-  static constexpr uint8_t BTN_LEFT = 2;
-  static constexpr uint8_t BTN_RIGHT = 3;
-  static constexpr uint8_t BTN_UP = 4;
-  static constexpr uint8_t BTN_DOWN = 5;
+  // Button indices. These mirror InputManager's, so they must stay in lockstep
+  // with the SDK -- static_assert below enforces it rather than trusting comments.
+  static constexpr uint8_t BTN_BACK = InputManager::BTN_BACK;
+  static constexpr uint8_t BTN_CONFIRM = InputManager::BTN_CONFIRM;
+  static constexpr uint8_t BTN_LEFT = InputManager::BTN_LEFT;
+  static constexpr uint8_t BTN_RIGHT = InputManager::BTN_RIGHT;
+  static constexpr uint8_t BTN_UP = InputManager::BTN_UP;
+  static constexpr uint8_t BTN_DOWN = InputManager::BTN_DOWN;
+  static constexpr uint8_t BTN_POWER = InputManager::BTN_POWER;
   // Second ADC combo group — physical duplicates of BTN_UP/BTN_DOWN on this board.
-  static constexpr uint8_t BTN_UP_2 = 6;    // Same logical action as BTN_UP
-  static constexpr uint8_t BTN_DOWN_2 = 7;  // Same logical action as BTN_DOWN
-  static constexpr uint8_t BTN_POWER = 8;   // Matches InputManager::BTN_POWER
+  static constexpr uint8_t BTN_UP_2 = InputManager::BTN_UP_2;
+  static constexpr uint8_t BTN_DOWN_2 = InputManager::BTN_DOWN_2;
 };
+
+// Only the four front buttons are persisted (CrossPointSettings::frontButton*),
+// so those four indices are the ABI: changing them would silently remap a user's
+// saved button assignments. The second side pair sits after BTN_POWER for the
+// same reason.
+static_assert(HalGPIO::BTN_BACK == 0 && HalGPIO::BTN_CONFIRM == 1 && HalGPIO::BTN_LEFT == 2 &&
+                  HalGPIO::BTN_RIGHT == 3,
+              "Persisted front-button indices must not change");
 
 extern HalGPIO gpio;  // Singleton
