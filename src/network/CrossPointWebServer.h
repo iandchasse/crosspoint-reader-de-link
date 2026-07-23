@@ -76,6 +76,7 @@ HalFile file;
   std::unique_ptr<WebSocketsServer> wsServer = nullptr;
   WebDAVHandler davHandler;
   bool running = false;
+  bool watchdogTaskRegistered = false;
   bool apMode = false;  // true when running in AP mode, false for STA mode
   uint16_t port = 80;
   uint16_t wsPort = 81;  // WebSocket port
