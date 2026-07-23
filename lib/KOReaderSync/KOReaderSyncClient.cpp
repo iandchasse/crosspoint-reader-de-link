@@ -135,8 +135,12 @@ KOReaderSyncClient::Error KOReaderSyncClient::createUser() {
   }
 
   const std::string url = KOREADER_STORE.getBaseUrl() + "/users/create";
-  LOG_DBG("KOSync", "Creating account: %s (heap: %u)", url.c_str(), (unsigned)ESP.getFreeHeap());
-  if (insufficientHeap()) return LOW_MEMORY;
+  const uint32_t freeHeap = ESP.getFreeHeap();
+  LOG_DBG("KOSync", "Creating account: %s (heap: %u)", url.c_str(), (unsigned)freeHeap);
+  if (freeHeap < MIN_HEAP_FOR_TLS) {
+    LOG_ERR("KOSync", "Insufficient heap for TLS handshake: %u bytes free (need %u)", freeHeap, MIN_HEAP_FOR_TLS);
+    return LOW_MEMORY;
+  }
 
   JsonDocument doc;
   doc["username"] = KOREADER_STORE.getUsername();
@@ -144,21 +148,28 @@ KOReaderSyncClient::Error KOReaderSyncClient::createUser() {
   std::string body;
   serializeJson(doc, body);
 
-  freeink::SecureHttpClient http;
-  http.setInsecure();
-  if (!http.begin(url)) {
-    LOG_ERR("KOSync", "Bad URL: %s", url.c_str());
+  // Use the port's esp_http_client path (same as authenticate/updateProgress). The
+  // upstream createUser was written against #2475's freeink::SecureHttpClient, which
+  // this port hasn't picked yet; the sibling methods here never adopted it.
+  ResponseBuffer buf;
+  esp_http_client_handle_t client = createClient(url.c_str(), &buf, HTTP_METHOD_POST);
+  if (!client) return NETWORK_ERROR;
+
+  if (esp_http_client_set_header(client, "Content-Type", "application/json") != ESP_OK ||
+      esp_http_client_set_post_field(client, body.c_str(), body.length()) != ESP_OK) {
+    LOG_ERR("KOSync", "Failed to set request body");
+    esp_http_client_cleanup(client);
     return NETWORK_ERROR;
   }
-  http.addHeader("Accept", "application/vnd.koreader.v1+json");
-  http.addHeader("Content-Type", "application/json");
-  const int httpCode = http.sendRequest("POST", body);
-  http.end();
+
+  esp_err_t err = esp_http_client_perform(client);
+  const int httpCode = esp_http_client_get_status_code(client);
   lastHttpCode = httpCode;
+  esp_http_client_cleanup(client);
 
-  LOG_DBG("KOSync", "Create user response: %d", httpCode);
+  LOG_DBG("KOSync", "Create user response: %d (err: %d)", httpCode, err);
 
-  if (httpCode <= 0) return NETWORK_ERROR;
+  if (err != ESP_OK) return NETWORK_ERROR;
   if (httpCode == 200 || httpCode == 201) return OK;
   if (httpCode == 402) return USER_EXISTS;
   return SERVER_ERROR;
