@@ -3,13 +3,13 @@
 #include <Arduino.h>
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
+#include <FreeInkUsbMsc.h>
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
 #include <HalGPIO.h>
 #include <HalStorage.h>
 #include <USB.h>
 #include <USBMSC.h>
-#include <FreeInkUsbMsc.h>
 #include <tusb.h>
 
 #include "CrossPointSettings.h"
@@ -106,12 +106,12 @@ void runUsbMscMode() {
   const auto height = renderer.getScreenHeight();
 
   drawStatus("Connecting as USB Drive...", height, true);
-  renderer.displayBuffer(HalDisplay::FULL_REFRESH);
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 
   if (!Storage.begin()) {
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, height / 2, "SD Card Init Failed!", true, EpdFontFamily::BOLD);
-    renderer.displayBuffer(HalDisplay::FULL_REFRESH);
+    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     delay(5000);
     restartToNormalMode();
   }
@@ -119,7 +119,7 @@ void runUsbMscMode() {
   if (!startUsbMsc()) {
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, height / 2, "USB Storage Failed!", true, EpdFontFamily::BOLD);
-    renderer.displayBuffer(HalDisplay::FULL_REFRESH);
+    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
     delay(5000);
     restartToNormalMode();
   }
