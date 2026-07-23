@@ -156,10 +156,16 @@ bool FileBrowserActivity::removeDirFile(const std::string& fullPath) {
     // Push this dir for post-order rmdir (after all children are processed).
     stack.push_back({currentPath, true});
 
+    // Snapshot the listing before touching anything: SdFat's openNextFile() walks
+    // a directory by a running on-disk index, so removing a file mid-iteration
+    // shifts the cursor and the walk skips the rest. Collect (path, isDir) first,
+    // close the dir, then act.
+    std::vector<std::pair<std::string, bool>> entries;
     dir.rewindDirectory();
     for (auto entry = dir.openNextFile(); entry; entry = dir.openNextFile()) {
       entry.getName(fileNameBuffer.get(), NAME_BUFFER_SIZE);
       if (strcmp(fileNameBuffer.get(), ".") == 0 || strcmp(fileNameBuffer.get(), "..") == 0) {
+        entry.close();
         continue;
       }
       std::string entryPath = currentPath;
@@ -167,10 +173,12 @@ bool FileBrowserActivity::removeDirFile(const std::string& fullPath) {
         entryPath += "/";
       }
       entryPath += fileNameBuffer.get();
-
-      const bool isDir = entry.isDirectory();
+      entries.emplace_back(std::move(entryPath), entry.isDirectory());
       entry.close();
+    }
+    dir.close();
 
+    for (auto& [entryPath, isDir] : entries) {
       if (isDir) {
         stack.push_back({std::move(entryPath), false});
       } else {
