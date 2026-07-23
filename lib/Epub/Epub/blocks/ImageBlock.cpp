@@ -119,6 +119,15 @@ bool renderFromCache(GfxRenderer& renderer, const std::string& cachePath, int x,
 }  // namespace
 
 void ImageBlock::render(GfxRenderer& renderer, const int x, const int y) {
+  // The font-prewarm scan pass only measures glyphs and suppresses normal
+  // drawing (GfxRenderer::drawPixel etc. early-return while scanning). But the
+  // image path writes through DirectPixelWriter straight to the framebuffer,
+  // bypassing that suppression — so without this guard the image is fully
+  // decoded and streamed to the .pxc cache during the scan pass. Skip it here so
+  // the decode/cache-write happens exactly once, in the real render pass below,
+  // where the write target and clip state are correct. (Matches upstream #2230.)
+  if (renderer.isFontCacheScanning()) return;
+
   LOG_DBG("IMG", "Rendering image at %d,%d: %s (%dx%d)", x, y, imagePath.c_str(), width, height);
 
   const int screenWidth = renderer.getScreenWidth();
