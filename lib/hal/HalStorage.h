@@ -39,6 +39,12 @@ class HalFile : public FsFile {
   [[nodiscard]] bool isDirectory() const { return isDir(); }
   void rewindDirectory() { rewind(); }
 
+  // Upstream's explicit 64-bit spellings. SdFat is already 64-bit throughout --
+  // fileSize() returns uint64_t and seekSet() takes one -- so these are pure
+  // naming, kept so the call sites read the same as upstream's.
+  [[nodiscard]] uint64_t fileSize64() { return fileSize(); }
+  bool seek64(uint64_t pos) { return seekSet(pos); }
+
   [[nodiscard]] HalFile openNextFile(oflag_t oflag = O_RDONLY) {
     HalFile next;
     next.openNext(this, oflag);
