@@ -303,13 +303,14 @@ void EpubReaderActivity::loop() {
     } else {
 #ifdef FRONTLIGHT_PRESENT
       if (SETTINGS.longPressConfirmBehavior == CrossPointSettings::LONG_PRESS_CONFIRM_FRONTLIGHT) {
-        // If behavior is frontlight, bookmarking triggers on release if held between 400ms and 1s
-        if (mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
-          addBookmark();
-          showBookmarkMessage = true;
-          bookmarkMessageTime = millis();
-          requestUpdate();
-        } else if (mappedInput.getHeldTime() < ReaderUtils::BOOKMARK_HOLD_MS) {
+        // TEMP: the 400ms–1s "add bookmark" shortcut on long-press Select is
+        // disabled for now. Any release below the frontlight hold threshold
+        // (GO_HOME_MS, 1s) opens the reader menu; a 1s+ hold still opens the
+        // frontlight control (handled on press above). Bookmarks remain available
+        // from the reader menu. Restore the branch below to re-enable the shortcut.
+        // NOTE: the longPressConfirmBehavior setting already toggles frontlight vs
+        // bookmark on long-press — revisit once the upstream resync lands.
+        if (mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
           const int currentPage = section ? section->currentPage + 1 : 0;
           const int totalPages = section ? section->pageCount : 0;
           float bookProgress = 0.0f;
@@ -576,6 +577,13 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
                              });
       break;
     }
+#ifdef FRONTLIGHT_PRESENT
+    case EpubReaderMenuActivity::MenuAction::FRONTLIGHT: {
+      startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
+                             [this](const ActivityResult& result) { requestUpdate(); });
+      break;
+    }
+#endif
     case EpubReaderMenuActivity::MenuAction::GO_TO_PERCENT: {
       float bookProgress = 0.0f;
       if (epub && epub->getBookSize() > 0 && section && section->pageCount > 0) {
