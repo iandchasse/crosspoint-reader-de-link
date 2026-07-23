@@ -857,7 +857,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     char timeBuf[16];
     bool haveTime = false;
     if (halClock.isAvailable()) {
-      haveTime = halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1);
+      haveTime = halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat12h != 0);
     } else {
       HalClock::formatTime(timeBuf, sizeof(timeBuf), !SETTINGS.clockFormat12h);
       haveTime = timeBuf[0] != '-';

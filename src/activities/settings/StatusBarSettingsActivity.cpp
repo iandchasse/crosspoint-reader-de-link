@@ -120,8 +120,8 @@ void StatusBarSettingsActivity::onEnter() {
     SETTINGS.clockUtcOffsetQ = 48;  // Default to UTC+0
   }
 
-  if (SETTINGS.clockFormat >= CLOCK_FORMAT_ITEMS) {
-    SETTINGS.clockFormat = 0;
+  if (SETTINGS.clockFormat12h >= CLOCK_FORMAT_ITEMS) {
+    SETTINGS.clockFormat12h = 0;
   }
 
   requestUpdate();
@@ -193,7 +193,7 @@ void StatusBarSettingsActivity::handleSelection() {
       SETTINGS.statusBarClock = (SETTINGS.statusBarClock + 1) % 2;
       break;
     case ITEM_CLOCK_FORMAT:
-      SETTINGS.clockFormat = (SETTINGS.clockFormat + 1) % CLOCK_FORMAT_ITEMS;
+      SETTINGS.clockFormat12h = (SETTINGS.clockFormat12h + 1) % CLOCK_FORMAT_ITEMS;
       break;
     case ITEM_CLOCK_UTC_OFFSET:
       startActivityForResult(std::make_unique<ClockOffsetActivity>(renderer, mappedInput), nullptr);
@@ -241,7 +241,7 @@ void StatusBarSettingsActivity::render(RenderLock&&) {
           case ITEM_CLOCK:
             return SETTINGS.statusBarClock ? tr(STR_SHOW) : tr(STR_HIDE);
           case ITEM_CLOCK_FORMAT: {
-            const uint8_t fmt = SETTINGS.clockFormat < CLOCK_FORMAT_ITEMS ? SETTINGS.clockFormat : 0;
+            const uint8_t fmt = SETTINGS.clockFormat12h < CLOCK_FORMAT_ITEMS ? SETTINGS.clockFormat12h : 0;
             return std::string(I18N.get(clockFormatNames[fmt]));
           }
           case ITEM_CLOCK_UTC_OFFSET:

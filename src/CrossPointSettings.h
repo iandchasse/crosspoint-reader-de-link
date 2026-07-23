@@ -235,6 +235,9 @@ class CrossPointSettings {
   // Quarter-hour granularity supports oddball zones like Nepal (+5:45) and Chatham (+12:45).
   uint8_t clockUtcOffsetQ = 48;
   // Clock display format: 0 = 24-hour, 1 = 12-hour
+  // DEPRECATED duplicate of clockFormat12h (same 0=24h/1=12h encoding). All
+  // display and menu code now reads clockFormat12h; this is retained only so the
+  // stored value/settings key survives until the two clock stacks are merged.
   uint8_t clockFormat = 0;
   // Set once an NTP sync succeeds. Used to skip re-syncing on every WiFi connect.
   // Resetting to 0 (e.g. via the web UI) forces a re-sync on next WiFi connect.

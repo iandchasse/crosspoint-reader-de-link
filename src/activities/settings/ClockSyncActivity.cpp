@@ -43,7 +43,7 @@ void ClockSyncActivity::runSync() {
 
   // Read the freshly synced time back for the user-facing confirmation.
   char buf[9];
-  if (halClock.formatTime(buf, sizeof(buf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1)) {
+  if (halClock.formatTime(buf, sizeof(buf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat12h != 0)) {
     snprintf(syncedTime, sizeof(syncedTime), "%s", buf);
   }
   state = SUCCESS;
