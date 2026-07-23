@@ -3,22 +3,51 @@
 #include <FS.h>  // need to be included before SdFat.h for compatibility with FS.h's File class
 #include <SDCardManager.h>
 
+#include <utility>  // std::move (HalFile is move-only)
 #include <vector>
 
-// --- Type compatibility aliases ---
-// FsFile is SdFat's own type again. The SDK mounts an FsVolume on a native
-// esp-idf SDMMC block device (SdFat has no SDIO driver of its own), so this
-// board gets real SdFat file objects even though its card is on 4-bit SDMMC
-// rather than SPI — which is what upstream already assumes.
+// --- File type ---
+// The card now yields real SdFat FsFile objects: the SDK mounts an FsVolume on a
+// native esp-idf SDMMC block device (SdFat has no SDIO driver of its own), so
+// this board gets the same file type upstream assumes despite being on 4-bit
+// SDMMC rather than SPI. That retired the old EspFsFile shim, which wrapped
+// ESP32's fs::File to re-add the SdFat methods Arduino's File lacks (seekCur,
+// int read(), void* read/write, getName, seekSet, fileSize, ...) — FsFile has
+// all of those natively.
 //
-// This retires the EspFsFile shim, which wrapped ESP32's fs::File and re-added
-// the SdFat methods Arduino's File lacks (seekCur, int read(), void* read/write,
-// getName, seekSet, fileSize, ...). FsFile has all of them natively.
+// Two names remain SdFat's own spelling rather than upstream's: FsFile calls
+// them isDir() and rewind(), while upstream CrossPoint (and therefore this
+// port's ~30 call sites) says isDirectory() and rewindDirectory(). Upstream
+// reconciles that with its own HalFile wrapper class; this is the same idea
+// pared down to the two names, since the ESP32 SD driver is already thread-safe
+// and needs none of upstream's mutex machinery.
 //
-// EspFsFile stays as an alias so the port's existing references keep compiling;
-// new code should use FsFile.
-using EspFsFile = FsFile;
-using HalFile = FsFile;
+// openNextFile() is shadowed so directory walks stay in this type — otherwise
+// `HalFile entry = dir.openNextFile()` would hand back a plain FsFile and lose
+// isDirectory() on the very call that needs it.
+class HalFile : public FsFile {
+ public:
+  HalFile() = default;
+  // Move-only: SdFat builds with FILE_COPY_CONSTRUCTOR_PRIVATE, so a file object
+  // can be moved but never copied. Matches how FsFile itself behaves.
+  HalFile(FsFile&& other) : FsFile(std::move(other)) {}
+  HalFile& operator=(FsFile&& other) {
+    FsFile::operator=(std::move(other));
+    return *this;
+  }
+
+  [[nodiscard]] bool isDirectory() const { return isDir(); }
+  void rewindDirectory() { rewind(); }
+
+  [[nodiscard]] HalFile openNextFile(oflag_t oflag = O_RDONLY) {
+    HalFile next;
+    next.openNext(this, oflag);
+    return next;
+  }
+};
+
+// The port's existing references; new code should use HalFile.
+using EspFsFile = HalFile;
 
 class HalStorage {
  public:

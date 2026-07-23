@@ -28,17 +28,11 @@ bool HalStorage::writeFile(const char* path, const String& content) { return SDC
 
 bool HalStorage::ensureDirectoryExists(const char* path) { return SDCard.ensureDirectoryExists(path); }
 
-EspFsFile HalStorage::open(const char* path, const oflag_t oflag) {
-  const char* mode = FILE_READ;
-  if ((oflag & O_RDWR) || (oflag & O_WRONLY)) {
-    if (oflag & O_APPEND) {
-      mode = FILE_APPEND;
-    } else {
-      mode = FILE_WRITE;
-    }
-  }
-  return SDCard.open(path, mode);
-}
+// The oflag is passed straight through: SdFat's open() is oflag-native, so the
+// translation to Arduino's "r"/"w"/"a" mode strings that used to live here is
+// gone along with the fs::File backend. It was also lossy — O_CREAT, O_TRUNC and
+// O_EXCL had no representation in the string form.
+EspFsFile HalStorage::open(const char* path, const oflag_t oflag) { return SDCard.open(path, oflag); }
 
 bool HalStorage::mkdir(const char* path, const bool /* pFlag */) { return SDCard.mkdir(path); }
 
