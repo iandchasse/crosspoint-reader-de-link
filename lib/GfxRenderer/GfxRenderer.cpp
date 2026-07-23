@@ -105,25 +105,27 @@ static inline void rotateCoordinates(const GfxRenderer::Orientation orientation,
                                      int* phyY, const uint16_t panelWidth, const uint16_t panelHeight) {
   switch (orientation) {
     case GfxRenderer::Portrait: {
-      // Logical portrait (480x800) → panel (800x480) - Inverted for specific physical mount
-      *phyX = panelWidth - 1 - y;
-      *phyY = x;
+      // Logical portrait (480x800) → panel (800x480)
+      // Rotation: 90 degrees clockwise
+      *phyX = y;
+      *phyY = panelHeight - 1 - x;
       break;
     }
     case GfxRenderer::LandscapeClockwise: {
-      // Logical landscape (800x480)
+      // Logical landscape (800x480) rotated 180 degrees (swap top/bottom and left/right)
       *phyX = panelWidth - 1 - x;
       *phyY = panelHeight - 1 - y;
       break;
     }
     case GfxRenderer::PortraitInverted: {
-      // Logical portrait (480x800) → panel (800x480) - Standard orientation
-      *phyX = y;
-      *phyY = panelHeight - 1 - x;
+      // Logical portrait (480x800) → panel (800x480)
+      // Rotation: 90 degrees counter-clockwise
+      *phyX = panelWidth - 1 - y;
+      *phyY = x;
       break;
     }
     case GfxRenderer::LandscapeCounterClockwise: {
-      // Logical landscape (800x480)
+      // Logical landscape (800x480) aligned with panel orientation
       *phyX = x;
       *phyY = y;
       break;
