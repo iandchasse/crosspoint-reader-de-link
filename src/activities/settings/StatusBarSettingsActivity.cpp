@@ -32,8 +32,9 @@ enum MenuItem {
   ITEM_COUNT
 };
 
-constexpr int BASE_MENU_ITEMS = ITEM_CLOCK;  // Items shown on every device
-constexpr int FULL_MENU_ITEMS = ITEM_COUNT;  // Items shown when RTC is available
+constexpr int BASE_MENU_ITEMS = ITEM_CLOCK;             // No time source at all
+constexpr int NTP_MENU_ITEMS = ITEM_CLOCK_UTC_OFFSET;   // NTP-synced time: show/hide + format
+constexpr int FULL_MENU_ITEMS = ITEM_COUNT;             // DS3231 present: also offset + sync
 
 const StrId menuNames[FULL_MENU_ITEMS] = {
     StrId::STR_CHAPTER_PAGE_COUNT,
@@ -74,9 +75,10 @@ const StrId progressBarThicknessNames[PROGRESS_BAR_THICKNESS_ITEMS] = {
 constexpr int TITLE_ITEMS = 3;
 const StrId titleNames[TITLE_ITEMS] = {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE};
 
-constexpr int BATTERY_ITEMS = 5;
-const StrId batteryNames[BATTERY_ITEMS] = {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS, StrId::STR_CLOCK,
-                                           StrId::STR_HYBRID};
+// Mirrors HIDE_BATTERY_PERCENTAGE. The Clock/Hybrid options were retired when the
+// clock moved to its own statusBarClock toggle; keep this in step with the enum.
+constexpr int BATTERY_ITEMS = CrossPointSettings::HIDE_BATTERY_PERCENTAGE_COUNT;
+const StrId batteryNames[BATTERY_ITEMS] = {StrId::STR_NEVER, StrId::STR_IN_READER, StrId::STR_ALWAYS};
 
 constexpr int XTC_STATUS_BAR_ITEMS = 3;
 const StrId xtcStatusBarNames[XTC_STATUS_BAR_ITEMS] = {StrId::STR_HIDE, StrId::STR_BOTTOM, StrId::STR_TOP};
@@ -89,7 +91,9 @@ void StatusBarSettingsActivity::onEnter() {
   Activity::onEnter();
 
   selectedIndex = 0;
-  visibleItemCount = halClock.isAvailable() ? FULL_MENU_ITEMS : BASE_MENU_ITEMS;
+  // Match BaseTheme: a clock exists if the DS3231 is present OR system time is NTP-synced.
+  visibleItemCount =
+      halClock.isAvailable() ? FULL_MENU_ITEMS : (HalClock::isSynced() ? NTP_MENU_ITEMS : BASE_MENU_ITEMS);
 
   // Clamp settings in case of corrupt/migrated data
   if (SETTINGS.statusBarProgressBar >= PROGRESS_BAR_ITEMS) {
@@ -178,13 +182,9 @@ void StatusBarSettingsActivity::handleSelection() {
       SETTINGS.statusBarTitle = (SETTINGS.statusBarTitle + 1) % TITLE_ITEMS;
       break;
     case ITEM_BATTERY:
-      if (halClock.isAvailable()) {
-        SETTINGS.statusBarBattery = (SETTINGS.statusBarBattery + 1) % 2;
-      } else {
-        SETTINGS.hideBatteryPercentage = (SETTINGS.hideBatteryPercentage + 1) % BATTERY_ITEMS;
-        SETTINGS.statusBarBattery =
-            (SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS) ? 0 : 1;
-      }
+      SETTINGS.hideBatteryPercentage = (SETTINGS.hideBatteryPercentage + 1) % BATTERY_ITEMS;
+      SETTINGS.statusBarBattery =
+          (SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS) ? 0 : 1;
       break;
     case ITEM_XTC_STATUS_BAR:
       SETTINGS.xtcStatusBarMode = (SETTINGS.xtcStatusBarMode + 1) % XTC_STATUS_BAR_ITEMS;
@@ -235,11 +235,7 @@ void StatusBarSettingsActivity::render(RenderLock&&) {
           case ITEM_TITLE:
             return I18N.get(titleNames[SETTINGS.statusBarTitle]);
           case ITEM_BATTERY:
-            if (halClock.isAvailable()) {
-              return SETTINGS.statusBarBattery ? tr(STR_SHOW) : tr(STR_HIDE);
-            } else {
-              return I18N.get(batteryNames[SETTINGS.hideBatteryPercentage]);
-            }
+            return I18N.get(batteryNames[SETTINGS.hideBatteryPercentage]);
           case ITEM_XTC_STATUS_BAR:
             return I18N.get(xtcStatusBarNames[SETTINGS.xtcStatusBarMode]);
           case ITEM_CLOCK:
