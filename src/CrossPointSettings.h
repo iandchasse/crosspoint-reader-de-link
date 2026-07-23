@@ -160,15 +160,11 @@ class CrossPointSettings {
     LONG_PRESS_MENU_FUNCTION_COUNT
   };
 
-  // Hide battery percentage
-  enum HIDE_BATTERY_PERCENTAGE {
-    HIDE_NEVER = 0,
-    HIDE_READER = 1,
-    HIDE_ALWAYS = 2,
-    SHOW_CLOCK = 3,
-    SHOW_CLOCK_HYBRID = 4,
-    HIDE_BATTERY_PERCENTAGE_COUNT
-  };
+  // Hide battery percentage. Matches upstream: the clock is NOT multiplexed into
+  // this setting — it has its own statusBarClock toggle. Reducing the count from
+  // 5 makes readAndValidate() reject persisted values 3/4 (the retired Clock and
+  // Hybrid options), leaving the default HIDE_NEVER.
+  enum HIDE_BATTERY_PERCENTAGE { HIDE_NEVER = 0, HIDE_READER = 1, HIDE_ALWAYS = 2, HIDE_BATTERY_PERCENTAGE_COUNT };
 
   // Page turn button long press behavior
   enum LONG_PRESS_BUTTON_BEHAVIOR {

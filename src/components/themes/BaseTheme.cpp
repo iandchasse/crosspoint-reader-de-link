@@ -803,30 +803,25 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     renderer.fillRect(barMarginLeft, progressBarY, barWidth, barHeight, true);
   }
 
-  // Draw Battery / Clock
-  const auto battSetting = SETTINGS.hideBatteryPercentage;
-  const bool showBatteryIcon =
-      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
-       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 == 0)));
+  // Draw Battery. The clock is no longer multiplexed into this setting: it is
+  // driven independently by SETTINGS.statusBarClock (upstream's X3 mechanism).
   const bool showBatteryPercentage =
-      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER ||
-       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 == 0)));
+      SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
 
-  const bool showClock =
-      (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK ||
-       (battSetting == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::SHOW_CLOCK_HYBRID && (currentPage % 2 != 0))) &&
-      HalClock::isSynced();
+  // Clock is shown whenever the status-bar clock toggle is on and a time source
+  // exists — the DS3231 when present (X3), otherwise the NTP-synced system time.
+  const bool showClock = SETTINGS.statusBarClock && (halClock.isAvailable() || HalClock::isSynced());
 
-  if (SETTINGS.statusBarBattery && (showBatteryIcon || showBatteryPercentage)) {
+  if (SETTINGS.statusBarBattery) {
     GUI.drawBatteryLeft(renderer,
                         Rect{metrics.statusBarHorizontalMargin + orientedMarginLeft + 1, textY, metrics.batteryWidth,
                              metrics.batteryHeight},
                         showBatteryPercentage);
   }
 
-  // Draw Clock (X3 only — DS3231 RTC)
+  // Draw Clock from the DS3231 when one is present (X3).
   int clockTextWidth = 0;
-  if (halClock.isAvailable() && SETTINGS.statusBarClock) {
+  if (showClock && halClock.isAvailable()) {
     char timeBuf[9];
     if (halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1)) {
       clockTextWidth = renderer.getTextWidth(SMALL_FONT_ID, timeBuf);
@@ -842,7 +837,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     char clockStr[16];
     HalClock::formatTime(clockStr, sizeof(clockStr), !SETTINGS.clockFormat12h);
     if (clockStr[0] != '-') {
-      const int clockX = SETTINGS.statusBarBattery && showBatteryIcon
+      const int clockX = SETTINGS.statusBarBattery
                              ? metrics.statusBarHorizontalMargin + orientedMarginLeft + 1 + metrics.batteryWidth +
                                    batteryPercentSpacing + 30
                              : metrics.statusBarHorizontalMargin + orientedMarginLeft + 1;
