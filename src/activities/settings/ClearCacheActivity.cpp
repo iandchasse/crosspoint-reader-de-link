@@ -5,6 +5,8 @@
 #include <I18n.h>
 #include <Logging.h>
 
+#include <vector>
+
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -90,29 +92,31 @@ void ClearCacheActivity::clearCache() {
   failedCount = 0;
   char name[128];
 
-  // Iterate through all entries in the directory
+  // Snapshot the book-cache directory names in one pass, THEN delete. Removing a
+  // directory while still iterating the parent shifts SdFat's openNextFile()
+  // cursor, so the walk skips siblings and most caches survive. Collect first,
+  // close the parent, then delete. (Regression from the SdFat/SDMMC SD backend;
+  // the old Arduino SD_MMC path tolerated delete-while-iterating.)
+  std::vector<String> cacheDirs;
   for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
     file.getName(name, sizeof(name));
-    String itemName(name);
-
-    // Only delete directories matching known book cache names.
-    if (file.isDirectory() && isBookCacheDirectoryName(itemName.c_str())) {
-      String fullPath = "/.crosspoint/" + itemName;
-      LOG_DBG("CLEAR_CACHE", "Removing cache: %s", fullPath.c_str());
-
-      file.close();  // Close before attempting to delete
-
-      if (Storage.removeDir(fullPath.c_str())) {
-        clearedCount++;
-      } else {
-        LOG_ERR("CLEAR_CACHE", "Failed to remove: %s", fullPath.c_str());
-        failedCount++;
-      }
-    } else {
-      file.close();
+    if (file.isDirectory() && isBookCacheDirectoryName(name)) {
+      cacheDirs.emplace_back(name);
     }
+    file.close();
   }
   root.close();
+
+  for (const auto& itemName : cacheDirs) {
+    const String fullPath = "/.crosspoint/" + itemName;
+    LOG_DBG("CLEAR_CACHE", "Removing cache: %s", fullPath.c_str());
+    if (Storage.removeDir(fullPath.c_str())) {
+      clearedCount++;
+    } else {
+      LOG_ERR("CLEAR_CACHE", "Failed to remove: %s", fullPath.c_str());
+      failedCount++;
+    }
+  }
 
   LOG_DBG("CLEAR_CACHE", "Cache cleared: %d removed, %d failed", clearedCount, failedCount);
 
