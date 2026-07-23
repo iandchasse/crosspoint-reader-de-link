@@ -4,11 +4,16 @@
 #include <I18n.h>
 
 #include "MappedInputManager.h"
+#include "SilentRestart.h"  // usbMscBootFlag / USB_MSC_BOOT_MAGIC
 #include "components/UITheme.h"
 #include "fontIds.h"
 
 namespace {
-constexpr int MENU_ITEM_COUNT = 3;
+// USB Mass Storage sits at the end of the File Transfer menu. It is not a network
+// mode -- selecting it reboots straight into MSC (see loop()) -- so it is counted
+// here for navigation but handled separately from the NetworkMode options.
+constexpr int USB_MSC_INDEX = 3;
+constexpr int MENU_ITEM_COUNT = 4;
 }  // namespace
 
 void NetworkModeSelectionActivity::onEnter() {
@@ -32,6 +37,13 @@ void NetworkModeSelectionActivity::loop() {
 
   // Handle confirm button - select current option
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
+    if (selectedIndex == USB_MSC_INDEX) {
+      // USB Mass Storage runs from a dedicated boot path, so arm the flag and
+      // reboot rather than returning a NetworkMode to the web-server flow.
+      usbMscBootFlag = USB_MSC_BOOT_MAGIC;
+      ESP.restart();
+      return;
+    }
     NetworkMode mode = NetworkMode::JOIN_NETWORK;
     if (selectedIndex == 1) {
       mode = NetworkMode::CONNECT_CALIBRE;
@@ -67,10 +79,10 @@ void NetworkModeSelectionActivity::render(RenderLock&&) {
   const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
   // Menu items and descriptions
   static constexpr StrId menuItems[MENU_ITEM_COUNT] = {StrId::STR_JOIN_NETWORK, StrId::STR_CALIBRE_WIRELESS,
-                                                       StrId::STR_CREATE_HOTSPOT};
+                                                       StrId::STR_CREATE_HOTSPOT, StrId::STR_USB_MASS_STORAGE};
   static constexpr StrId menuDescs[MENU_ITEM_COUNT] = {StrId::STR_JOIN_DESC, StrId::STR_CALIBRE_DESC,
-                                                       StrId::STR_HOTSPOT_DESC};
-  static constexpr UIIcon menuIcons[MENU_ITEM_COUNT] = {UIIcon::Wifi, UIIcon::Library, UIIcon::Hotspot};
+                                                       StrId::STR_HOTSPOT_DESC, StrId::STR_USB_MASS_STORAGE_DESC};
+  static constexpr UIIcon menuIcons[MENU_ITEM_COUNT] = {UIIcon::Wifi, UIIcon::Library, UIIcon::Hotspot, UIIcon::Usb};
 
   GUI.drawList(
       renderer, Rect{0, contentTop, pageWidth, contentHeight}, static_cast<int>(MENU_ITEM_COUNT), selectedIndex,

@@ -433,4 +433,5 @@ STR_FIRMWARE_UPDATE_DO_NOT_POWER_OFF: "Do not power off!"
 STR_RECOVERY_MODE: "Recovery Mode"
 STR_RECOVERY_MODE_HINT: "Place firmware.bin on SD card root and select it"
 STR_USB_MASS_STORAGE: "USB Mass Storage"
+STR_USB_MASS_STORAGE_DESC: "Mount the SD card as a USB drive"
 

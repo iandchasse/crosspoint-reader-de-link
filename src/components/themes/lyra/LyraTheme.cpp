@@ -29,6 +29,7 @@
 #include "components/icons/settings2.h"
 #include "components/icons/text24.h"
 #include "components/icons/transfer.h"
+#include "components/icons/usb.h"
 #include "components/icons/wifi.h"
 #include "fontIds.h"
 #include "HalClock.h"
@@ -82,6 +83,8 @@ const uint8_t* iconForName(UIIcon icon, int size) {
         return HotspotIcon;
       case UIIcon::Bookmark:
         return BookmarkIcon;
+      case UIIcon::Usb:
+        return UsbIcon;
       default:
         return nullptr;
     }
