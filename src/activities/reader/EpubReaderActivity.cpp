@@ -331,24 +331,22 @@ void EpubReaderActivity::loop() {
   }
 
   // Long-press Confirm runs the user-selected function (SETTINGS.longPressMenuFunction).
-  // On frontlight hardware this port can instead bind a 1s+ hold to the frontlight
-  // control via SETTINGS.longPressConfirmBehavior.
   if (mappedInput.isPressed(MappedInputManager::Button::Confirm)) {
-#ifdef FRONTLIGHT_PRESENT
-    if (SETTINGS.longPressConfirmBehavior == CrossPointSettings::LONG_PRESS_CONFIRM_FRONTLIGHT) {
-      // Hold ~1s opens the frontlight control.
-      if (mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
-        startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
-                               [this](const ActivityResult& result) {
-                                 // After returning from frontlight control, request screen update
-                               });
-        ignoreNextConfirmRelease = true;  // suppress the menu open on the following release
-        return;
-      }
-    } else
-#endif
     {
       switch (SETTINGS.longPressMenuFunction) {
+#ifdef FRONTLIGHT_PRESENT
+        case CrossPointSettings::LP_MENU_FRONTLIGHT:
+          // Hold ~1s opens the frontlight control.
+          if (mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+            startActivityForResult(std::make_unique<FrontlightControlActivity>(renderer, mappedInput),
+                                   [this](const ActivityResult& result) {
+                                     // After returning from frontlight control, request screen update
+                                   });
+            ignoreNextConfirmRelease = true;  // suppress the menu open on the following release
+            return;
+          }
+          break;
+#endif
         case CrossPointSettings::LP_MENU_BOOKMARK:
           // Hold ~0.4s drops a bookmark at the current page.
           if (mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && !showBookmarkMessage) {

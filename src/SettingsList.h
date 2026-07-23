@@ -190,16 +190,16 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           {StrId::STR_LONG_PRESS_BEHAVIOR_OFF, StrId::STR_LONG_PRESS_BEHAVIOR_SKIP,
                            StrId::STR_LONG_PRESS_BEHAVIOR_ORIENTATION},
                           "longPressButtonBehavior", StrId::STR_CAT_CONTROLS),
-#ifdef FRONTLIGHT_PRESENT
-        SettingInfo::Enum(StrId::STR_LONG_PRESS_CONFIRM_BEHAVIOR, &CrossPointSettings::longPressConfirmBehavior,
-                          {StrId::STR_LONG_PRESS_CONFIRM_FRONTLIGHT, StrId::STR_LONG_PRESS_CONFIRM_BOOKMARK},
-                          "longPressConfirmBehavior", StrId::STR_CAT_CONTROLS),
-#endif
-        // Selects the long-press Confirm action when it is not opening the
-        // frontlight control (see longPressConfirmBehavior above).
+        // Single setting for the long-press Confirm gesture. Option order must
+        // match LONG_PRESS_MENU_FUNCTION; Frontlight is last and only offered on
+        // frontlight hardware.
         SettingInfo::Enum(StrId::STR_LONG_PRESS_MENU, &CrossPointSettings::longPressMenuFunction,
-                          {StrId::STR_KOSYNC, StrId::STR_DISABLED, StrId::STR_BOOKMARK_OPTION}, "longPressMenuFunction",
-                          StrId::STR_CAT_CONTROLS),
+#ifdef FRONTLIGHT_PRESENT
+                          {StrId::STR_KOSYNC, StrId::STR_DISABLED, StrId::STR_BOOKMARK_OPTION, StrId::STR_FRONTLIGHT},
+#else
+                          {StrId::STR_KOSYNC, StrId::STR_DISABLED, StrId::STR_BOOKMARK_OPTION},
+#endif
+                          "longPressMenuFunction", StrId::STR_CAT_CONTROLS),
         SettingInfo::Toggle(StrId::STR_DISABLE_SIDE_PAGE_TURN, &CrossPointSettings::disableSidePageTurn,
                             "disableSidePageTurn", StrId::STR_CAT_CONTROLS),
         // Option order must match the SHORT_PWRBTN enum, where FOOTNOTES is 5

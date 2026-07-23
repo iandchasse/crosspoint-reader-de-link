@@ -157,6 +157,10 @@ class CrossPointSettings {
     LP_MENU_KOSYNC = 0,
     LP_MENU_DISABLED = 1,
     LP_MENU_BOOKMARK = 2,
+    // Appended last (never renumber): frontlight hardware only. Replaces the
+    // former separate longPressConfirmBehavior setting so one gesture has one
+    // setting. On non-frontlight builds this value is simply never offered.
+    LP_MENU_FRONTLIGHT = 3,
     LONG_PRESS_MENU_FUNCTION_COUNT
   };
 
@@ -172,13 +176,6 @@ class CrossPointSettings {
     CHAPTER_SKIP = 1,
     ORIENTATION_CHANGE = 2,
     LONG_PRESS_BUTTON_BEHAVIOR_COUNT
-  };
-
-  // Confirm button long press behavior
-  enum LONG_PRESS_CONFIRM_BEHAVIOR {
-    LONG_PRESS_CONFIRM_FRONTLIGHT = 0,
-    LONG_PRESS_CONFIRM_BOOKMARK = 1,
-    LONG_PRESS_CONFIRM_BEHAVIOR_COUNT
   };
 
   // UI Theme
@@ -288,10 +285,6 @@ class CrossPointSettings {
   uint8_t hideBatteryPercentage = HIDE_NEVER;
   // Long-press page turn button behavior
   uint8_t longPressButtonBehavior = OFF;
-  // Long-press confirm button behavior (frontlight settings or bookmark).
-  // FRONTLIGHT_PRESENT only: decides whether a 1s+ hold opens the frontlight
-  // control. When it does not, longPressMenuFunction below selects the action.
-  uint8_t longPressConfirmBehavior = LONG_PRESS_CONFIRM_FRONTLIGHT;
   // Disable page-turn on left side button combo (BTN_UP_2/BTN_DOWN_2)
   uint8_t disableSidePageTurn = 0;
   // Long-press Confirm function in EPUB reader (cycles through LONG_PRESS_MENU_FUNCTION values).
