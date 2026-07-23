@@ -825,6 +825,15 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     GUI.drawPopup(renderer, tr(STR_SAVE_PROGRESS_FAILED));
   };
 
+  // A section build failure (e.g. an invalid/corrupt EPUB that fails XML parsing) leaves the
+  // "Indexing" popup on screen with no way forward. Surface an explicit error instead of hanging.
+  // clearScreen first so the error popup doesn't overlay the stale "Indexing" popup.
+  const auto showBuildError = [this]() {
+    renderer.clearScreen();
+    GUI.drawPopup(renderer, tr(STR_INDEX_FAILED));
+    automaticPageTurnActive = false;
+  };
+
   // edge case handling for sub-zero spine index
   if (currentSpineIndex < 0) {
     currentSpineIndex = 0;
@@ -888,7 +897,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
                                       SETTINGS.imageRendering, SETTINGS.focusReadingEnabled, popupFn)) {
         LOG_ERR("ERS", "Failed to persist page data to SD");
         section.reset();
-        showPendingSyncSaveError();
+        showBuildError();
         return;
       }
     } else {
@@ -972,11 +981,22 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     auto p = section->loadPageFromSectionFile();
     if (!p) {
       LOG_ERR("ERS", "Failed to load page from SD - clearing section cache");
+      automaticPageTurnActive = false;
+      // Retrying rebuilds a transiently corrupt section and usually recovers, but a page that keeps
+      // failing would loop forever on a blank screen, so bound the retries before giving up.
+      const bool giveUp = ++pageLoadRetryCount > MAX_PAGE_LOAD_RETRIES;
       section->clearCache();
       section.reset();
+      if (giveUp) {
+        LOG_ERR("ERS", "Page load retry limit reached, aborting");
+        pageLoadRetryCount = 0;  // Reset so a later user-initiated navigation can try afresh
+        renderer.clearScreen();
+        renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
+        renderer.displayBuffer();
+        showPendingSyncSaveError();
+        return;
+      }
       requestUpdate();  // Try again after clearing cache
-                        // TODO: prevent infinite loop if the page keeps failing to load for some reason
-      automaticPageTurnActive = false;
       showPendingSyncSaveError();
       return;
     }
