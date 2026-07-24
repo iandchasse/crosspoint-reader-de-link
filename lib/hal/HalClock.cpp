@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <esp_private/esp_clk.h>
 #include <esp_sntp.h>
+#include <esp_system.h>
 #include <sys/time.h>
 #include <time.h>
 #include <Wire.h>
@@ -173,6 +174,20 @@ void HalClock::restore() {
     // Therefore, we do NOT attempt to manually calculate elapsed time here (which was causing a 2-hour drift).
     clockApproximate = true;
     LOG_INF("CLK", "Restored from Native ESP-IDF RTC (TimeUtil will calibrate)");
+    return;
+  }
+
+  // Item C: software restart (ESP.restart / silentRestart for post-Wi-Fi heap
+  // reclaim, OTA, etc.). Unlike a cold boot, the RTC timer keeps running across
+  // esp_restart() and the IDF preserves gettimeofday() — the same mechanism the
+  // deep-sleep branch above relies on. The lpValid flag isn't set for a reboot,
+  // so without this branch a silentRestart falls to the NVS path below and loses
+  // all wall-clock time since the last NVS write (potentially hours). Trust native
+  // time when RTC memory survived (rtcValid) and the clock is valid — we lose only
+  // the ~1-2 s of the reboot itself.
+  if (esp_reset_reason() == ESP_RST_SW && rtcValid() && isSynced()) {
+    clockApproximate = true;
+    LOG_INF("CLK", "Restored from native RTC across software restart (epoch %lld)", (long long)time(nullptr));
     return;
   }
 
