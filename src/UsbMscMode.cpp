@@ -1,6 +1,7 @@
 #include "UsbMscMode.h"
 
 #include <Arduino.h>
+#include <BoardConfig.h>
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
 #include <FreeInkUsbMsc.h>
@@ -107,6 +108,22 @@ void forceUsbSerialJtag() { freeink::UsbMsc::forceSerialJtagPhy(); }
 
 void runUsbMscMode() {
   usbMscBootFlag = 0;
+
+#ifdef FRONTLIGHT_PRESENT
+  // Force the frontlight OFF for the whole USB MSC session. MSC mode is a
+  // separate boot path that never inits FrontlightManager, and a reboot into it
+  // can leave the P-FET rail gate in its power-on state (gate not yet driven),
+  // so the light would stay lit the entire time the device is mounted. Drive the
+  // gate directly (active-low: HIGH = off) rather than spinning up the full
+  // FrontlightManager (LEDC + a GPIO ISR) right before the USB handoff. The
+  // normal boot after MSC exit re-reads SETTINGS.frontlightEnabled and restores
+  // the user's setting, so nothing is lost.
+  const int8_t flRailGpio = BoardConfig::ACTIVE.frontlight.railEnableGpio;
+  if (flRailGpio != BoardConfig::PIN_UNASSIGNED) {
+    pinMode(flRailGpio, OUTPUT);
+    digitalWrite(flRailGpio, HIGH);
+  }
+#endif
 
   gpio.begin();
   display.begin(false);
