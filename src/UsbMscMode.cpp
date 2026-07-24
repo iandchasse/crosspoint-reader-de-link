@@ -54,6 +54,22 @@ bool startUsbMsc() {
   msc.mediaPresent(true);
   msc.begin(usbMsc.sectorCount(), usbMsc.sectorSize());
 
+  // Settle before handing the USB peripheral to TinyUSB.
+  //
+  // USB.begin() allocates the USB interrupt via esp_intr_alloc(), which runs on
+  // the other core through the IPC task. Racing that against work still landing
+  // from the preceding init -- notably the priority-5 "usbmsc_write" task that
+  // freeink::UsbMsc::begin() has just spawned, plus SDMMC and the e-ink refresh --
+  // faults inside the heap allocator on the IPC task, with a corrupted backtrace
+  // and ~215KB free (so it is not exhaustion).
+  //
+  // This is a mitigation, not a root-cause fix: the underlying race is in the
+  // Arduino USB stack's interrupt setup, not in this file. The SDK already uses
+  // the same idiom (UsbMsc::end() does forceSerialJtagPhy(); delay(100)). Without
+  // it the crash is reproducible on nearly every entry; with it, MSC comes up
+  // reliably. Do not remove without re-testing MSC entry ~10 times.
+  delay(100);
+
   USB.begin();
   return true;
 }
