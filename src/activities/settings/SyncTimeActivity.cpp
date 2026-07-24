@@ -10,6 +10,7 @@
 #include "MappedInputManager.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
+#include "util/TimeUtil.h"
 #include "fontIds.h"
 
 void SyncTimeActivity::onEnter() {
@@ -54,7 +55,9 @@ void SyncTimeActivity::onWifiSelectionComplete(bool success) {
 void SyncTimeActivity::onWifiSelectionCancelled() { finish(); }
 
 void SyncTimeActivity::performSync() {
-  bool ok = HalClock::syncNtp();
+  // syncAndCalibrate so a manual sync also feeds the RTC drift learner, not just
+  // the clock. wifiOff(true) then skips the redundant internal opportunistic sync.
+  bool ok = TimeUtil::syncAndCalibrate();
   HalClock::wifiOff(true);
 
   state = ok ? SUCCESS : FAILED;

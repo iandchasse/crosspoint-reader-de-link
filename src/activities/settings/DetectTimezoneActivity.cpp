@@ -14,6 +14,21 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TimeUtil.h"
+
+namespace {
+// Before tearing down Wi-Fi, take advantage of the live connection to refresh the
+// clock and feed the RTC drift learner — but only when the clock is approximate,
+// so leaving the screen doesn't block on SNTP every time. Replaces HalClock::
+// wifiOff()'s internal opportunistic sync, which can't feed calibration (HAL
+// can't call up into the app-level TimeUtil).
+void opportunisticSyncAndTeardownWifi() {
+  if (HalClock::isApproximate()) {
+    TimeUtil::syncAndCalibrate();
+  }
+  HalClock::wifiOff(true);
+}
+}  // namespace
 #include "network/HttpDownloader.h"
 
 namespace {
@@ -209,7 +224,7 @@ void DetectTimezoneActivity::onEnter() {
 
 void DetectTimezoneActivity::onExit() {
   Activity::onExit();
-  HalClock::wifiOff();
+  opportunisticSyncAndTeardownWifi();
 }
 
 void DetectTimezoneActivity::onWifiSelectionComplete(bool success) {
@@ -244,7 +259,7 @@ void DetectTimezoneActivity::performDetect() {
     state = FAILED;
   }
 
-  HalClock::wifiOff();
+  opportunisticSyncAndTeardownWifi();
   requestUpdate();
 }
 

@@ -14,6 +14,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/TimeUtil.h"
 
 void ClockSyncActivity::onEnter() {
   Activity::onEnter();
@@ -70,6 +71,9 @@ void ClockSyncActivity::runSync() {
     requestUpdate();
     return;
   }
+  // Feed the RTC drift learner from this sync too (DS3231 devices; no-op on the
+  // native-clock path where isSynced() gates it).
+  TimeUtil::onNtpSynced();
 
   // Mark as synced so the auto-sync hook stops firing on future WiFi connects.
   SETTINGS.clockHasBeenSynced = 1;
