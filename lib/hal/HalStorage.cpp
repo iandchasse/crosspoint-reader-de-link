@@ -68,4 +68,8 @@ bool HalStorage::openFileForWrite(const char* moduleName, const String& path, Es
   return openFileForWrite(moduleName, path.c_str(), file);
 }
 
-bool HalStorage::removeDir(const char* path) { return SDCard.rmdir(path); }
+// SDCardManager::removeDir() recurses (snapshots each directory's listing, then
+// deletes children before rmdir'ing the dir). rmdir() alone only removes an
+// already-empty directory, so it fails on populated cache dirs like
+// /.crosspoint/epub_* — which is why "Clear Cache" reported N failed, 0 removed.
+bool HalStorage::removeDir(const char* path) { return SDCard.removeDir(path); }
