@@ -5,7 +5,9 @@
 #include <HalClock.h>
 #include <HalStorage.h>
 #include <WiFi.h>
+#include <esp_private/esp_clk.h>
 #include <esp_sntp.h>
+#include <soc/rtc.h>
 #include <time.h>
 
 #include "CrossPointSettings.h"
@@ -27,6 +29,29 @@ constexpr int64_t MAX_CALIBRATION_AGE_SECONDS = 48 * 3600;  // 48 h
 // Raw RTC time captured on wake before correction is applied.
 // Used by onNtpSynced() to compute actual drift.
 int64_t rtcWakeTime = 0;
+
+// A1+A2: cycles to measure the RTC slow clock (150 kHz internal RC) period at
+// sleep-entry. The IDF boot default (CONFIG_RTC_CLK_CAL_CYCLES) is 1024, which is
+// too coarse for good timekeeping and, worse, was taken once at boot temperature.
+// 8192 cycles (~55 ms at 150 kHz) measures the period ~8x more precisely, right
+// before sleep, at the current temperature — so the native RTC keeps better time
+// across the upcoming sleep with no periodic wake and no drift-ratio dependency.
+constexpr uint32_t RTC_CAL_CYCLES = 8192;
+
+// Re-measure the RTC slow-clock period and install it, so the native deep-sleep
+// timekeeping uses a precise, temperature-current calibration for this sleep.
+void recalibrateRtcSlowClock() {
+  // RTC_CAL_RTC_MUX = whatever slow clock is currently selected (the 150 kHz RC here).
+  const uint32_t period = rtc_clk_cal(RTC_CAL_RTC_MUX, RTC_CAL_CYCLES);
+  if (period == 0) {
+    LOG_ERR("RTC_CAL", "rtc_clk_cal returned 0; keeping existing calibration");
+    return;
+  }
+  esp_clk_slowclk_cal_set(period);
+  // period is a fixed-point value with RTC_CLK_CAL_FRACT (19) fractional bits, in us.
+  LOG_DBG("RTC_CAL", "Recalibrated RTC slow clock: period=%.4f us (%u cycles)",
+          period / (double)(1u << RTC_CLK_CAL_FRACT), RTC_CAL_CYCLES);
+}
 }  // namespace
 
 void TimeUtil::reconfigure() {
@@ -77,6 +102,11 @@ bool TimeUtil::saveCalibration(const CalibrationData& data) {
 }
 
 void TimeUtil::recordSleepEntry() {
+  // A1+A2: refresh the slow-clock calibration at the current temperature before
+  // sleeping. Independent of NTP/clock state — it only makes the native RTC keep
+  // better time across the coming sleep.
+  recalibrateRtcSlowClock();
+
   time_t now;
   ::time(&now);
 
