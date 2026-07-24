@@ -36,9 +36,10 @@ class TimeUtil {
 
  private:
   struct CalibrationData {
-    int64_t sleepStartTime = 0;  // time_t when we entered deep sleep
-    int64_t lastNtpTime = 0;     // time_t of last successful NTP sync
-    double driftRatio = 1.0;     // RTC ticks / real ticks (>1 = RTC runs fast)
+    int64_t sleepStartTime = 0;      // time_t when we entered deep sleep
+    int64_t lastNtpTime = 0;         // time_t of last successful NTP sync
+    double driftRatio = 1.0;         // RTC ticks / real ticks (>1 = RTC runs fast)
+    int64_t driftRatioUpdatedAt = 0; // time_t driftRatio was last (re)measured; 0 = never
   };
 
   static bool loadCalibration(CalibrationData& data);

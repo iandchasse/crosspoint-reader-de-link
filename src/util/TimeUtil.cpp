@@ -16,6 +16,14 @@ constexpr char RTC_CAL_FILE[] = "/.crosspoint/rtc_cal.json";
 constexpr double SMOOTHING_ALPHA = 0.3;       // EMA smoothing factor
 constexpr int64_t MIN_ELAPSED_SECONDS = 60;    // Minimum sleep to calibrate from
 
+// A3 fail-safe: the drift ratio is a single global scalar with no temperature
+// term, so a ratio learned days ago (likely at a different temperature) can
+// correct with the wrong magnitude or sign. Past this age, applying it does more
+// harm than good — skip correction and fall back to the raw native RTC, which is
+// at least self-consistent. A regularly-synced device re-stamps this well within
+// the window; only long offline stretches trip it.
+constexpr int64_t MAX_CALIBRATION_AGE_SECONDS = 48 * 3600;  // 48 h
+
 // Raw RTC time captured on wake before correction is applied.
 // Used by onNtpSynced() to compute actual drift.
 int64_t rtcWakeTime = 0;
@@ -48,6 +56,9 @@ bool TimeUtil::loadCalibration(CalibrationData& data) {
   data.sleepStartTime = doc["sleepStartTime"] | (int64_t)0;
   data.lastNtpTime = doc["lastNtpTime"] | (int64_t)0;
   data.driftRatio = doc["driftRatio"] | 1.0;
+  // Absent in pre-A3 files: treat as "unknown age". Fall back to lastNtpTime so an
+  // existing ratio isn't instantly considered stale on the first boot after upgrade.
+  data.driftRatioUpdatedAt = doc["driftRatioUpdatedAt"] | data.lastNtpTime;
   return true;
 }
 
@@ -58,6 +69,7 @@ bool TimeUtil::saveCalibration(const CalibrationData& data) {
   doc["sleepStartTime"] = data.sleepStartTime;
   doc["lastNtpTime"] = data.lastNtpTime;
   doc["driftRatio"] = data.driftRatio;
+  doc["driftRatioUpdatedAt"] = data.driftRatioUpdatedAt;
 
   String json;
   serializeJson(doc, json);
@@ -106,6 +118,16 @@ void TimeUtil::correctTimeOnWake() {
 
   if (data.driftRatio == 1.0) {
     LOG_DBG("RTC_CAL", "No drift data yet, skipping correction (captured rtcWakeTime=%lld)", rtcWakeTime);
+    return;
+  }
+
+  // A3 fail-safe: refuse to apply a stale (or malformed) drift ratio. rtcNow is
+  // the uncorrected RTC time, which is more than accurate enough to judge an age
+  // measured in days.
+  const int64_t calibrationAge = rtcNow - data.driftRatioUpdatedAt;
+  if (data.driftRatioUpdatedAt <= 0 || calibrationAge > MAX_CALIBRATION_AGE_SECONDS) {
+    LOG_INF("RTC_CAL", "Drift ratio stale (age %lldh, ratio=%.6f); skipping correction, using raw RTC",
+            (long long)(calibrationAge / 3600), data.driftRatio);
     return;
   }
 
@@ -184,6 +206,7 @@ void TimeUtil::onNtpSynced() {
 
   data.driftRatio = newRatio;
   data.lastNtpTime = actualNow;
+  data.driftRatioUpdatedAt = actualNow;  // A3: stamp freshness so wake-time correction can trust it
   saveCalibration(data);
 
   // Reset for next cycle
