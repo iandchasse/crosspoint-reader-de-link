@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <esp_private/esp_clk.h>
 #include <esp_sntp.h>
+#include <esp_timer.h>
 #include <soc/rtc.h>
 #include <time.h>
 
@@ -29,6 +30,13 @@ constexpr int64_t MAX_CALIBRATION_AGE_SECONDS = 48 * 3600;  // 48 h
 // Raw RTC time captured on wake before correction is applied.
 // Used by onNtpSynced() to compute actual drift.
 int64_t rtcWakeTime = 0;
+
+// Item D: monotonic (crystal-based) microseconds captured at the same instant as
+// rtcWakeTime. onNtpSynced() subtracts the awake interval since wake so the drift
+// sample reflects ONLY the sleep, not the reading time before the user connected
+// Wi-Fi. Without this, actualSleepDuration includes awake time and the learned
+// ratio is biased low (and the EMA converges to that bias, not the truth).
+int64_t wakeMonotonicUs = 0;
 
 // A1+A2: cycles to measure the RTC slow clock (150 kHz internal RC) period at
 // sleep-entry. The IDF boot default (CONFIG_RTC_CLK_CAL_CYCLES) is 1024, which is
@@ -143,8 +151,11 @@ void TimeUtil::correctTimeOnWake() {
   const int64_t rtcNow = static_cast<int64_t>(now);
   const int64_t rtcElapsed = rtcNow - data.sleepStartTime;
 
-  // Always capture the raw RTC wake time for onNtpSynced() to use later
+  // Always capture the raw RTC wake time for onNtpSynced() to use later, plus a
+  // crystal-based monotonic reference at the same instant (Item D) so the awake
+  // interval before the next sync can be removed from the drift sample.
   rtcWakeTime = rtcNow;
+  wakeMonotonicUs = esp_timer_get_time();
 
   if (data.driftRatio == 1.0) {
     LOG_DBG("RTC_CAL", "No drift data yet, skipping correction (captured rtcWakeTime=%lld)", rtcWakeTime);
@@ -180,6 +191,14 @@ void TimeUtil::correctTimeOnWake() {
           correction, rtcElapsed, data.driftRatio);
 }
 
+bool TimeUtil::syncAndCalibrate() {
+  if (!HalClock::syncNtp()) {
+    return false;
+  }
+  onNtpSynced();
+  return true;
+}
+
 void TimeUtil::onNtpSynced() {
   if (!HalClock::isSynced()) {
     LOG_DBG("RTC_CAL", "Time not valid after NTP sync, skipping calibration");
@@ -213,7 +232,14 @@ void TimeUtil::onNtpSynced() {
   //   sleepStartTime: NTP-accurate time when we entered sleep
   //   rtcWakeTime:    raw RTC time when we woke (before any correction)
   //   actualNow:      NTP-accurate time right now
-  const int64_t actualSleepDuration = actualNow - data.sleepStartTime;
+  //
+  // Item D: actualNow is when we synced, which is later than the wake — the user
+  // read for a while before Wi-Fi connected. That awake gap is measured accurately
+  // by the crystal (esp_timer), so subtract it to recover the NTP-accurate time AT
+  // THE WAKE. Both spans then cover only the sleep, and the ratio is unbiased.
+  const int64_t awakeSeconds = (esp_timer_get_time() - wakeMonotonicUs) / 1000000;
+  const int64_t accurateWakeTime = actualNow - awakeSeconds;
+  const int64_t actualSleepDuration = accurateWakeTime - data.sleepStartTime;
   const int64_t rtcSleepDuration = rtcWakeTime - data.sleepStartTime;
 
   if (rtcSleepDuration < MIN_ELAPSED_SECONDS || actualSleepDuration < MIN_ELAPSED_SECONDS) {
@@ -222,6 +248,7 @@ void TimeUtil::onNtpSynced() {
     LOG_DBG("RTC_CAL", "Sleep too short (rtc=%llds, actual=%llds), updating baseline",
             rtcSleepDuration, actualSleepDuration);
     rtcWakeTime = 0;
+    wakeMonotonicUs = 0;
     return;
   }
 
@@ -241,4 +268,5 @@ void TimeUtil::onNtpSynced() {
 
   // Reset for next cycle
   rtcWakeTime = 0;
+  wakeMonotonicUs = 0;
 }

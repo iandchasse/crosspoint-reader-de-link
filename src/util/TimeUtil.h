@@ -34,6 +34,14 @@ class TimeUtil {
    */
   static void onNtpSynced();
 
+  /**
+   * Opportunistic NTP sync + calibration in one call: runs HalClock::syncNtp()
+   * and, on success, feeds onNtpSynced(). Every place that has Wi-Fi up should
+   * route through this so no sync opportunity is wasted on the drift learner.
+   * Returns true if the sync succeeded. Cheap no-op cost if already synced.
+   */
+  static bool syncAndCalibrate();
+
  private:
   struct CalibrationData {
     int64_t sleepStartTime = 0;      // time_t when we entered deep sleep
