@@ -384,18 +384,6 @@ void setup() {
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);
 
-#ifdef FRONTLIGHT_PRESENT
-  // Init frontlight manager
-  frontlightManager.begin();
-  if (SETTINGS.frontlightEnabled) {
-    if (!frontlightManager.enable()) {
-      SETTINGS.frontlightEnabled = false;
-    } else {
-      frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
-      frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
-    }
-  }
-#endif
   switch (gpio.getWakeupReason()) {
     case HalGPIO::WakeupReason::PowerButton:
       // For normal wakeups, verify power button press duration
@@ -416,6 +404,23 @@ void setup() {
     default:
       break;
   }
+
+#ifdef FRONTLIGHT_PRESENT
+  // Init frontlight manager — AFTER the wake-reason check above. That check can
+  // decide the press was too short and go straight back to deep sleep; enabling
+  // the frontlight before it would flash the light on for the aborted boot and
+  // then kill it, which reads as a glitch. Only reach here once we're committed
+  // to actually booting.
+  frontlightManager.begin();
+  if (SETTINGS.frontlightEnabled) {
+    if (!frontlightManager.enable()) {
+      SETTINGS.frontlightEnabled = false;
+    } else {
+      frontlightManager.setBrightness(SETTINGS.frontlightBrightness);
+      frontlightManager.setColorTemperature(SETTINGS.frontlightWarmth);
+    }
+  }
+#endif
 
   // Recovery firmware mode: hold left side button (BTN_UP) together with the power button at
   // boot to skip directly to the SD-card firmware update screen. Useful on devices where USB
