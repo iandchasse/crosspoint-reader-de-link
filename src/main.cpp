@@ -451,6 +451,7 @@ void setup() {
   const BootResume resume = isSilentReboot              ? BootResume::Silent
                             : !APP_STATE.showBootScreen ? BootResume::QuickResume
                                                         : BootResume::Splash;
+  bool allowFastInitialReaderRefresh = false;
 
   setupDisplayAndFonts(resume != BootResume::Splash);
 
@@ -466,10 +467,22 @@ void setup() {
       APP_STATE.showBootScreen = true;
       APP_STATE.saveToFile();
       if (loadSleepFrameBuffer()) {
-        // Sync both BW and RED RAM buffers in the display controller to match the sleep frame,
-        // so that the screen doesn't need to refresh now, and the subsequent update will
-        // perform a clean partial update relative to the sleep frame.
-        display.copyGrayscaleBuffers(display.getFrameBuffer(), display.getFrameBuffer());
+        // Upstream's X3 Quick-Resume-flash fix (#2698): X3 needs a differential
+        // refresh + loading icon because begin() clears its controller RAM. de-link
+        // (non-X3) keeps its own no-flash path below — copyGrayscaleBuffers syncs
+        // both BW and RED controller RAM to the sleep frame, so the screen doesn't
+        // refresh at all (no flash) and the next reader update is a clean partial.
+        if (gpio.deviceIsX3()) {
+          // begin() clears the X3 controller RAM, so restore the saved frame as
+          // the baseline before replacing the moon with the loading icon.
+          renderer.cleanupGrayscaleWithFrameBuffer();
+          const auto pageHeight = renderer.getScreenHeight();
+          renderer.drawImage(LoadingIcon, 0, pageHeight - LOADINGICON_HEIGHT, LOADINGICON_WIDTH, LOADINGICON_HEIGHT);
+          renderer.displayGrayscaleBase(HalDisplay::FAST_REFRESH);
+          allowFastInitialReaderRefresh = true;
+        } else {
+          display.copyGrayscaleBuffers(display.getFrameBuffer(), display.getFrameBuffer());
+        }
       } else {
         activityManager.goToBoot();  // frame file missing, fall back to the splash
       }
@@ -505,7 +518,7 @@ void setup() {
     APP_STATE.openEpubPath = "";
     APP_STATE.readerActivityLoadCount++;
     APP_STATE.saveToFile();
-    activityManager.goToReader(path);
+    activityManager.goToReader(path, allowFastInitialReaderRefresh);
   }
 
   if (resume == BootResume::Silent) {
