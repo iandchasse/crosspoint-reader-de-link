@@ -27,6 +27,15 @@ constexpr int64_t MIN_ELAPSED_SECONDS = 60;    // Minimum sleep to calibrate fro
 // the window; only long offline stretches trip it.
 constexpr int64_t MAX_CALIBRATION_AGE_SECONDS = 48 * 3600;  // 48 h
 
+// Item E: reject implausible drift samples. A single global drift ratio should sit
+// very close to 1.0 — the boot calibration already removes the RC's nominal offset,
+// leaving only temperature drift (a few % at the extreme). Anything beyond ±5% is
+// not real RC drift but a bad sample: an NTP reply with a large/asymmetric round-
+// trip delay skewing the reference, or residual awake-time contamination. Learning
+// from it would drag the EMA toward garbage, so we drop the sample instead.
+constexpr double MIN_PLAUSIBLE_RATIO = 0.95;
+constexpr double MAX_PLAUSIBLE_RATIO = 1.05;
+
 // Raw RTC time captured on wake before correction is applied.
 // Used by onNtpSynced() to compute actual drift.
 int64_t rtcWakeTime = 0;
@@ -38,13 +47,15 @@ int64_t rtcWakeTime = 0;
 // ratio is biased low (and the EMA converges to that bias, not the truth).
 int64_t wakeMonotonicUs = 0;
 
-// A1+A2: cycles to measure the RTC slow clock (150 kHz internal RC) period at
-// sleep-entry. The IDF boot default (CONFIG_RTC_CLK_CAL_CYCLES) is 1024, which is
-// too coarse for good timekeeping and, worse, was taken once at boot temperature.
-// 8192 cycles (~55 ms at 150 kHz) measures the period ~8x more precisely, right
-// before sleep, at the current temperature — so the native RTC keeps better time
-// across the upcoming sleep with no periodic wake and no drift-ratio dependency.
-constexpr uint32_t RTC_CAL_CYCLES = 8192;
+// A2: cycles to measure the RTC slow clock (~136 kHz internal RC) period at
+// sleep-entry. The value of doing this here is the TIMING — the period is captured
+// right before sleep at the current temperature, rather than only at boot/wake.
+// The cycle COUNT barely matters: 1024 cycles already resolves the period to a few
+// ppm (40 MHz counted over ~7.5 ms), and empirically increasing it does not reduce
+// drift — drift is temperature-driven, not measurement-noise-driven (see the
+// esp32-s3 timekeeping analysis). So use the IDF default 1024 (~7 ms) rather than
+// paying ~55 ms/sleep for 8192 that buys nothing.
+constexpr uint32_t RTC_CAL_CYCLES = 1024;
 
 // Re-measure the RTC slow-clock period and install it, so the native deep-sleep
 // timekeeping uses a precise, temperature-current calibration for this sleep.
@@ -254,6 +265,17 @@ void TimeUtil::onNtpSynced() {
 
   // Drift ratio for this sleep cycle: how many RTC seconds per real second
   const double cycleRatio = static_cast<double>(rtcSleepDuration) / static_cast<double>(actualSleepDuration);
+
+  // Item E: drop implausible samples rather than let them poison the EMA.
+  if (cycleRatio < MIN_PLAUSIBLE_RATIO || cycleRatio > MAX_PLAUSIBLE_RATIO) {
+    LOG_INF("RTC_CAL", "Implausible drift sample %.6f (rtc=%llds, actual=%llds); discarding", cycleRatio,
+            rtcSleepDuration, actualSleepDuration);
+    data.lastNtpTime = actualNow;
+    saveCalibration(data);
+    rtcWakeTime = 0;
+    wakeMonotonicUs = 0;
+    return;
+  }
 
   // Smooth with exponential moving average
   const double newRatio = SMOOTHING_ALPHA * cycleRatio + (1.0 - SMOOTHING_ALPHA) * data.driftRatio;
