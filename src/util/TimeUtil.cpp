@@ -81,6 +81,10 @@ int dbgWakeResetReason = 0;
 // paying ~55 ms/sleep for 8192 that buys nothing.
 constexpr uint32_t RTC_CAL_CYCLES = 1024;
 
+// Last slow-clock period measured at sleep entry (µs). Doubles as a temperature
+// proxy in the diagnostic log — the RC period tracks die temperature ~linearly.
+double lastMeasuredPeriodUs = 0.0;
+
 // Re-measure the RTC slow-clock period and install it, so the native deep-sleep
 // timekeeping uses a precise, temperature-current calibration for this sleep.
 void recalibrateRtcSlowClock() {
@@ -92,8 +96,67 @@ void recalibrateRtcSlowClock() {
   }
   esp_clk_slowclk_cal_set(period);
   // period is a fixed-point value with RTC_CLK_CAL_FRACT (19) fractional bits, in us.
-  LOG_DBG("RTC_CAL", "Recalibrated RTC slow clock: period=%.4f us (%u cycles)",
-          period / (double)(1u << RTC_CLK_CAL_FRACT), RTC_CAL_CYCLES);
+  lastMeasuredPeriodUs = period / (double)(1u << RTC_CLK_CAL_FRACT);
+  LOG_DBG("RTC_CAL", "Recalibrated RTC slow clock: period=%.4f us (%u cycles)", lastMeasuredPeriodUs, RTC_CAL_CYCLES);
+}
+
+// --- TEMP on-SD diagnostic log ------------------------------------------------
+// One JSON object per line at each sleep/wake/sync so the clock can be
+// characterized untethered (terminal misses the ~355 ms wake logs). Analyze
+// later, then remove. Capped so it can't fill the card.
+constexpr char DIAG_FILE[] = "/.crosspoint/rtc_diag.jsonl";
+constexpr uint64_t DIAG_MAX_BYTES = 512ULL * 1024;
+
+void appendDiag(JsonDocument& d) {
+  d["ms"] = (uint32_t)millis();
+  d["dev"] = (int64_t)::time(nullptr);  // device clock at log time
+  EspFsFile f = Storage.open(DIAG_FILE, O_WRONLY | O_CREAT | O_APPEND);
+  if (!f) {
+    return;
+  }
+  if (f.fileSize64() <= DIAG_MAX_BYTES) {
+    String line;
+    serializeJson(d, line);
+    line += '\n';
+    f.write(reinterpret_cast<const uint8_t*>(line.c_str()), line.length());
+  }
+  f.close();
+}
+
+void diagWake(const char* action, double driftRatio, int64_t rtcElapsed, int64_t correction) {
+  JsonDocument d;
+  d["ev"] = "wake";
+  d["reset"] = dbgWakeResetReason;
+  d["rtcValid"] = dbgWakeRtcValid;
+  d["sleepStart"] = dbgWakeSleepStart;
+  d["rtcWake"] = rtcWakeTime;
+  d["rtcElapsed"] = rtcElapsed;
+  d["driftRatio"] = driftRatio;
+  d["action"] = action;
+  d["correction"] = correction;
+  appendDiag(d);
+}
+
+void diagSync(const char* outcome, int64_t ntp, int64_t bracketStart, int64_t rtcWake, int64_t awake, int64_t accWake,
+              int64_t rtcSleepDur, int64_t actualSleepDur, double cycleRatio, double ratioBefore, double ratioAfter) {
+  JsonDocument d;
+  d["ev"] = "sync";
+  d["outcome"] = outcome;
+  d["ntp"] = ntp;
+  d["wakeRtcValid"] = dbgWakeRtcValid;
+  d["wakeReset"] = dbgWakeResetReason;
+  d["sleepStart"] = bracketStart;
+  d["rtcWake"] = rtcWake;
+  d["awake"] = awake;
+  d["accWake"] = accWake;
+  // clock error at wake (s); +fast / -slow. THE per-sleep accuracy metric.
+  d["driftAtWake"] = (rtcWake != 0 && accWake != 0) ? (rtcWake - accWake) : 0;
+  d["rtcSleepDur"] = rtcSleepDur;
+  d["actualSleepDur"] = actualSleepDur;
+  d["cycleRatio"] = cycleRatio;
+  d["ratioBefore"] = ratioBefore;
+  d["ratioAfter"] = ratioAfter;
+  appendDiag(d);
 }
 }  // namespace
 
@@ -170,6 +233,15 @@ void TimeUtil::recordSleepEntry() {
   data.sleepStartTime = static_cast<int64_t>(now);
   saveCalibration(data);
   LOG_DBG("RTC_CAL", "Recorded sleep entry at %lld", (long long)rtcSleepStartEpoch);
+
+  {
+    JsonDocument d;
+    d["ev"] = "sleep";
+    d["sleepStart"] = rtcSleepStartEpoch;
+    d["period_us"] = lastMeasuredPeriodUs;  // temperature proxy
+    d["driftRatio"] = data.driftRatio;
+    appendDiag(d);
+  }
 }
 
 void TimeUtil::correctTimeOnWake() {
@@ -196,6 +268,7 @@ void TimeUtil::correctTimeOnWake() {
   rtcSleepStartMagic = 0;
   if (sleepStart == 0) {
     LOG_DBG("RTC_CAL", "No sleep start time, skipping correction");
+    diagWake("skip_nostart", data.driftRatio, 0, 0);
     return;
   }
 
@@ -213,6 +286,7 @@ void TimeUtil::correctTimeOnWake() {
 
   if (data.driftRatio == 1.0) {
     LOG_DBG("RTC_CAL", "No drift data yet, skipping correction (captured rtcWakeTime=%lld)", rtcWakeTime);
+    diagWake("skip_nodrift", data.driftRatio, rtcElapsed, 0);
     return;
   }
 
@@ -223,11 +297,13 @@ void TimeUtil::correctTimeOnWake() {
   if (data.driftRatioUpdatedAt <= 0 || calibrationAge > MAX_CALIBRATION_AGE_SECONDS) {
     LOG_INF("RTC_CAL", "Drift ratio stale (age %lldh, ratio=%.6f); skipping correction, using raw RTC",
             (long long)(calibrationAge / 3600), data.driftRatio);
+    diagWake("skip_stale", data.driftRatio, rtcElapsed, 0);
     return;
   }
 
   if (rtcElapsed < MIN_ELAPSED_SECONDS) {
     LOG_DBG("RTC_CAL", "Sleep too short (%llds), skipping correction", rtcElapsed);
+    diagWake("skip_short", data.driftRatio, rtcElapsed, 0);
     return;
   }
 
@@ -243,6 +319,7 @@ void TimeUtil::correctTimeOnWake() {
 
   LOG_INF("RTC_CAL", "Corrected %llds of drift (slept %llds, ratio=%.6f)",
           correction, rtcElapsed, data.driftRatio);
+  diagWake("applied", data.driftRatio, rtcElapsed, correction);
 }
 
 bool TimeUtil::syncAndCalibrate() {
@@ -276,6 +353,7 @@ void TimeUtil::onNtpSynced() {
     data.lastNtpTime = actualNow;
     saveCalibration(data);
     LOG_INF("RTC_CAL", "NTP synced, recorded baseline at %lld", actualNow);
+    diagSync("baseline", actualNow, bracketSleepStart, rtcWakeTime, 0, 0, 0, 0, 0, data.driftRatio, data.driftRatio);
     return;
   }
 
@@ -285,6 +363,7 @@ void TimeUtil::onNtpSynced() {
     data.lastNtpTime = actualNow;
     saveCalibration(data);
     LOG_INF("RTC_CAL", "No pre-correction RTC time available, updating baseline");
+    diagSync("no_bracket", actualNow, bracketSleepStart, rtcWakeTime, 0, 0, 0, 0, 0, data.driftRatio, data.driftRatio);
     return;
   }
 
@@ -307,6 +386,8 @@ void TimeUtil::onNtpSynced() {
     saveCalibration(data);
     LOG_DBG("RTC_CAL", "Sleep too short (rtc=%llds, actual=%llds), updating baseline",
             rtcSleepDuration, actualSleepDuration);
+    diagSync("reject_short", actualNow, bracketSleepStart, rtcWakeTime, awakeSeconds, accurateWakeTime, rtcSleepDuration,
+             actualSleepDuration, 0, data.driftRatio, data.driftRatio);
     rtcWakeTime = 0;
     wakeMonotonicUs = 0;
     bracketSleepStart = 0;
@@ -320,6 +401,8 @@ void TimeUtil::onNtpSynced() {
   if (cycleRatio < MIN_PLAUSIBLE_RATIO || cycleRatio > MAX_PLAUSIBLE_RATIO) {
     LOG_INF("RTC_CAL", "Implausible drift sample %.6f (rtc=%llds, actual=%llds); discarding", cycleRatio,
             rtcSleepDuration, actualSleepDuration);
+    diagSync("reject_implausible", actualNow, bracketSleepStart, rtcWakeTime, awakeSeconds, accurateWakeTime,
+             rtcSleepDuration, actualSleepDuration, cycleRatio, data.driftRatio, data.driftRatio);
     data.lastNtpTime = actualNow;
     saveCalibration(data);
     rtcWakeTime = 0;
@@ -329,6 +412,7 @@ void TimeUtil::onNtpSynced() {
   }
 
   // Smooth with exponential moving average
+  const double oldRatio = data.driftRatio;
   const double newRatio = SMOOTHING_ALPHA * cycleRatio + (1.0 - SMOOTHING_ALPHA) * data.driftRatio;
 
   LOG_INF("RTC_CAL", "Cycle drift: %.6f, smoothed: %.6f -> %.6f (slept %llds)",
@@ -338,6 +422,8 @@ void TimeUtil::onNtpSynced() {
   data.lastNtpTime = actualNow;
   data.driftRatioUpdatedAt = actualNow;  // A3: stamp freshness so wake-time correction can trust it
   saveCalibration(data);
+  diagSync("accepted", actualNow, bracketSleepStart, rtcWakeTime, awakeSeconds, accurateWakeTime, rtcSleepDuration,
+           actualSleepDuration, cycleRatio, oldRatio, newRatio);
 
   // Reset for next cycle
   rtcWakeTime = 0;
