@@ -23,6 +23,9 @@ namespace {
 // v32: ImageBlock serializes the book-internal source href after the cache path
 //      (lazy extraction: images are header-probed at build time and extracted on
 //      first render).
+// v33: two format-affecting EPUB changes land together as v33 — text blocks now
+//      split on closed tags to stop CSS style leaks (#2679), changing block/word
+//      boundaries; plus native <ruby>/<rt> support, skipping <rp> (#2665).
 constexpr uint8_t SECTION_FILE_VERSION = 33;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
