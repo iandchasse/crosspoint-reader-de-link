@@ -47,6 +47,21 @@ int64_t rtcWakeTime = 0;
 // ratio is biased low (and the EMA converges to that bias, not the truth).
 int64_t wakeMonotonicUs = 0;
 
+// Per-sleep bracket state in RTC_NOINIT, NOT on the SD card. An SD write issued
+// milliseconds before esp_deep_sleep_start() is not reliably flushed to the card,
+// so rtc_cal.json's sleepStartTime could not be read back on wake -> correctTime-
+// OnWake() bailed at loadCalibration() -> rtcWakeTime never set -> the drift learner
+// was permanently starved (every sync logged "No pre-correction"). RTC_NOINIT is
+// designed to survive a deep-sleep wake, so the bracket start lives here. (SD keeps
+// the long-term driftRatio/lastNtpTime, which must survive a full power-off.)
+RTC_NOINIT_ATTR int64_t rtcSleepStartEpoch;
+RTC_NOINIT_ATTR uint32_t rtcSleepStartMagic;
+constexpr uint32_t SLEEP_START_MAGIC = 0x5CA1B5A7;
+
+// The sleep-start resolved for the current wake's bracket (0 = none). Set by
+// correctTimeOnWake() from RTC_NOINIT, consumed by onNtpSynced().
+int64_t bracketSleepStart = 0;
+
 // A2: cycles to measure the RTC slow clock (~136 kHz internal RC) period at
 // sleep-entry. The value of doing this here is the TIMING — the period is captured
 // right before sleep at the current temperature, rather than only at boot/wake.
@@ -134,25 +149,35 @@ void TimeUtil::recordSleepEntry() {
     return;
   }
 
+  // Authoritative bracket start in RTC_NOINIT — survives the deep sleep reliably,
+  // unlike an SD write flushed right before power-down.
+  rtcSleepStartEpoch = static_cast<int64_t>(now);
+  rtcSleepStartMagic = SLEEP_START_MAGIC;
+
+  // Still mirror to SD (harmless; keeps the file's view coherent for debugging),
+  // but wake reads the RTC_NOINIT copy above.
   CalibrationData data;
   loadCalibration(data);  // Load existing data to preserve driftRatio and lastNtpTime
   data.sleepStartTime = static_cast<int64_t>(now);
-
-  if (saveCalibration(data)) {
-    LOG_DBG("RTC_CAL", "Recorded sleep entry at %lld", data.sleepStartTime);
-  } else {
-    LOG_ERR("RTC_CAL", "Failed to save sleep entry");
-  }
+  saveCalibration(data);
+  LOG_DBG("RTC_CAL", "Recorded sleep entry at %lld", (long long)rtcSleepStartEpoch);
 }
 
 void TimeUtil::correctTimeOnWake() {
+  // Long-term learner state (driftRatio/lastNtpTime) from SD; a read failure is
+  // non-fatal — it just means no correction this wake, but we can still capture a
+  // wake reference so the learner gets a sample on the next sync.
   CalibrationData data;
-  if (!loadCalibration(data)) {
-    LOG_DBG("RTC_CAL", "No calibration data found, skipping correction");
-    return;
-  }
+  loadCalibration(data);
 
-  if (data.sleepStartTime == 0) {
+  // Bracket start comes from RTC_NOINIT (survives the deep sleep), NOT the SD copy.
+  const bool haveRtcSleepStart = (rtcSleepStartMagic == SLEEP_START_MAGIC);
+  const int64_t sleepStart = haveRtcSleepStart ? rtcSleepStartEpoch : (int64_t)0;
+  // Consume it: each sleep-start pairs with exactly one wake. Invalidate so a later
+  // software restart (which never called recordSleepEntry) can't reuse a stale start
+  // and fabricate a bogus "sleep" spanning the previous awake session.
+  rtcSleepStartMagic = 0;
+  if (sleepStart == 0) {
     LOG_DBG("RTC_CAL", "No sleep start time, skipping correction");
     return;
   }
@@ -160,13 +185,14 @@ void TimeUtil::correctTimeOnWake() {
   time_t now;
   ::time(&now);
   const int64_t rtcNow = static_cast<int64_t>(now);
-  const int64_t rtcElapsed = rtcNow - data.sleepStartTime;
+  const int64_t rtcElapsed = rtcNow - sleepStart;
 
-  // Always capture the raw RTC wake time for onNtpSynced() to use later, plus a
-  // crystal-based monotonic reference at the same instant (Item D) so the awake
+  // Capture the wake reference for onNtpSynced(): the raw RTC time, the resolved
+  // sleep start, and a crystal-based monotonic instant (Item D) so the awake
   // interval before the next sync can be removed from the drift sample.
   rtcWakeTime = rtcNow;
   wakeMonotonicUs = esp_timer_get_time();
+  bracketSleepStart = sleepStart;
 
   if (data.driftRatio == 1.0) {
     LOG_DBG("RTC_CAL", "No drift data yet, skipping correction (captured rtcWakeTime=%lld)", rtcWakeTime);
@@ -190,7 +216,7 @@ void TimeUtil::correctTimeOnWake() {
 
   // Correct: if RTC runs fast (ratio > 1), real elapsed time is less than RTC elapsed
   const int64_t correctedElapsed = static_cast<int64_t>(static_cast<double>(rtcElapsed) / data.driftRatio);
-  const int64_t correctedTime = data.sleepStartTime + correctedElapsed;
+  const int64_t correctedTime = sleepStart + correctedElapsed;
   const int64_t correction = correctedElapsed - rtcElapsed;
 
   struct timeval tv;
@@ -223,16 +249,17 @@ void TimeUtil::onNtpSynced() {
   CalibrationData data;
   loadCalibration(data);  // OK if file doesn't exist yet — defaults are fine
 
-  if (data.lastNtpTime == 0 || data.sleepStartTime == 0) {
-    // First sync ever, or no sleep data — just record baseline
+  if (data.lastNtpTime == 0) {
+    // First sync ever — just record baseline to measure the next interval against.
     data.lastNtpTime = actualNow;
     saveCalibration(data);
     LOG_INF("RTC_CAL", "NTP synced, recorded baseline at %lld", actualNow);
     return;
   }
 
-  if (rtcWakeTime == 0) {
-    // correctTimeOnWake didn't run (e.g. first boot or no sleep occurred)
+  if (rtcWakeTime == 0 || bracketSleepStart == 0) {
+    // No complete sleep→wake bracket this session (first boot, or no sleep since
+    // the last consumed sample) — record baseline and wait for the next cycle.
     data.lastNtpTime = actualNow;
     saveCalibration(data);
     LOG_INF("RTC_CAL", "No pre-correction RTC time available, updating baseline");
@@ -250,8 +277,8 @@ void TimeUtil::onNtpSynced() {
   // THE WAKE. Both spans then cover only the sleep, and the ratio is unbiased.
   const int64_t awakeSeconds = (esp_timer_get_time() - wakeMonotonicUs) / 1000000;
   const int64_t accurateWakeTime = actualNow - awakeSeconds;
-  const int64_t actualSleepDuration = accurateWakeTime - data.sleepStartTime;
-  const int64_t rtcSleepDuration = rtcWakeTime - data.sleepStartTime;
+  const int64_t actualSleepDuration = accurateWakeTime - bracketSleepStart;
+  const int64_t rtcSleepDuration = rtcWakeTime - bracketSleepStart;
 
   if (rtcSleepDuration < MIN_ELAPSED_SECONDS || actualSleepDuration < MIN_ELAPSED_SECONDS) {
     data.lastNtpTime = actualNow;
@@ -260,6 +287,7 @@ void TimeUtil::onNtpSynced() {
             rtcSleepDuration, actualSleepDuration);
     rtcWakeTime = 0;
     wakeMonotonicUs = 0;
+    bracketSleepStart = 0;
     return;
   }
 
@@ -274,6 +302,7 @@ void TimeUtil::onNtpSynced() {
     saveCalibration(data);
     rtcWakeTime = 0;
     wakeMonotonicUs = 0;
+    bracketSleepStart = 0;
     return;
   }
 
@@ -291,4 +320,5 @@ void TimeUtil::onNtpSynced() {
   // Reset for next cycle
   rtcWakeTime = 0;
   wakeMonotonicUs = 0;
+  bracketSleepStart = 0;
 }
