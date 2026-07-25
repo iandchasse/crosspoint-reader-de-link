@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <esp_private/esp_clk.h>
 #include <esp_sntp.h>
+#include <esp_system.h>
 #include <esp_timer.h>
 #include <soc/rtc.h>
 #include <time.h>
@@ -61,6 +62,14 @@ constexpr uint32_t SLEEP_START_MAGIC = 0x5CA1B5A7;
 // The sleep-start resolved for the current wake's bracket (0 = none). Set by
 // correctTimeOnWake() from RTC_NOINIT, consumed by onNtpSynced().
 int64_t bracketSleepStart = 0;
+
+// TEMP DIAGNOSTIC: correctTimeOnWake runs ~355 ms into a deep-sleep-wake boot,
+// before USB-CDC serial re-enumerates (~300 ms), so its logs are lost. Stash what
+// it saw here and re-print at the next sync, which is always well past reconnect.
+bool dbgWakeRan = false;
+bool dbgWakeRtcValid = false;
+int64_t dbgWakeSleepStart = 0;
+int dbgWakeResetReason = 0;
 
 // A2: cycles to measure the RTC slow clock (~136 kHz internal RC) period at
 // sleep-entry. The value of doing this here is the TIMING — the period is captured
@@ -173,6 +182,14 @@ void TimeUtil::correctTimeOnWake() {
   // Bracket start comes from RTC_NOINIT (survives the deep sleep), NOT the SD copy.
   const bool haveRtcSleepStart = (rtcSleepStartMagic == SLEEP_START_MAGIC);
   const int64_t sleepStart = haveRtcSleepStart ? rtcSleepStartEpoch : (int64_t)0;
+  // TEMP DIAGNOSTIC: stash for re-print at the next sync (this log is lost — see
+  // the globals' comment). resetReason 8 = ESP_RST_DEEPSLEEP.
+  dbgWakeRan = true;
+  dbgWakeRtcValid = haveRtcSleepStart;
+  dbgWakeSleepStart = sleepStart;
+  dbgWakeResetReason = (int)esp_reset_reason();
+  LOG_INF("RTC_CAL", "onWake: rtcNoinitValid=%d sleepStart=%lld resetReason=%d driftRatio=%.6f", haveRtcSleepStart,
+          (long long)sleepStart, dbgWakeResetReason, data.driftRatio);
   // Consume it: each sleep-start pairs with exactly one wake. Invalidate so a later
   // software restart (which never called recordSleepEntry) can't reuse a stale start
   // and fabricate a bogus "sleep" spanning the previous awake session.
@@ -245,6 +262,11 @@ void TimeUtil::onNtpSynced() {
   time_t now;
   ::time(&now);
   const int64_t actualNow = static_cast<int64_t>(now);
+
+  // TEMP DIAGNOSTIC: replay what correctTimeOnWake saw (its own log is lost in the
+  // ~300 ms USB-CDC reconnect window after a deep-sleep wake).
+  LOG_INF("RTC_CAL", "onSync: wakeRan=%d wakeRtcValid=%d wakeSleepStart=%lld wakeReset=%d rtcWakeTime=%lld",
+          dbgWakeRan, dbgWakeRtcValid, (long long)dbgWakeSleepStart, dbgWakeResetReason, (long long)rtcWakeTime);
 
   CalibrationData data;
   loadCalibration(data);  // OK if file doesn't exist yet — defaults are fine
