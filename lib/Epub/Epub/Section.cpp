@@ -26,7 +26,13 @@ namespace {
 // v33: two format-affecting EPUB changes land together as v33 — text blocks now
 //      split on closed tags to stop CSS style leaks (#2679), changing block/word
 //      boundaries; plus native <ruby>/<rt> support, skipping <rp> (#2665).
-constexpr uint8_t SECTION_FILE_VERSION = 33;
+// v34: word gaps are only suppressed for tokens glued in the source, so spaces
+//      between Hangul words survive again; ruby element boundaries carry the
+//      continuation flag instead (#2768). Also covers the <br> layout change (a
+//      <br> after text is a margin-stripped line break; only a <br> whose block
+//      stays empty injects the scene-break gap — #2710, common CJK formatting),
+//      which changed layout at v33 without bumping. Invalidates all v33 caches.
+constexpr uint8_t SECTION_FILE_VERSION = 34;
 // Written into the version field while a build is in progress; patched to
 // SECTION_FILE_VERSION only when the build is finalized. An abandoned /
 // crash-interrupted .bin therefore carries version 0, which loadSectionFile rejects
