@@ -114,6 +114,12 @@ constexpr uint64_t DIAG_MAX_BYTES = 512ULL * 1024;
 void appendDiag(JsonDocument& d) {
   d["ms"] = (uint32_t)millis();
   d["dev"] = (int64_t)::time(nullptr);  // device clock at log time
+  // B1-full prep: the S3 internal die-temperature sensor, logged alongside the
+  // period_us (drift-rate) and cycleRatio already captured, so the temp<->drift
+  // relationship can be fit offline. Reads die temp (self-heating-affected), which
+  // is the same physical quantity driving the RC oscillator's drift. No auto-wake
+  // needed — this piggybacks on the existing sleep/wake/sync events.
+  d["tempC"] = temperatureRead();
   EspFsFile f = Storage.open(DIAG_FILE, O_WRONLY | O_CREAT | O_APPEND);
   if (!f) {
     return;
