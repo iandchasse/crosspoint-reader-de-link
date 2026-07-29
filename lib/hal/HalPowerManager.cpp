@@ -96,6 +96,16 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
   }
 #endif
+#ifdef RTC_DIAG_TICK_S
+  // TEMP(diag): also wake on a timer to log mid-sleep (period_us, tempC) samples
+  // (see main.cpp's tick path). Effective only on the S3, whose RTC domain stays
+  // powered across deep sleep; the C3 fully powers down so the timer never fires.
+  // Battery-guarded so an unattended device can't tick itself flat. ext1 (button)
+  // stays armed above, so a user wake always takes priority.
+  if (getBatteryPercentage() > 15) {
+    esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(RTC_DIAG_TICK_S) * 1000000ULL);
+  }
+#endif
   // Enter Deep Sleep
   esp_deep_sleep_start();
 }

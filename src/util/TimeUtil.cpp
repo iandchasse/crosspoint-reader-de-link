@@ -104,6 +104,14 @@ void recalibrateRtcSlowClock() {
   LOG_DBG("RTC_CAL", "Recalibrated RTC slow clock: period=%.4f us (%u cycles)", lastMeasuredPeriodUs, RTC_CAL_CYCLES);
 }
 
+// Read-only slow-clock period (µs): the same measurement recalibrateRtcSlowClock()
+// makes, but WITHOUT installing it (no esp_clk_slowclk_cal_set). A diagnostic tick
+// observes the current drift rate without altering native timekeeping mid-sleep.
+double measureSlowClockPeriodUs() {
+  const uint32_t period = rtc_clk_cal(RTC_CAL_RTC_MUX, RTC_CAL_CYCLES);
+  return period ? period / (double)(1u << RTC_CLK_CAL_FRACT) : 0.0;
+}
+
 // --- TEMP on-SD diagnostic log ------------------------------------------------
 // One JSON object per line at each sleep/wake/sync so the clock can be
 // characterized untethered (terminal misses the ~355 ms wake logs). Analyze
@@ -328,6 +336,22 @@ void TimeUtil::correctTimeOnWake() {
   LOG_INF("RTC_CAL", "Corrected %llds of drift (slept %llds, ratio=%.6f)",
           correction, rtcElapsed, data.driftRatio);
   diagWake(ratioStale ? "applied_stale" : "applied", data.driftRatio, rtcElapsed, correction);
+}
+
+void TimeUtil::logDiagTick() {
+  // TEMP(diag), B1-full prep: a mid-sleep timer wake logs one (period_us, tempC)
+  // sample between the real sleep-entry and the real wake, at the ambient-cooled die
+  // temperature the entry-time sample can't capture. Purely passive — does NOT touch
+  // the RTC_NOINIT drift bracket (rtcSleepStartMagic/Epoch) and does NOT install a new
+  // calibration, so the in-progress drift measurement is unaffected. The caller
+  // (main.cpp) goes straight back to sleep without waking the UI.
+  JsonDocument d;
+  d["ev"] = "tick";
+  d["period_us"] = measureSlowClockPeriodUs();
+  CalibrationData data;
+  loadCalibration(data);
+  d["driftRatio"] = data.driftRatio;
+  appendDiag(d);  // adds ms, dev, tempC
 }
 
 bool TimeUtil::syncAndCalibrate() {

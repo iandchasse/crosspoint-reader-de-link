@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <BoardConfig.h>
+#include <esp_sleep.h>  // esp_sleep_get_wakeup_cause / ESP_SLEEP_WAKEUP_TIMER (RTC_DIAG_TICK_S)
 #include <Epub.h>
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
@@ -367,6 +368,33 @@ void setup() {
     activityManager.goToFullScreenMessage("SD card error", EpdFontFamily::BOLD);
     return;
   }
+
+#ifdef RTC_DIAG_TICK_S
+  // TEMP(diag): a timer wake mid-sleep logs one passive (period_us, tempC) sample and
+  // goes straight back to sleep WITHOUT waking the UI. Runs here — after SD is up but
+  // before any display/frontlight/clock init — so the screen holds its last frame, the
+  // light never activates, and correctTimeOnWake() below never runs (the drift bracket
+  // is preserved). The device only ticks while asleep, so this is inert whenever it's
+  // actually in use. A button pressed during the tick falls through to a normal boot;
+  // startDeepSleep()'s ext1 re-arm is the backstop for a held button.
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
+#ifdef FRONTLIGHT_PRESENT
+    // Belt-and-suspenders: force the frontlight rail gate OFF (active-low: HIGH) so a
+    // wake can't flash the light before we re-sleep.
+    const int8_t flRail = BoardConfig::ACTIVE.frontlight.railEnableGpio;
+    if (flRail != BoardConfig::PIN_UNASSIGNED) {
+      pinMode(flRail, OUTPUT);
+      digitalWrite(flRail, HIGH);
+    }
+#endif
+    TimeUtil::logDiagTick();
+    gpio.update();
+    if (!gpio.isPressed(HalGPIO::BTN_POWER)) {
+      powerManager.startDeepSleep(gpio);  // re-arms ext1 + timer; does not return
+    }
+    // Button down during the tick: continue into a normal boot below.
+  }
+#endif
 
   HalSystem::checkPanic();
 

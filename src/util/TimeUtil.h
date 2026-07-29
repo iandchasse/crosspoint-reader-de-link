@@ -42,6 +42,13 @@ class TimeUtil {
    */
   static bool syncAndCalibrate();
 
+  /**
+   * TEMP(diag): log one passive (period_us, tempC) sample to rtc_diag.jsonl for a
+   * mid-sleep timer wake. Does NOT touch the drift bracket or install a calibration.
+   * Gated at the call site by -DRTC_DIAG_TICK_S; remove with the rest of temp(diag).
+   */
+  static void logDiagTick();
+
  private:
   struct CalibrationData {
     int64_t sleepStartTime = 0;      // time_t when we entered deep sleep
