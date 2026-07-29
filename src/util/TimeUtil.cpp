@@ -20,12 +20,16 @@ constexpr char RTC_CAL_FILE[] = "/.crosspoint/rtc_cal.json";
 constexpr double SMOOTHING_ALPHA = 0.3;       // EMA smoothing factor
 constexpr int64_t MIN_ELAPSED_SECONDS = 60;    // Minimum sleep to calibrate from
 
-// A3 fail-safe: the drift ratio is a single global scalar with no temperature
-// term, so a ratio learned days ago (likely at a different temperature) can
-// correct with the wrong magnitude or sign. Past this age, applying it does more
-// harm than good — skip correction and fall back to the raw native RTC, which is
-// at least self-consistent. A regularly-synced device re-stamps this well within
-// the window; only long offline stretches trip it.
+// A3 confidence boundary (relaxed): the drift ratio is a single global scalar with
+// no temperature term, so a ratio learned days ago may be at a different temperature.
+// Past this age we still APPLY it (a stale ratio's error is bounded by the ±5% sample
+// filter — far smaller than the ~1-2%/sleep raw RC drift we'd otherwise eat) but flag
+// the wake "applied_stale" for lower confidence in the log. This USED to skip
+// correction and fall back to raw RTC; that made a battery swap run fully uncorrected —
+// freshness is re-stamped only by an accepted sleep bracket, and the post-cold-boot
+// resync is a no_bracket baseline that never re-stamps it, so a good ratio silently
+// aged out of the window and drift blew up (+8min/8h vs the calibrated +3s). Never
+// fall back to raw.
 constexpr int64_t MAX_CALIBRATION_AGE_SECONDS = 48 * 3600;  // 48 h
 
 // Item E: reject implausible drift samples. A single global drift ratio should sit
@@ -290,15 +294,13 @@ void TimeUtil::correctTimeOnWake() {
     return;
   }
 
-  // A3 fail-safe: refuse to apply a stale (or malformed) drift ratio. rtcNow is
-  // the uncorrected RTC time, which is more than accurate enough to judge an age
-  // measured in days.
+  // A3 (relaxed): flag staleness but still apply — a stale ratio beats raw RTC.
+  // See MAX_CALIBRATION_AGE_SECONDS above for why the old skip-to-raw was harmful.
   const int64_t calibrationAge = rtcNow - data.driftRatioUpdatedAt;
-  if (data.driftRatioUpdatedAt <= 0 || calibrationAge > MAX_CALIBRATION_AGE_SECONDS) {
-    LOG_INF("RTC_CAL", "Drift ratio stale (age %lldh, ratio=%.6f); skipping correction, using raw RTC",
+  const bool ratioStale = (data.driftRatioUpdatedAt <= 0 || calibrationAge > MAX_CALIBRATION_AGE_SECONDS);
+  if (ratioStale) {
+    LOG_INF("RTC_CAL", "Drift ratio stale (age %lldh, ratio=%.6f); applying anyway (beats raw RTC)",
             (long long)(calibrationAge / 3600), data.driftRatio);
-    diagWake("skip_stale", data.driftRatio, rtcElapsed, 0);
-    return;
   }
 
   if (rtcElapsed < MIN_ELAPSED_SECONDS) {
@@ -319,7 +321,7 @@ void TimeUtil::correctTimeOnWake() {
 
   LOG_INF("RTC_CAL", "Corrected %llds of drift (slept %llds, ratio=%.6f)",
           correction, rtcElapsed, data.driftRatio);
-  diagWake("applied", data.driftRatio, rtcElapsed, correction);
+  diagWake(ratioStale ? "applied_stale" : "applied", data.driftRatio, rtcElapsed, correction);
 }
 
 bool TimeUtil::syncAndCalibrate() {
