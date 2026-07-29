@@ -36,6 +36,8 @@
 #include "activities/settings/FrontlightControlActivity.h"
 #endif
 #include "RecentBooksStore.h"
+#include "SdCardFontSystem.h"
+#include "activities/settings/TextSettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/BookmarkUtil.h"
@@ -830,6 +832,24 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
 #endif
+    case EpubReaderMenuActivity::MenuAction::TEXT_SETTINGS: {
+      startActivityForResult(std::make_unique<TextSettingsActivity>(renderer, mappedInput, &sdFontSystem.registry(),
+                                                                    TextSettingsActivity::Tab::Family),
+                             [this](const ActivityResult&) {
+                               SETTINGS.saveToFile();
+                               // Font/size/spacing/margin changes invalidate the current
+                               // layout: preserve position and force a re-layout, mirroring
+                               // applyOrientation()'s reflow.
+                               RenderLock lock(*this);
+                               if (section) {
+                                 cachedSpineIndex = currentSpineIndex;
+                                 cachedChapterTotalPageCount = section->pageCount;
+                                 nextPageNumber = section->currentPage;
+                               }
+                               section.reset();
+                             });
+      break;
+    }
     case EpubReaderMenuActivity::MenuAction::GO_TO_PERCENT: {
       float bookProgress = 0.0f;
       if (epub && epub->getBookSize() > 0 && section && section->pageCount > 0) {

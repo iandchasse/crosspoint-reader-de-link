@@ -18,6 +18,7 @@ class EpubReaderMenuActivity final : public Activity {
 #ifdef FRONTLIGHT_PRESENT
     FRONTLIGHT,
 #endif
+    TEXT_SETTINGS,
     GO_TO_PERCENT,
     AUTO_PAGE_TURN,
     ROTATE_SCREEN,
