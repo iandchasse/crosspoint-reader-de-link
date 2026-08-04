@@ -323,19 +323,18 @@ void TimeUtil::correctTimeOnWake() {
     return;
   }
 
-  // Correct: if RTC runs fast (ratio > 1), real elapsed time is less than RTC elapsed
+  // EXPERIMENT (2026-07-30): drift-ratio correction DISABLED. With the 20-min tick
+  // wakes active, the IDF re-calibrates the RTC slow clock at each sleep segment, so
+  // the native RTC already tracks temperature on its own (a 32.5h ticked sleep drifted
+  // ~0.05% vs the ~0.3-0.5% the ratio expects). Applying the ratio on top DOUBLE-
+  // corrects and pushed the clock minutes slow. So: still MEASURE the would-be
+  // correction for the diag log, but do NOT settimeofday() — trust the native clock.
+  // onNtpSynced() keeps measuring cycleRatio so we can watch the native drift directly.
   const int64_t correctedElapsed = static_cast<int64_t>(static_cast<double>(rtcElapsed) / data.driftRatio);
-  const int64_t correctedTime = sleepStart + correctedElapsed;
   const int64_t correction = correctedElapsed - rtcElapsed;
-
-  struct timeval tv;
-  tv.tv_sec = static_cast<time_t>(correctedTime);
-  tv.tv_usec = 0;
-  settimeofday(&tv, nullptr);
-
-  LOG_INF("RTC_CAL", "Corrected %llds of drift (slept %llds, ratio=%.6f)",
-          correction, rtcElapsed, data.driftRatio);
-  diagWake(ratioStale ? "applied_stale" : "applied", data.driftRatio, rtcElapsed, correction);
+  LOG_INF("RTC_CAL", "Drift correction DISABLED (would-be %llds; slept %llds, ratio=%.6f)",
+          (long long)correction, (long long)rtcElapsed, data.driftRatio);
+  diagWake(ratioStale ? "measured_stale" : "measured", data.driftRatio, rtcElapsed, correction);
 }
 
 void TimeUtil::logDiagTick() {
