@@ -375,8 +375,9 @@ void setup() {
   // before any display/frontlight/clock init — so the screen holds its last frame, the
   // light never activates, and correctTimeOnWake() below never runs (the drift bracket
   // is preserved). The device only ticks while asleep, so this is inert whenever it's
-  // actually in use. A button pressed during the tick falls through to a normal boot;
-  // startDeepSleep()'s ext1 re-arm is the backstop for a held button.
+  // actually in use. The tick ALWAYS re-sleeps: a timer-cause wake is never a button
+  // wake (a real press produces an EXT1 wake, taken by the normal boot below), and a
+  // button held through the tick is caught by startDeepSleep()'s ext1 re-arm.
   if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
 #ifdef FRONTLIGHT_PRESENT
     // Belt-and-suspenders: force the frontlight rail gate OFF (active-low: HIGH) so a
@@ -388,11 +389,13 @@ void setup() {
     }
 #endif
     TimeUtil::logDiagTick();
-    gpio.update();
-    if (!gpio.isPressed(HalGPIO::BTN_POWER)) {
-      powerManager.startDeepSleep(gpio);  // re-arms ext1 + timer; does not return
-    }
-    // Button down during the tick: continue into a normal boot below.
+    // Unconditional re-sleep. The old gpio.isPressed() gate here false-positived
+    // (the button needs ~500ms to settle after wake, per the HalGPIO contract, but
+    // only one gpio.update() had run) and fell through to a normal boot — which, with
+    // a book open, resumed the reader and flashed its "indexing" popup every ~20 min,
+    // bypassing quick-resume. startDeepSleep()'s own power-button-release wait settles
+    // the pin, and its ext1 re-arm catches a button genuinely held through the tick.
+    powerManager.startDeepSleep(gpio);  // re-arms ext1 + timer; does not return
   }
 #endif
 
